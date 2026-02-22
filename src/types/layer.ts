@@ -15,6 +15,8 @@ export interface BaseLayer {
     id: number;
     /** Display name of the layer */
     name: string;
+    /** The ID of the parent GroupLayer, if nested. */
+    parent_id?: number;
     /** Whether the layer is currently visible in the editor/exports */
     visible: boolean;
     /** Opacity level (0 = transparent, 255 = fully opaque) */

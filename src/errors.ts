@@ -26,6 +26,10 @@ export function domainError(message: string): DomainErrorResponse {
     };
 }
 
+export function invalidArgument(message: string): DomainErrorResponse {
+    return domainError(`Invalid argument: ${message}`);
+}
+
 // ----------------------------------------------------------------------------
 // project
 // ----------------------------------------------------------------------------

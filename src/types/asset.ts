@@ -11,6 +11,12 @@ import type { Tag } from './tag.js';
 export type Perspective = 'flat' | 'top_down' | 'top_down_3/4' | 'isometric';
 
 /**
+ * Anchor positions used for resizing canvas bounds.
+ */
+export type Anchor = 'top_left' | 'top_center' | 'top_right' | 'center_left' | 'center' | 'center_right' | 'bottom_left' | 'bottom_center' | 'bottom_right';
+
+
+/**
  * Core type for a complete Asset document.
  * Represents a single art file loaded in the workspace.
  */
