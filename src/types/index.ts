@@ -1,2 +1,5 @@
 export * from './palette.js';
 export * from './layer.js';
+export * from './frame.js';
+export * from './cel.js';
+export * from './shape.js';

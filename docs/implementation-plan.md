@@ -26,7 +26,7 @@ Define the core type hierarchy as described in [design §2.1](design.md) and [de
 
 - [x] **1.1.1** **Palette types** — `Palette` interface (array of up to 256 `[r, g, b, a]` entries), palette index type alias, color validation helpers
 - [x] **1.1.2** **Layer types** — discriminated union: `ImageLayer | TilemapLayer | ShapeLayer | GroupLayer`. Each carries `id`, `name`, `type`, `visible`, `opacity`. Shape layers add `role`, `physics_layer`.
-- [ ] **1.1.3** **Frame & Cel types** — `Frame` interface (`index`, `duration_ms`). `Cel` as discriminated union: `ImageCel` (x, y, data as `number[][]`), `TilemapCel` (grid as `number[][]`), `ShapeCel` (shapes array), `LinkedCel` (link reference string). Cel key format: `"{layer_id}/{frame_index}"`.
+- [x] **1.1.3** **Frame & Cel types** — `Frame` interface (`index`, `duration_ms`). `Cel` as discriminated union: `ImageCel` (x, y, data as `number[][]`), `TilemapCel` (grid as `number[][]`), `ShapeCel` (shapes array), `LinkedCel` (link reference string). Cel key format: `"{layer_id}/{frame_index}"`.
 - [ ] **1.1.4** **Tag types** — discriminated union: `FrameTag` (name, start, end, direction, facing?) and `LayerTag` (name, layers). Direction enum: `forward | reverse | ping_pong`. Facing enum: `N | NE | E | SE | S | SW | W | NW`.
 - [ ] **1.1.5** **Shape types** — discriminated union: `RectShape` (name, x, y, width, height) and `PolygonShape` (name, points as `[number, number][]`).
 - [ ] **1.1.6** **Asset types** — `Asset` interface: name, width, height, `perspective` (free string: `"flat"`, `"top_down"`, `"top_down_3/4"`, `"isometric"`; defaults to `"flat"`), palette, layers, frames, cels (Map keyed by string), tags. Optional tileset fields: `tile_width`, `tile_height`, `tile_count`, `tile_physics`, `tile_terrain`.
