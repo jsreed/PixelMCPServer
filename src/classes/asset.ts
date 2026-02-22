@@ -704,4 +704,18 @@ export class AssetClass {
     private markDirty(): void {
         this.isDirty = true;
     }
+
+    /**
+     * Internal method for undo/redo commands to selectively restore state.
+     * Takes a partial snapshot of the asset data and replaces the current data.
+     */
+    public _restoreDataPatch(patch: Partial<Asset>): void {
+        if (patch.layers) this._data.layers = JSON.parse(JSON.stringify(patch.layers));
+        if (patch.frames) this._data.frames = JSON.parse(JSON.stringify(patch.frames));
+        if (patch.tags) this._data.tags = JSON.parse(JSON.stringify(patch.tags));
+        if (patch.cels) this._data.cels = JSON.parse(JSON.stringify(patch.cels));
+        if (patch.width !== undefined) this._data.width = patch.width;
+        if (patch.height !== undefined) this._data.height = patch.height;
+        this.markDirty();
+    }
 }

@@ -60,7 +60,7 @@ Stateful classes that manage in-memory data and enforce invariants.
 
 - [x] **1.3.1** **`Command` interface** — `execute(): void`, `undo(): void`. Immutable snapshot of the before-state captured at creation time.
 - [x] **1.3.2** **`CommandHistory` class** — push/undo/redo stack management. `push(cmd)` clears the redo stack. Max history depth (configurable, default 100). Wire into `Workspace` to replace the placeholder `_undoStack`/`_redoStack` arrays and make `undo()`/`redo()` functional.
-- [ ] **1.3.3** **Concrete command classes** for each mutation category. Each captures the before-state snapshot on construction and restores it on `undo()`. Tool actions that use each command are listed for cross-reference:
+- [x] **1.3.3** **Concrete command classes** for each mutation category. Each captures the before-state snapshot on construction and restores it on `undo()`. Tool actions that use each command are listed for cross-reference:
   - `PaletteCommand` — captures palette entry before-state. Used by: `palette set`, `palette set_bulk`, `palette swap`, `palette load`, `palette fetch_lospec`, `palette generate_ramp`.
   - `CelWriteCommand` — captures full cel data snapshot before mutation. Used by: `draw` (all operations), `transform` (all operations), `effect` (all operations), `selection paste`, `selection cut`. Handles linked cel break on first write.
   - `LayerCommand` — captures layer list state for add/remove/reorder. Used by: `asset add_layer`, `asset add_group`, `asset remove_layer`, `asset reorder_layer`.
