@@ -58,7 +58,7 @@ Stateful classes that manage in-memory data and enforce invariants.
 
 ### 1.3 Command System (Undo/Redo)
 
-- [ ] **1.3.1** **`Command` interface** — `execute(): void`, `undo(): void`. Immutable snapshot of the before-state captured at creation time.
+- [x] **1.3.1** **`Command` interface** — `execute(): void`, `undo(): void`. Immutable snapshot of the before-state captured at creation time.
 - [ ] **1.3.2** **`CommandHistory` class** — push/undo/redo stack management. `push(cmd)` clears the redo stack. Max history depth (configurable, default 100). Wire into `Workspace` to replace the placeholder `_undoStack`/`_redoStack` arrays and make `undo()`/`redo()` functional.
 - [ ] **1.3.3** **Concrete command classes** for each mutation category. Each captures the before-state snapshot on construction and restores it on `undo()`. Tool actions that use each command are listed for cross-reference:
   - `PaletteCommand` — captures palette entry before-state. Used by: `palette set`, `palette set_bulk`, `palette swap`, `palette load`, `palette fetch_lospec`, `palette generate_ramp`.
