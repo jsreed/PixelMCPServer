@@ -1,5 +1,7 @@
-# Example LLM Chat Scenarios
 This document outlines realistic examples of how a user might interact with an LLM to drive the PixelMCP server. These examples highlight how the server acts as an automated, "headless Aseprite," bridging the gap between raw pixel data and full Godot `.tres` scene integrations. The scenarios assume an architecture defined in `design.md` and a project structure matching `example-art-asset-directory.md`.
+
+**The Importance of Human Validation:**
+Because pixel art often relies on precise aesthetic choices and game-feel, these scenarios emphasize a "human-in-the-loop" workflow. The LLM should proactively pause its work to request visual review—using MCP preview resources (`pixel://view/...`)—before undertaking destructive edits, bulk frame generation, or final Godot asset exports. This iterative critique ensures the user retains creative control.
 
 ## Scenario 1: Scaffolding a New Equipment Variant (The "Slim Iron Sword")
 
@@ -13,14 +15,15 @@ The user has a modular "paper-doll" equipment system in their Godot game (as def
 
 **The Chat and MCP Server Flow:**
 
-1.  **User Prompt:** *"Create a new 'slim' variant of the iron sword weapon. It needs to match our standard 16x16 character rig. Use a couple of steel greys and brown from our default palette. Make a very thin, 1-pixel wide blade pointing up-right. Frame 0 is `idle`. Frame 1 is `attack` (rotate the sword 90 degrees clockwise). Export it as Godot SpriteFrames into the slim iron sword directory."*
+1.  **User Prompt:** *"Create a new 'slim' variant of the iron sword weapon. It needs to match our standard 16x16 character rig. Use a couple of steel greys and brown from our default palette. Make a very thin, 1-pixel wide blade pointing up-right. Let me see the `idle` frame before you animate and export it."*
 2.  **LLM Action (Context Gathering):** The LLM calls `{action: "info"}` on the `palette` tool to check the project's default ENDESGA-32 palette and find the exact integer indices for steel grey and leather brown.
 3.  **LLM Action (Scaffolding):** The LLM calls `{action: "create"}` on the `asset` tool, passing `width: 16, height: 16`, generating two frames (`duration_ms: 100`), and scaffolding the `idle` and `attack` tags via the `tags` array parameter in a single highly-efficient call.
 4.  **LLM Action (Drawing):** The LLM calls the `draw` tool for `frame_index: 0`. It passes an `operations` array with a `line` primitive for the thin 1px blade, and a few `pixel` and `rect` primitives for the brown hilt.
-5.  **LLM Action (Animating):** Because Frame 1 must be the attack frame, the LLM calls `selection all`, then `selection copy` on frame 0. It calls `selection paste` targeting frame 1. It then calls the `transform` tool on frame 1 with the `rotate` operation (angle: 90) to create the downward swing.
-6.  **LLM Action (Exporting):** The LLM calls `workspace save`, then `export` with the `godot_spriteframes` action, pointing at the correct path in the `assets/equipment/.../slim/` directory.
-7.  **LLM Chat Response:** The agent replies confirming the exact steps taken to ensure the user knows the logic. It includes the resource link: `![Preview](pixel://view/asset/iron_sword_slim)` so the user can immediately see the sword in the chat UI.
-8.  **Follow-up:** The user sees the preview and says, *"The blade is a bit too short, make it 2 pixels longer."* The LLM uses the `draw` tool line primitives to extend exactly those pixels on both frames, re-exports, and shows the updated preview.
+5.  **LLM Chat Response (Validation Request):** The agent replies: *"I have scaffolded the asset and drawn the initial idle frame. How does the 1px blade look? `![Preview](pixel://view/asset/iron_sword_slim)`"*
+6.  **Human Critique:** The user sees the preview and says, *"The blade is a bit too short, make it 2 pixels longer, then go ahead and do the attack frame and export."*
+7.  **LLM Action (Refinement & Animating):** The LLM uses the `draw` tool to extend the blade by 2 pixels on frame 0. Because Frame 1 must be the attack frame, the LLM calls `selection all`, then `selection copy` on frame 0. It calls `selection paste` targeting frame 1. It then calls the `transform` tool on frame 1 with the `rotate` operation (angle: 90) to create the downward swing.
+8.  **LLM Action (Exporting):** The LLM calls `workspace save`, then `export` with the `godot_spriteframes` action, pointing at the correct path in the `assets/equipment/.../slim/` directory.
+9.  **LLM Chat Response:** The agent replies confirming the exact steps taken for the animation and export, showing the final state inline with another resource link.
 
 ---
 
@@ -37,10 +40,12 @@ The principles of the Single Source of Truth (SSoT) Godot pipeline dictate that 
 
 1.  **User Prompt:** *"Load up the `chest_basic` interactable prop. We need to define an interaction boundary so the player can open it. Add a shape layer with the role 'interactable' mapped to collision layer 4. On frame 0 (the closed idle frame), add a 16x16 rectangular hitbox covering the chest. Ensure the open frames do not have this hitbox. Save it and re-export the Godot spriteframes."*
 2.  **LLM Action (Context Gathering):** The LLM calls `workspace load_asset` for `chest_basic`, followed by `asset info` to understand the frame timeline (e.g., verifying that frame 0 is the closed frame, and frames 1-3 are the opening animation).
-3.  **LLM Action (Structure Injection):** The LLM calls `asset add_layer` (type: `shape`, role: `interactable`, physics_layer: `4`).
-4.  **LLM Action (Geometric Slicing):** The LLM calls `asset add_shape` for `frame_index: 0`. It specifies `shape_type: rect` and passes the bounds (`x:0, y:0, width:16, height:16`).
-5.  **LLM Action (Exporting):** The LLM saves and calls `export godot_spriteframes`.
-6.  **LLM Chat Response:** The agent replies: *"I've injected the 'interactable' shape layer. I added a 16x16 bounding box exclusively to Frame 0. I exported the asset package. Because you now have a shape layer, the exporter has generated the `chest_basic_shapes.tres` file. When you drop this into your Godot `AnimationPlayer`, the interaction Area2D will automatically be enabled on the closed frame and deactivated during the opening animation frames."*
+3.  **LLM Action (Structure Injection):** The LLM calls `asset add_layer` (`layer_type: "shape"`, `layer_role: "interactable"`, `layer_physics_layer: 4`).
+4.  **LLM Action (Geometric Slicing):** The LLM calls `asset add_shape` for `frame_index: 0`. It specifies `shape_name: "bounds"`, `shape_type: "rect"` and passes the bounds (`shape_x: 0, shape_y: 0, shape_width: 16, shape_height: 16`).
+5.  **LLM Chat Response (Validation Request):** The agent replies: *"I've injected the 'interactable' shape layer and added the 16x16 bounding box to Frame 0. Please verify the hitbox placement on the chest before I export. `![Hitbox Preview](pixel://view/asset/chest_basic)`"*
+6.  **Human Critique:** The user checks the visual preview, which renders the shape layer over the sprite. *"Actually, the chest is only 14 pixels wide visually. Shrink the hitbox width to 14 and center it (x=1), then export."*
+7.  **LLM Action (Refinement & Exporting):** The LLM calls `update_shape` on frame 0 with the adjusted bounds (`shape_x: 1, shape_y: 0, shape_width: 14, shape_height: 16`), calls `workspace save`, and `export godot_spriteframes`.
+8.  **LLM Chat Response:** The agent replies: *"The hitbox has been centered. I exported the asset package. Because you now have a shape layer, the exporter has generated the `chest_basic_shapes.tres` file. When you drop this into your Godot `AnimationPlayer`, the interaction Area2D will automatically be enabled on the closed frame and deactivated during the opening animation frames."*
 
 ---
 
@@ -79,7 +84,7 @@ Painting collision bounds on a TileSet inside the Godot editor is incredibly ted
 
 1.  **User Prompt:** *"Load the `ground_base` terrain tileset. We need to make the first three tiles (tiles 0, 1, and 2) completely solid. Inject full 16x16 collision physics polygons for these three tiles. Export the Godot Tileset so the physics layers are baked in."*
 2.  **LLM Action (Context Gathering):** The LLM loads the `ground_base` asset. It checks `asset info` to confirm the `tile_width` and `tile_height` are indeed 16x16.
-3.  **LLM Action (Mathematics & Data Injection):** A full 16x16 square collision box in Cartesian geometry relative to the tile's origin is `[[0,0], [16,0], [16,16], [0,16]]`. The LLM sequentially calls the `tileset` tool with the `set_tile_physics` action three times, assigning the calculated polygon array to `tile_index` 0, 1, and 2.
+3.  **LLM Action (Mathematics & Data Injection):** A full 16x16 square collision box in Cartesian geometry relative to the tile's origin is `[[0,0], [16,0], [16,16], [0,16]]`. The LLM sequentially calls the `tileset` tool with the `set_tile_physics` action three times, assigning the calculated polygon array to the `physics_polygon` parameter for `tile_index` 0, 1, and 2.
 4.  **LLM Action (Exporting):** The LLM calls `workspace save` and `export godot_tileset`. The MCP server's backend logic automatically translates these JSON coordinates into a Godot native `TileData` object with a physics layer, appending it to the `.tres` text file.
 5.  **LLM Chat Response:** The agent replies: *"I mapped the 16x16 rectangular polygons to tiles 0, 1, and 2, and overwrote the `ground_base.tres` Godot file. The Godot engine will instantly detect the file change. Your TileMapLayer will now block the player using those specific tiles without you ever having to open Godot's TileSet UI."*
 
@@ -97,9 +102,13 @@ The player character requires a base body that all other modular equipment will 
 1.  **User Prompt:** *"Let's build the `human_male_a` base body. 16x16 canvas. I need a 4-directional setup: Idle and Walk for South, North, East, and West. The walk cycles should be 4 frames each. Use our standard skin tone palette. Go ahead and scaffold the tags with the proper facing directions so the exporter knows how to name them. Draw a basic standing frame for the South idle to start."*
 2.  **LLM Action (Context & Scaffolding):** The LLM calls `asset create` outfitting a 20-frame animation timeline (1 idle frame x 4 dirs = 4; 4 walk frames x 4 dirs = 16). It meticulously assigns the tags, utilizing the `tag_facing` property: `[{"name": "idle", "facing": "S", "start": 0, "end": 0}, {"name": "idle", "facing": "N", "start": 1, "end": 1}, ... {"name": "walk", "facing": "S", "start": 4, "end": 7}, ...]`.
 3.  **LLM Action (Drawing):** The LLM uses `draw` operations (rects, lines, and pixel placement) to construct the forward-facing naked base body in `frame_index: 0`.
-4.  **LLM Action (Duplication/Modification):** To create the North facing frame, the LLM calls `selection all`, `selection copy` on frame 0, and `selection paste` on frame 1. It then uses `draw` to overwrite the face pixels with hair pixels, indicating the back of the head.
-5.  **LLM Action (Exporting):** The LLM calls `export godot_spriteframes`. Because the tags contain structural `facing` metadata, the Godot `.tres` file automatically organizes the animations into `idle_S`, `idle_N`, `walk_E`, etc., exactly as a 2D blendspace requires.
-6.  **LLM Chat Response:** The agent replies: *"I have scaffolded the 20-frame rig for `human_male_a` with all 4-directional tags properly facing-assigned. I've drawn the base South and North idle frames. Check the preview: `![South Idle](pixel://view/asset/human_male_a)`. Let's refine the anatomy here before I generate the walk-cycle animation frames."*
+4.  **LLM Chat Response (Validation Request):** The agent replies: *"I have scaffolded the 20-frame rig for `human_male_a` with all tags properly facing-assigned. I've drawn the base South idle frame. Before I generate the other facing directions and walk cycles, let me know if the proportions are correct: `![South Idle](pixel://view/asset/human_male_a)`."*
+5.  **Human Critique:** The user looks at the preview inline. *"The shoulders are a pixel too wide, and the torso needs to be 1 pixel longer. Adjust that, then generate the North frame and show me both."*
+6.  **LLM Action (Refinement & Duplication):** The LLM adjusts the torso and shoulders on frame 0. To create the North facing frame, it calls `selection all`, `selection copy` on frame 0, and `selection paste` on frame 1. It uses `draw` to overwrite the face pixels with hair pixels, indicating the back of the head.
+7.  **LLM Chat Response (Validation Request):** The agent replies: *"I've lengthened the torso, narrowed the shoulders, and generated the North facing frame. `![North Idle](pixel://view/asset/human_male_a/frame/1)`"*
+8.  **Human Critique:** *"Perfect. Go ahead and generate the East/West idle frames, the walk cycles, and export it all."*
+9.  **LLM Action (Bulk Generation & Exporting):** The LLM calculates the mirrored sides for East/West, iterates through the 4-frame walk cycles applying subpixel limb shifts, and finally calls `export godot_spriteframes`. Because the tags contain structural `facing` metadata, the Godot `.tres` file automatically organizes the animations into `idle_S`, `idle_N`, `walk_E`, etc., exactly as a 2D blendspace requires.
+10. **LLM Chat Response:** The agent replies confirming the generation and export steps are complete.
 
 ---
 
