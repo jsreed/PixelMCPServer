@@ -3,6 +3,12 @@ import { WorkspaceClass, getWorkspace } from './workspace.js';
 import { ProjectClass } from './project.js';
 import { type Asset } from '../types/asset.js';
 import { type Command } from '../commands/command.js';
+import { loadAssetFile, saveAssetFile } from '../io/index.js';
+
+vi.mock('../io/index.js', () => ({
+    loadAssetFile: vi.fn(),
+    saveAssetFile: vi.fn(),
+}));
 
 /** Minimal valid Asset fixture for testing. */
 function makeTestAsset(name: string): Asset {
@@ -19,10 +25,38 @@ function makeTestAsset(name: string): Asset {
     };
 }
 
+function setupMockProject(ws: WorkspaceClass) {
+    const projData = {
+        pixelmcp_version: '1.0',
+        name: 'Test Project',
+        assets: {
+            'player': { type: 'char', path: 'player.json' },
+            'sword': { type: 'wpn', path: 'sword.json' },
+            'shield': { type: 'wpn', path: 'shield.json' },
+            'bow': { type: 'wpn', path: 'bow.json' },
+            'a': { type: 'misc', path: 'a.json' },
+            'b': { type: 'misc', path: 'b.json' },
+            'c': { type: 'misc', path: 'c.json' },
+            'npc': { type: 'char', path: 'npc.json' },
+            'armor': { type: 'armor', variants: { 'slim': 'armor_slim.json', 'large': 'armor_large.json' } },
+            'hero': { type: 'char', path: 'hero.json' }
+        }
+    };
+    const proj = ProjectClass.fromJSON('/mock/pixelmcp.json', projData);
+    ws.setProject(proj);
+}
+
 describe('WorkspaceClass', () => {
 
     beforeEach(() => {
+        vi.clearAllMocks();
         WorkspaceClass.reset();
+        (loadAssetFile as any).mockImplementation(async (path: string) => {
+            const name = path.split('/').pop()?.replace('.json', '') || 'unknown';
+            const cleanName = name.replace('_slim', '').replace('_large', '');
+            return makeTestAsset(cleanName);
+        });
+        (saveAssetFile as any).mockResolvedValue(undefined);
     });
 
     it('returns the same singleton instance', () => {
@@ -52,12 +86,20 @@ describe('WorkspaceClass', () => {
         expect(ws.project).toBe(proj);
     });
 
-    it('loads and retrieves an asset', () => {
+    it('loads and retrieves an asset', async () => {
         const ws = WorkspaceClass.instance();
-        ws.loadAsset('player', makeTestAsset('player'));
+        setupMockProject(ws);
+
+        await ws.loadAsset('player');
 
         const asset = ws.getAsset('player');
         expect(asset.name).toBe('player');
+        expect(loadAssetFile).toHaveBeenCalledWith('/mock/player.json');
+    });
+
+    it('throws when loading asset without active project', async () => {
+        const ws = WorkspaceClass.instance();
+        await expect(ws.loadAsset('player')).rejects.toThrow('No project loaded');
     });
 
     it('throws when getting an unloaded asset', () => {
@@ -65,17 +107,18 @@ describe('WorkspaceClass', () => {
         expect(() => { ws.getAsset('ghost'); }).toThrow('not loaded');
     });
 
-    it('unloads an asset and reports dirty state', () => {
+    it('unloads an asset and reports dirty state', async () => {
         const ws = WorkspaceClass.instance();
-        ws.loadAsset('sword', makeTestAsset('sword'));
+        setupMockProject(ws);
 
+        await ws.loadAsset('sword');
         // Not dirty — clean unload
         const result1 = ws.unloadAsset('sword');
         expect(result1.hadUnsavedChanges).toBe(false);
         expect(ws.loadedAssets.has('sword')).toBe(false);
 
         // Dirty unload
-        ws.loadAsset('shield', makeTestAsset('shield'));
+        await ws.loadAsset('shield');
         const shieldAsset = ws.getAsset('shield');
         shieldAsset.addFrame({ index: 1, duration_ms: 200 }); // marks dirty
         const result2 = ws.unloadAsset('shield');
@@ -87,9 +130,10 @@ describe('WorkspaceClass', () => {
         expect(() => { ws.unloadAsset('ghost'); }).toThrow('not loaded');
     });
 
-    it('clears selection when unloading the targeted asset', () => {
+    it('clears selection when unloading the targeted asset', async () => {
         const ws = WorkspaceClass.instance();
-        ws.loadAsset('player', makeTestAsset('player'));
+        setupMockProject(ws);
+        await ws.loadAsset('player');
         ws.selection = {
             asset_name: 'player', layer_id: 1, frame_index: 0,
             x: 0, y: 0, width: 8, height: 8,
@@ -100,40 +144,46 @@ describe('WorkspaceClass', () => {
         expect(ws.selection).toBeNull();
     });
 
-    it('save returns serialized data and clears dirty', () => {
+    it('save writes to disk and clears dirty', async () => {
         const ws = WorkspaceClass.instance();
-        ws.loadAsset('bow', makeTestAsset('bow'));
+        setupMockProject(ws);
+        await ws.loadAsset('bow');
+
         const asset = ws.getAsset('bow');
         asset.addFrame({ index: 1, duration_ms: 150 }); // marks dirty
         expect(asset.isDirty).toBe(true);
 
-        const data = ws.save('bow');
-        expect(data.name).toBe('bow');
+        const result = await ws.save('bow');
+        expect(result.name).toBe('bow');
+        expect(result.path).toBe('/mock/bow.json');
+
+        expect(saveAssetFile).toHaveBeenCalledWith('/mock/bow.json', expect.any(Object));
         expect(asset.isDirty).toBe(false);
     });
 
-    it('saveAll returns serialized data for dirty assets', () => {
+    it('saveAll writes only dirty assets', async () => {
         const ws = WorkspaceClass.instance();
-        ws.loadAsset('a', makeTestAsset('a'));
-        ws.loadAsset('b', makeTestAsset('b'));
-        ws.loadAsset('c', makeTestAsset('c'));
+        setupMockProject(ws);
+        await ws.loadAsset('a');
+        await ws.loadAsset('b');
+        await ws.loadAsset('c');
 
         // Only dirty 'a' and 'c'
         ws.getAsset('a').addFrame({ index: 1, duration_ms: 100 });
         ws.getAsset('c').addFrame({ index: 1, duration_ms: 100 });
 
-        const saved = ws.saveAll();
+        const saved = await ws.saveAll();
         const savedNames = saved.map((s) => s.name);
+
         expect(savedNames).toContain('a');
         expect(savedNames).toContain('c');
         expect(savedNames).not.toContain('b');
-        // Each entry should have serialized data
-        for (const entry of saved) {
-            expect(entry.data).toBeDefined();
-            expect(entry.data.name).toBe(entry.name);
-        }
+
+        expect(saveAssetFile).toHaveBeenCalledTimes(2);
+
         expect(ws.getAsset('a').isDirty).toBe(false);
         expect(ws.getAsset('c').isDirty).toBe(false);
+        expect(ws.getAsset('b').isDirty).toBe(false);
     });
 
     describe('undo/redo', () => {
@@ -188,15 +238,14 @@ describe('WorkspaceClass', () => {
         });
     });
 
-    it('info returns correct workspace summary', () => {
+    it('info returns correct workspace summary', async () => {
         const ws = WorkspaceClass.instance();
-        const proj = ProjectClass.create('/mock/pixelmcp.json', 'My Game');
-        ws.setProject(proj);
-        ws.loadAsset('hero', makeTestAsset('hero'));
+        setupMockProject(ws);
+        await ws.loadAsset('hero');
 
         const summary = ws.info();
         expect(summary.project).not.toBeNull();
-        expect(summary.project?.name).toBe('My Game');
+        expect(summary.project?.name).toBe('Test Project');
         expect(summary.loadedAssets).toHaveLength(1);
         expect(summary.loadedAssets[0]?.name).toBe('hero');
         expect(summary.undoDepth).toBe(0);
@@ -204,9 +253,10 @@ describe('WorkspaceClass', () => {
         expect(summary.selection).toBeNull();
     });
 
-    it('info reports selection when active', () => {
+    it('info reports selection when active', async () => {
         const ws = WorkspaceClass.instance();
-        ws.loadAsset('npc', makeTestAsset('npc'));
+        setupMockProject(ws);
+        await ws.loadAsset('npc');
         ws.selection = {
             asset_name: 'npc', layer_id: 1, frame_index: 0,
             x: 2, y: 3, width: 4, height: 5,
@@ -218,10 +268,11 @@ describe('WorkspaceClass', () => {
         expect(summary.selection?.asset_name).toBe('npc');
     });
 
-    it('tracks and reports which variant was loaded', () => {
+    it('tracks and reports which variant was loaded', async () => {
         const ws = WorkspaceClass.instance();
-        ws.loadAsset('armor', makeTestAsset('armor'), 'slim');
-        ws.loadAsset('sword', makeTestAsset('sword')); // no variant
+        setupMockProject(ws);
+        await ws.loadAsset('armor', 'slim');
+        await ws.loadAsset('sword'); // no variant
 
         const summary = ws.info();
         const armorEntry = summary.loadedAssets.find(a => a.name === 'armor');

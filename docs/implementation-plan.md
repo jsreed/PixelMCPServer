@@ -76,7 +76,7 @@ Stateful classes that manage in-memory data and enforce invariants.
 Files under `src/io/`. Models have `toJSON()`/`fromJSON()` for serialization; this layer handles the actual `fs` read/write and schema validation.
 
 - [x] **1.4.1** **Asset serialization** — `loadAssetFile(path): Asset` reads and validates `.json` asset files using `AssetClass.fromJSON()`. `saveAssetFile(path, asset)` writes them using `asset.toJSON()`. Must handle all cel formats (image, tilemap, shape, linked). Sets `modified` timestamp on save.
-- [ ] **1.4.2** **Project serialization** — `loadProjectFile(path): ProjectConfig` reads and validates `pixelmcp.json` using `ProjectClass.fromJSON()`. `saveProjectFile(path, project)` writes using `project.toJSON()`. Wire into `Workspace.loadAsset()` and `Workspace.save()` to replace any placeholder file I/O.
+- [x] **1.4.2** **Project serialization** — `loadProjectFile(path): ProjectConfig` reads and validates `pixelmcp.json` using `ProjectClass.fromJSON()`. `saveProjectFile(path, project)` writes using `project.toJSON()`. Wire into `Workspace.loadAsset()` and `Workspace.save()` to replace any placeholder file I/O.
 - [ ] **1.4.3** **Palette file I/O** — `loadPaletteFile(path): PaletteData` and `savePaletteFile(path, palette, name)`. Validates `{ name, colors }` schema where colors is `Array<[r,g,b,a] | null>`. Returns validation errors for malformed files using the shared error factory.
 
 ### 1.5 Drawing & Geometry Algorithms

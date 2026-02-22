@@ -1,5 +1,6 @@
 import { type Asset } from '../types/asset.js';
 import { type SelectionMask } from '../types/selection.js';
+import { loadAssetFile, saveAssetFile } from '../io/index.js';
 import { type Command, CommandHistory } from '../commands/command.js';
 import { AssetClass } from './asset.js';
 import { ProjectClass } from './project.js';
@@ -88,11 +89,16 @@ export class WorkspaceClass {
     }
 
     /**
-     * Loads an asset into the workspace from parsed Asset data.
-     * The actual file I/O (reading from disk) is handled by the io/ layer in Phase 1.4.
-     * @param variant The variant key that was used to resolve this asset, if any.
+     * Loads an asset into the workspace from disk.
+     * @param name The logical name of the asset to load.
+     * @param variant The variant key if the asset provides multiple fits.
      */
-    loadAsset(name: string, data: Asset, variant?: string): void {
+    async loadAsset(name: string, variant?: string): Promise<void> {
+        if (!this.project) {
+            throw new Error(errors.noProjectLoaded().content[0].text);
+        }
+        const path = this.project.resolveAssetPath(name, variant);
+        const data = await loadAssetFile(path);
         const asset = AssetClass.fromJSON(data);
         this.loadedAssets.set(name, asset);
         this._loadedVariants.set(name, variant);
@@ -124,28 +130,33 @@ export class WorkspaceClass {
     // ------------------------------------------------------------------------
 
     /**
-     * Serializes a loaded asset and clears its dirty flag.
-     * The actual file write is handled by the io/ layer in Phase 1.4.
-     * @returns The serialized Asset data.
+     * Serializes a loaded asset, writes it to disk, and clears its dirty flag.
+     * @returns Information about the saved asset.
      */
-    save(name: string): Asset {
+    async save(name: string): Promise<{ name: string; path: string }> {
+        if (!this.project) {
+            throw new Error(errors.noProjectLoaded().content[0].text);
+        }
         const asset = this.getAsset(name);
-        const data = asset.toJSON();
+        const variant = this._loadedVariants.get(name);
+        const path = this.project.resolveAssetPath(name, variant);
+
+        await saveAssetFile(path, asset.toJSON());
         asset.isDirty = false;
-        return data;
+
+        return { name, path };
     }
 
     /**
      * Saves all loaded assets that have unsaved changes.
-     * @returns Array of { name, data } for each saved asset.
+     * @returns Array of { name, path } for each saved asset.
      */
-    saveAll(): Array<{ name: string; data: Asset }> {
-        const saved: Array<{ name: string; data: Asset }> = [];
+    async saveAll(): Promise<Array<{ name: string; path: string }>> {
+        const saved: Array<{ name: string; path: string }> = [];
         for (const [name, asset] of this.loadedAssets) {
             if (asset.isDirty) {
-                const data = asset.toJSON();
-                asset.isDirty = false;
-                saved.push({ name, data });
+                const info = await this.save(name);
+                saved.push(info);
             }
         }
         return saved;
