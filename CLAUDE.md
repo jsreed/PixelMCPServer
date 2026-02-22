@@ -176,6 +176,9 @@ The `draw`, `transform`, and `effect` tools use a **batched operations array** â
 - **`interface` for data model types, `type` for unions.** Use `interface` for model objects (Asset, Layer, Cel, etc.) and `type` for unions and computed types.
 - **No `any`.** Use `unknown` and narrow. Especially important since MCP request params are loosely typed.
 - **`.js` extensions on all relative imports.** This is an ESM project with Node16 module resolution â€” TypeScript requires `.js` extensions in import specifiers even though the source files are `.ts`. Example: `import { Asset } from '../types/asset.js';` not `'../types/asset'` or `'../types/asset.ts'`.
+- **String Template Interpolation**: When using template literals, explicitly convert variables to strings (e.g., `` `Layer ${String(id)}` ``) to satisfy `@typescript-eslint/restrict-template-expressions`.
+- **Strict Checks**: Avoid redundant conditionals (`@typescript-eslint/no-unnecessary-condition`) and type assertions (`@typescript-eslint/no-unnecessary-type-assertion`). If TypeScript has narrowed a union or determined a property exists, trust it.
+- **Arrow Functions & Void**: Do not return a void expression from a shorthand arrow function (`@typescript-eslint/no-confusing-void-expression`). Wrap void-returning calls in braces: `() => { myVoidCall(); }` instead of `() => myVoidCall()`.
 
 ### Import Layering
 
