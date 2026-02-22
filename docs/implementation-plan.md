@@ -12,7 +12,7 @@ Reference: [design.md](design.md)
 - [x] **0.4** Create core claude-code customizations (CLAUDE.md) — complete before Phase 1 so agents have correct context from the start. Should contain project architecture, file layout conventions, and testing commands.
 - [x] **0.5** Develop design doc [design.md](design.md)
 - [x] **0.6** Develop implementation plan doc [implementation-plan.md](implementation-plan.md)
-- [ ] **0.7** Implement shared error factory (`src/errors.ts`) — typed error constructors for every domain error in [design §2.6](design.md). Each tool handler imports these rather than constructing ad-hoc error strings. Build this early so all phases use consistent error responses.
+- [x] **0.7** Implement shared error factory (`src/errors.ts`) — typed error constructors for every domain error in [design §2.6](design.md). Each tool handler imports these rather than constructing ad-hoc error strings. Build this early so all phases use consistent error responses.
 
 ---
 
