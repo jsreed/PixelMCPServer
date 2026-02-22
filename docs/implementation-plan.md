@@ -37,7 +37,7 @@ Define the core type hierarchy as described in [design §2.1](design.md) and [de
 
 Stateful classes that manage in-memory data and enforce invariants.
 
-- [ ] **1.2.1** **`Palette` class** — wraps the color array. Methods: `get(index)`, `set(index, rgba)`, `setBulk(entries)`, `swap(i, j)`, `toJSON()`, `fromJSON()`. Validates index bounds (0–255).
+- [x] **1.2.1** **`Palette` class** — wraps the color array. Methods: `get(index)`, `set(index, rgba)`, `setBulk(entries)`, `swap(i, j)`, `toJSON()`, `fromJSON()`. Validates index bounds (0–255).
 - [ ] **1.2.2** **`Asset` class** — in-memory representation of a loaded asset. Methods for:
   - Layer CRUD: `addLayer()`, `addGroup()`, `removeLayer()`, `reorderLayer()` with group/parent logic
   - Frame CRUD: `addFrame()`, `removeFrame()`, `setFrameDuration()` with tag index shifting
