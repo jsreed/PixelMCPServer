@@ -82,3 +82,63 @@ Painting collision bounds on a TileSet inside the Godot editor is incredibly ted
 3.  **LLM Action (Mathematics & Data Injection):** A full 16x16 square collision box in Cartesian geometry relative to the tile's origin is `[[0,0], [16,0], [16,16], [0,16]]`. The LLM sequentially calls the `tileset` tool with the `set_tile_physics` action three times, assigning the calculated polygon array to `tile_index` 0, 1, and 2.
 4.  **LLM Action (Exporting):** The LLM calls `workspace save` and `export godot_tileset`. The MCP server's backend logic automatically translates these JSON coordinates into a Godot native `TileData` object with a physics layer, appending it to the `.tres` text file.
 5.  **LLM Chat Response:** The agent replies: *"I mapped the 16x16 rectangular polygons to tiles 0, 1, and 2, and overwrote the `ground_base.tres` Godot file. The Godot engine will instantly detect the file change. Your TileMapLayer will now block the player using those specific tiles without you ever having to open Godot's TileSet UI."*
+
+## Scenario 5: Creating a Base Character Rig
+
+**What the user is trying to accomplish:**
+The player character requires a base body that all other modular equipment will attach to. The user needs to establish the foundational 16x16 sprite with a 4-directional walk cycle (South, North, East, West) and idle frames. They want the LLM to generate the raw pixel data, set up the facing tags properly for directional exports, and align the pivot so the SSoT spriteframes load perfectly centered in Godot.
+
+**Related MCP Server Tools & Resources:**
+
+*   **Tools:** `asset create`, `draw`, `selection`, `transform`, `workspace save`, `export per_tag`, `export godot_spriteframes`.
+
+**The Chat and MCP Server Flow:**
+
+1.  **User Prompt:** *"Let's build the `human_male_a` base body. 16x16 canvas. I need a 4-directional setup: Idle and Walk for South, North, East, and West. The walk cycles should be 4 frames each. Use our standard skin tone palette. Go ahead and scaffold the tags with the proper facing directions so the exporter knows how to name them. Draw a basic standing frame for the South idle to start."*
+2.  **LLM Action (Context & Scaffolding):** The LLM calls `asset create` outfitting a 20-frame animation timeline (1 idle frame x 4 dirs = 4; 4 walk frames x 4 dirs = 16). It meticulously assigns the tags, utilizing the `tag_facing` property: `[{"name": "idle", "facing": "S", "start": 0, "end": 0}, {"name": "idle", "facing": "N", "start": 1, "end": 1}, ... {"name": "walk", "facing": "S", "start": 4, "end": 7}, ...]`.
+3.  **LLM Action (Drawing):** The LLM uses `draw` operations (rects, lines, and pixel placement) to construct the forward-facing naked base body in `frame_index: 0`.
+4.  **LLM Action (Duplication/Modification):** To create the North facing frame, the LLM calls `selection all`, `selection copy` on frame 0, and `selection paste` on frame 1. It then uses `draw` to overwrite the face pixels with hair pixels, indicating the back of the head.
+5.  **LLM Action (Exporting):** The LLM calls `export godot_spriteframes`. Because the tags contain structural `facing` metadata, the Godot `.tres` file automatically organizes the animations into `idle_S`, `idle_N`, `walk_E`, etc., exactly as a 2D blendspace requires.
+6.  **LLM Chat Response:** The agent replies: *"I have scaffolded the 20-frame rig for `human_male_a` with all 4-directional tags properly facing-assigned. I've drawn the base South and North idle frames. Check the preview: `![South Idle](pixel://view/asset/human_male_a)`. Let's refine the anatomy here before I generate the walk-cycle animation frames."*
+
+---
+
+## Scenario 6: Generating an Autotiling Dungeon Biome
+
+**What the user is trying to accomplish:**
+The user needs a new underground biome (e.g., a "Crypt") utilizing Godot's 4.6 Terrains system. Instead of manually painting 47 tiles to support the `Match Corners and Sides` bitmask (Blob-47), they want the LLM to generate the unified 47-tile stone floor pattern, inject the Godot terrain peering bits instantly, and export the ready-to-use TileSet block.
+
+**Related MCP Server Tools & Resources:**
+
+*   **Tools:** `asset create`, `draw`, `effect`, `tileset autotile_generate`, `export godot_tileset`.
+*   **Resources:** `pixel://view/tileset/crypt_floor`
+
+**The Chat and MCP Server Flow:**
+
+1.  **User Prompt:** *"I need a new 16x16 Blob-47 autotile floorset for a Crypt biome. Make the base stone a cold grey, and the 'wall' boundaries a darker, nearly black grey. Generate all 47 combinations. Inject the Godot 4.6 peering bits for terrain set 0, terrain 0, so it autotiles immediately in-engine."*
+2.  **LLM Action (Scaffolding):** The LLM creates the tileset asset natively: `asset create` *(name: "crypt_floor", tile_width: 16, tile_height: 16)*.
+3.  **LLM Action (Algorithmic Generation):** Because generating 47 tiles via standard `draw` operations is incredibly context-heavy, the LLM heavily utilizes the MCP server's built-in macro tools. It calls `tileset autotile_generate` *(asset_name: "crypt_floor", pattern: "blob47", base_color: 8, edge_color: 2, terrain_set: 0, terrain: 0)*. The pixelMCP backend processes the algorithmic layout and automatically embeds the 3x3 minimal peering bits mapping into the tileset custom data.
+4.  **LLM Action (Texturing Polish):** The LLM uses `effect` *(action: "noise")* specifically masked over the base color (cold grey) to give the stone some gritty texture without breaking the dark edge boundaries.
+5.  **LLM Action (Exporting):** The LLM calls `export godot_tileset`. The resulting `.tres` file perfectly contains all 47 bitmasks mapped to the corresponding tile coordinates.
+6.  **LLM Chat Response:** The agent responds: *"The Crypt floor Blob-47 autotile has been generated and textured. All Godot 4.6 Terrains peering bits are mathematically mapped to Terrain Set 0. I exported `crypt_floor.tres` to your environments folder. You can instantly start drawing with the Terrain tool in Godot!"*
+
+---
+
+## Scenario 7: Creating Prop Silhouettes for Complex Environments
+
+**What the user is trying to accomplish:**
+The user is building an outdoor environment containing large, irregular assets like a "twisted ancient tree." They want the LLM to draw the tree, but critically, they need a complex, pixel-perfect collision polygon generated so players don't walk through the trunk, while allowing them to walk *behind* the upper canopy (Y-sorting).
+
+**Related MCP Server Tools & Resources:**
+
+*   **Tools:** `asset create`, `draw`, `effect`, `asset add_layer`, `tileset set_tile_physics` / Node geometry generation, `export godot_spriteframes`.
+
+**The Chat and MCP Server Flow:**
+
+1.  **User Prompt:** *"Draw a 'twisted_ancient_tree' prop. It should be large, maybe 64x64. Make the trunk gnarled brown and the canopy dead, grey wisps. Once it looks good, I need you to generate a pixel-perfect navigation/collision boundary only for the bottom 16 pixels of the trunk so the player can walk behind the dead branches but collides with the roots."*
+2.  **LLM Action (Drawing):** The LLM calls `asset create` (64x64). It executes a series of `draw` operations (filled ellipses for the canopy, curving lines and fills for the twisted roots and trunk).
+3.  **LLM Action (Procedural Generation):** The LLM runs `effect` *(action: "cleanup_orphans")* and `effect` *(action: "auto_aa")* to smooth the complex organic rendering.
+4.  **LLM Action (Silhouette Collision Injection):** The LLM creates a structural shape layer: `asset add_layer` *(name: "trunk_phys", type: "shape", role: "solid")*.
+5.  **LLM Action (Geometric Slicing):** The LLM analyzes the bounding box of the roots drawn at the bottom of the canvas and calls `asset add_shape` for frame 0, generating a polygon mapping to the coordinates of the drawn trunk (e.g., `shape_points: [[24, 50], [40, 50], [44, 60], [20, 60]]`).
+6.  **LLM Action (Exporting):** The LLM saves and calls `export godot_spriteframes`. The exporter recognizes the polygon shape and embeds it as a `CollisionPolygon2D` track in the generated `_shapes.tres` file.
+7.  **LLM Chat Response:** The agent responds: *"The 64x64 twisted ancient tree is complete. I drew a specific pixel-perfect physics polygon wrapping just the base roots (from Y:50 to Y:60), ignoring the canopy. I exported `twisted_ancient_tree_shapes.tres`. When assigned to an Area2D or StaticBody2D beneath your Sprite, Y-sorting will function perfectly as players walk behind the upper branches!"*
