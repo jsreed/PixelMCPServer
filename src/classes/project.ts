@@ -82,7 +82,7 @@ export class ProjectClass {
      * Supports single-path assets, variant-based assets, and recolor tracking.
      */
     registerAsset(name: string, entry: AssetRegistryEntry): void {
-        this._data.assets[name] = { ...entry };
+        this._data.assets[name] = JSON.parse(JSON.stringify(entry)) as AssetRegistryEntry;
         this.markDirty();
     }
 

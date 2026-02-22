@@ -111,7 +111,7 @@ describe('WorkspaceClass', () => {
         expect(asset.isDirty).toBe(false);
     });
 
-    it('saveAll returns names of dirty assets', () => {
+    it('saveAll returns serialized data for dirty assets', () => {
         const ws = WorkspaceClass.instance();
         ws.loadAsset('a', makeTestAsset('a'));
         ws.loadAsset('b', makeTestAsset('b'));
@@ -122,9 +122,15 @@ describe('WorkspaceClass', () => {
         ws.getAsset('c').addFrame({ index: 1, duration_ms: 100 });
 
         const saved = ws.saveAll();
-        expect(saved).toContain('a');
-        expect(saved).toContain('c');
-        expect(saved).not.toContain('b');
+        const savedNames = saved.map((s) => s.name);
+        expect(savedNames).toContain('a');
+        expect(savedNames).toContain('c');
+        expect(savedNames).not.toContain('b');
+        // Each entry should have serialized data
+        for (const entry of saved) {
+            expect(entry.data).toBeDefined();
+            expect(entry.data.name).toBe(entry.name);
+        }
         expect(ws.getAsset('a').isDirty).toBe(false);
         expect(ws.getAsset('c').isDirty).toBe(false);
     });

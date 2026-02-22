@@ -115,6 +115,10 @@ export function paletteIndexOutOfRange(index: number): DomainErrorResponse {
     return domainError(`Palette index ${String(index)} is out of range (0–255).`);
 }
 
+export function invalidColor(): DomainErrorResponse {
+    return domainError('Invalid RGBA color. Expected [r, g, b, a] with each channel 0–255.');
+}
+
 export function paletteIndexNoColor(index: number): DomainErrorResponse {
     return domainError(`Palette index ${String(index)} has no color defined. Set it before generating a ramp.`);
 }

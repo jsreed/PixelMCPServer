@@ -33,13 +33,12 @@ export class PaletteClass {
 
     /**
      * Sets the color at the specified index.
-     * Throws `paletteIndexOutOfRange` if index is invalid or if the color is invalid.
+     * Throws `paletteIndexOutOfRange` if index is invalid, `invalidColor` if the color is invalid.
      */
     set(index: number, color: Color): void {
         this.validateIndex(index);
         if (!isValidColor(color)) {
-            // we use the parameter format from domainError
-            throw new Error(errors.paletteIndexOutOfRange(0).content[0].text);
+            throw new Error(errors.invalidColor().content[0].text);
         }
         this.colors[index] = [...color] as Color;
     }
@@ -52,7 +51,7 @@ export class PaletteClass {
         for (const [index, color] of entries) {
             this.validateIndex(index);
             if (!isValidColor(color)) {
-                throw new Error(errors.paletteIndexOutOfRange(0).content[0].text);
+                throw new Error(errors.invalidColor().content[0].text);
             }
         }
 

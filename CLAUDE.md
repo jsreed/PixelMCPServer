@@ -43,7 +43,7 @@ src/
 │   ├── project.ts                 #   ProjectConfig, AssetRegistryEntry, Conventions, Defaults
 │   └── selection.ts               #   SelectionMask interface
 │
-├── models/                        # Stateful classes (enforce invariants, no MCP awareness)
+├── classes/                       # Stateful classes (enforce invariants, no MCP awareness)
 │   ├── palette.ts                 #   Palette class — get/set/swap/setBulk/toJSON/fromJSON
 │   ├── asset.ts                   #   Asset class — layer/frame/cel/tag/shape CRUD, resize, dirty tracking
 │   ├── project.ts                 #   Project class — init/open/info, registry, path resolution, defaults
@@ -114,12 +114,12 @@ src/
 ```
 
 **Structural principles:**
-- **`types/` vs `models/`** — types are pure interfaces/unions with no runtime logic; models are stateful classes. Both algorithms and tool handlers can import from `types/` without pulling in class dependencies.
+- **`types/` vs `classes/`** — types are pure interfaces/unions with no runtime logic; classes are stateful wrappers. Both algorithms and tool handlers can import from `types/` without pulling in class dependencies.
 - **`commands/`** — undo/redo command classes live separately from models to keep the system cohesive and `models/` focused.
 - **`io/`** — file I/O is separate from models. Models have `toJSON()`/`fromJSON()` for serialization; `io/` handles the actual `fs` read/write.
 - **`algorithms/`** — flat directory of pure functions with no model dependencies. Each file is independently testable.
 - **`tools/`** — mirrors the 10-tool design spec 1:1. Each file exports a single `register*Tool(server)` function. Tool handlers are thin wrappers: validate input → delegate to model/algorithm → format MCP response.
-- **Tests colocated** — `*.test.ts` files sit next to their source (e.g., `src/algorithms/bresenham.test.ts`, `src/models/asset.test.ts`).
+- **Tests colocated** — `*.test.ts` files sit next to their source (e.g., `src/algorithms/bresenham.test.ts`, `src/classes/asset.test.ts`).
 
 ### Data Model (defined in [`design.md` §2.1](docs/design.md))
 
@@ -186,24 +186,24 @@ Dependencies flow in one direction. Never import upward or sideways in ways that
 
 ```
 types/          ← no internal deps (imported by everything)
+errors.ts       ← no internal deps (imported by classes/, tools/)
 algorithms/     ← imports only from types/
-models/         ← imports from types/, algorithms/
-commands/       ← imports from types/, models/
-io/             ← imports from types/, models/
-tools/          ← imports from types/, models/, commands/, io/, algorithms/
-resources/      ← imports from types/, models/, algorithms/
+classes/        ← imports from types/, errors.ts, algorithms/
+commands/       ← imports from types/, classes/
+io/             ← imports from types/, classes/
+tools/          ← imports from types/, classes/, commands/, io/, algorithms/
+resources/      ← imports from types/, classes/, algorithms/
 prompts/        ← imports from types/
-errors.ts       ← no internal deps (imported by tools/)
 ```
 
-- `algorithms/` must **never** import from `models/` — they are pure functions that accept plain data (arrays, numbers) and return plain data.
-- `models/` must **never** import from `tools/`, `io/`, or MCP SDK types.
+- `algorithms/` must **never** import from `classes/` — they are pure functions that accept plain data (arrays, numbers) and return plain data.
+- `classes/` must **never** import from `tools/`, `io/`, or MCP SDK types.
 - `tools/` is the integration layer — it wires everything together but contains no business logic of its own.
 
 ### MCP Server Architecture
 
 - **One file per tool handler.** Each tool exports a registration function (e.g., `registerDrawTool(server: McpServer)`) that calls `server.registerTool()` with the tool's schema and callback. The entry point imports and calls these — keep `index.ts` thin.
-- **Separate data model from tool handlers.** Data model types and stateful classes live under `src/models/`, independent of MCP concerns. Tool handlers are thin wrappers: validate input → delegate to model/algorithm → format MCP response.
+- **Separate data model from tool handlers.** Data model types and stateful classes live under `src/classes/`, independent of MCP concerns. Tool handlers are thin wrappers: validate input → delegate to model/algorithm → format MCP response.
 - **Workspace singleton.** Expose a module-level `getWorkspace()` accessor that tool handlers import. The Workspace holds the active Project, loaded Assets, undo/redo history, clipboard, and selection state.
 - **Use `console.error` for logging, never `console.log`.** stdio transport uses stdout for protocol messages — any `console.log` will corrupt the MCP stream.
 - **`isError: true` for recoverable domain errors.** For domain errors (e.g., "asset not loaded", "palette index out of range"), return `{ content: [...], isError: true }` so the LLM can self-correct. Use the shared error factory in `src/errors.ts`. Protocol-level errors are handled by the SDK.

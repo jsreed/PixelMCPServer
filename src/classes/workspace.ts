@@ -139,14 +139,15 @@ export class WorkspaceClass {
 
     /**
      * Saves all loaded assets that have unsaved changes.
-     * @returns The names of assets that were saved.
+     * @returns Array of { name, data } for each saved asset.
      */
-    saveAll(): string[] {
-        const saved: string[] = [];
+    saveAll(): Array<{ name: string; data: Asset }> {
+        const saved: Array<{ name: string; data: Asset }> = [];
         for (const [name, asset] of this.loadedAssets) {
             if (asset.isDirty) {
+                const data = asset.toJSON();
                 asset.isDirty = false;
-                saved.push(name);
+                saved.push({ name, data });
             }
         }
         return saved;

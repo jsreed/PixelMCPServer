@@ -43,6 +43,11 @@ export class AssetClass {
         return this._data.name;
     }
 
+    set name(value: string) {
+        this._data.name = value;
+        this.markDirty();
+    }
+
     get width(): number {
         return this._data.width;
     }
@@ -99,7 +104,7 @@ export class AssetClass {
                 throw new Error(errors.layerNotFound(parentId, this.name).content[0].text);
             }
             if (parentLayer.type !== 'group') {
-                throw new Error(`Layer ${String(parentId)} is not a group layer`);
+                throw new Error(errors.notAGroupLayer(parentId).content[0].text);
             }
         }
 
@@ -270,8 +275,10 @@ export class AssetClass {
             for (const layer of this._data.layers) {
                 const oldKey = packCelKey(layer.id, i - 1);
                 const newKey = packCelKey(layer.id, i);
-                const oldCel = this._data.cels[oldKey];
-                this._data.cels[newKey] = oldCel as NonNullable<Cel>;
+                const oldCel = this._data.cels[oldKey] as Cel | undefined;
+                if (oldCel !== undefined) {
+                    this._data.cels[newKey] = oldCel;
+                }
                 // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
                 delete this._data.cels[oldKey];
             }
@@ -333,8 +340,10 @@ export class AssetClass {
             for (const layer of this._data.layers) {
                 const oldKey = packCelKey(layer.id, i);
                 const newKey = packCelKey(layer.id, i - 1);
-                const oldCel = this._data.cels[oldKey];
-                this._data.cels[newKey] = oldCel as NonNullable<Cel>;
+                const oldCel = this._data.cels[oldKey] as Cel | undefined;
+                if (oldCel !== undefined) {
+                    this._data.cels[newKey] = oldCel;
+                }
                 // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
                 delete this._data.cels[oldKey];
             }
@@ -408,7 +417,8 @@ export class AssetClass {
             // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
             delete this._data.cels[key];
         }
-        this._data.cels[key] = Object.assign({}, cel);
+        // Deep copy to prevent external mutation of nested arrays (e.g. ImageCel.data)
+        this._data.cels[key] = JSON.parse(JSON.stringify(cel)) as Cel;
         this.markDirty();
     }
 
@@ -419,6 +429,30 @@ export class AssetClass {
             delete this._data.cels[key];
             this.markDirty();
         }
+    }
+
+    /**
+     * Returns a mutable reference to the cel at the given position,
+     * breaking any link first (link-break-on-write semantics).
+     * If the cel is a linked cel, the link is resolved, the source data
+     * is deep-copied into an independent cel, and the copy is returned.
+     * Returns undefined if no cel exists at the position.
+     */
+    private getMutableCel(layerId: number, frameIndex: number): Cel | undefined {
+        const key = packCelKey(layerId, frameIndex);
+        const raw = this._data.cels[key] as Cel | undefined;
+        if (raw === undefined) return undefined;
+
+        if ('link' in raw) {
+            // Resolve and deep-copy to break the link
+            const resolved = this.getCel(layerId, frameIndex);
+            if (resolved === undefined) return undefined;
+            const copy = JSON.parse(JSON.stringify(resolved)) as Cel;
+            this._data.cels[key] = copy;
+            return copy;
+        }
+
+        return raw;
     }
 
     // ------------------------------------------------------------------------
@@ -437,16 +471,20 @@ export class AssetClass {
                 throw new Error(errors.invalidArgument(`Frame tag with name '${ftag.name}' and facing '${ftag.facing ?? 'none'}' already exists`).content[0].text);
             }
         }
-        this._data.tags.push(Object.assign({}, tag));
+        this._data.tags.push(JSON.parse(JSON.stringify(tag)) as Tag);
         this.markDirty();
     }
 
     removeTag(name: string, facing?: Facing): void {
         this._data.tags = this._data.tags.filter(t => {
             if (t.name !== name) return true;
-            if (t.type === 'frame' && facing !== undefined) {
-                const ftag = t;
-                if (ftag.facing !== facing) return true;
+            if (t.type === 'layer') {
+                // Layer tags have no facing — only remove if no facing filter was given
+                return facing !== undefined;
+            }
+            // Frame tag: if facing is specified, only remove matching facing
+            if (facing !== undefined) {
+                return t.facing !== facing;
             }
             return false;
         });
@@ -473,17 +511,11 @@ export class AssetClass {
         if (!layer) throw new Error(errors.layerNotFound(layerId, this.name).content[0].text);
         if (layer.type !== 'shape') throw new Error(errors.notAShapeLayer(layerId).content[0].text);
 
-        const cel = this.getCel(layerId, frameIndex);
+        const cel = this.getMutableCel(layerId, frameIndex);
         if (cel === undefined) {
-            const newCel: ShapeCel = { shapes: [] };
-            this.setCel(layerId, frameIndex, newCel);
-            const refetchCel = this.getCel(layerId, frameIndex);
-            if (refetchCel !== undefined && 'shapes' in refetchCel) {
-                refetchCel.shapes.push({ ...shape });
-            }
-        } else if (!('shapes' in cel)) {
-            return;
-        } else {
+            // No cel exists yet — create one with the new shape
+            this.setCel(layerId, frameIndex, { shapes: [{ ...shape }] } as ShapeCel);
+        } else if ('shapes' in cel) {
             cel.shapes.push({ ...shape });
         }
 
@@ -494,7 +526,7 @@ export class AssetClass {
         const layer = this.getLayer(layerId);
         if (!layer || layer.type !== 'shape') return;
 
-        const cel = this.getCel(layerId, frameIndex);
+        const cel = this.getMutableCel(layerId, frameIndex);
         if (cel && 'shapes' in cel) {
             cel.shapes = cel.shapes.filter((s: Shape) => s.name !== shapeName);
             this.markDirty();
@@ -505,7 +537,7 @@ export class AssetClass {
         const layer = this.getLayer(layerId);
         if (!layer || layer.type !== 'shape') return;
 
-        const cel = this.getCel(layerId, frameIndex);
+        const cel = this.getMutableCel(layerId, frameIndex);
         if (cel && 'shapes' in cel) {
             const idx = cel.shapes.findIndex((s: Shape) => s.name === shapeName);
             if (idx !== -1) {
@@ -599,6 +631,35 @@ export class AssetClass {
                     imgCel.x = cx;
                     imgCel.y = cy;
                 }
+            } else if ('grid' in cel) {
+                // Tilemap cel: resize grid to match new canvas dimensions
+                const tileW = this._data.tile_width ?? 1;
+                const tileH = this._data.tile_height ?? 1;
+                const newCols = Math.ceil(width / tileW);
+                const newRows = Math.ceil(height / tileH);
+                const oldGrid = cel.grid;
+                const oldRows = oldGrid.length;
+                const oldCols = oldRows > 0 ? (oldGrid[0]?.length ?? 0) : 0;
+
+                // Compute shift in tile-grid units
+                const tileShiftX = Math.floor(shiftX / tileW);
+                const tileShiftY = Math.floor(shiftY / tileH);
+
+                const newGrid: number[][] = Array.from({ length: newRows }, () =>
+                    Array.from({ length: newCols }, () => -1)
+                );
+
+                for (let r = 0; r < oldRows; r++) {
+                    for (let c = 0; c < oldCols; c++) {
+                        const nr = r + tileShiftY;
+                        const nc = c + tileShiftX;
+                        if (nr >= 0 && nr < newRows && nc >= 0 && nc < newCols) {
+                            newGrid[nr][nc] = oldGrid[r][c];
+                        }
+                    }
+                }
+
+                cel.grid = newGrid;
             } else if ('shapes' in cel) {
                 const shapeCel = cel;
                 for (const shape of shapeCel.shapes) {
@@ -623,10 +684,9 @@ export class AssetClass {
     // ------------------------------------------------------------------------
 
     toJSON(): Asset {
-        return {
-            ...this._data,
-            palette: this.palette.toJSON()
-        };
+        const copy = JSON.parse(JSON.stringify(this._data)) as Asset;
+        copy.palette = this.palette.toJSON();
+        return copy;
     }
 
     static fromJSON(data: Asset): AssetClass {
