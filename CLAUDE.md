@@ -58,7 +58,8 @@ src/
 │   ├── tag-command.ts             #   TagCommand
 │   ├── shape-command.ts           #   ShapeCommand
 │   ├── resize-command.ts          #   ResizeCommand — captures all cel data + dimensions
-│   └── asset-delete-command.ts    #   AssetDeleteCommand — captures registry entry
+│   ├── asset-delete-command.ts    #   AssetDeleteCommand — captures registry entry
+│   └── rename-command.ts          #   RenameCommand — captures old name, registry key, filename
 │
 ├── io/                            # File I/O (serialization to/from disk)
 │   ├── asset-io.ts                #   loadAssetFile() / saveAssetFile()

@@ -18,7 +18,7 @@ Reference: [design.md](design.md)
 
 ## Phase 1: Core Data Model & Algorithms
 
-Build the in-memory data model types and classes under `src/models/`, plus pure drawing algorithms under `src/algorithms/`. No MCP wiring yet — just pure TypeScript with unit tests. Everything in later phases depends on this.
+Build the in-memory data model types and classes under `src/types/` and `src/classes/`, plus pure drawing algorithms under `src/algorithms/`. No MCP wiring yet — just pure TypeScript with unit tests. Everything in later phases depends on this.
 
 ### 1.1 Types & Interfaces
 
@@ -59,22 +59,25 @@ Stateful classes that manage in-memory data and enforce invariants.
 ### 1.3 Command System (Undo/Redo)
 
 - [ ] **1.3.1** **`Command` interface** — `execute(): void`, `undo(): void`. Immutable snapshot of the before-state captured at creation time.
-- [ ] **1.3.2** **`CommandHistory` class** — push/undo/redo stack management. `push(cmd)` clears the redo stack. Max history depth (configurable, default 100).
-- [ ] **1.3.3** **Concrete command classes** for each mutation category:
-  - `PaletteCommand` — captures palette entry before-state
-  - `CelWriteCommand` — captures full cel data snapshot before mutation
-  - `LayerCommand` — captures layer list state for add/remove/reorder
-  - `FrameCommand` — captures frame list + affected cels + tag shifts
-  - `TagCommand` — captures tag list before-state
-  - `ShapeCommand` — captures shapes array before-state
-  - `ResizeCommand` — captures all cel data + dimensions before-state
-  - `AssetDeleteCommand` — captures registry entry (file deletion not reversible)
+- [ ] **1.3.2** **`CommandHistory` class** — push/undo/redo stack management. `push(cmd)` clears the redo stack. Max history depth (configurable, default 100). Wire into `Workspace` to replace the placeholder `_undoStack`/`_redoStack` arrays and make `undo()`/`redo()` functional.
+- [ ] **1.3.3** **Concrete command classes** for each mutation category. Each captures the before-state snapshot on construction and restores it on `undo()`. Tool actions that use each command are listed for cross-reference:
+  - `PaletteCommand` — captures palette entry before-state. Used by: `palette set`, `palette set_bulk`, `palette swap`, `palette load`, `palette fetch_lospec`, `palette generate_ramp`.
+  - `CelWriteCommand` — captures full cel data snapshot before mutation. Used by: `draw` (all operations), `transform` (all operations), `effect` (all operations), `selection paste`, `selection cut`. Handles linked cel break on first write.
+  - `LayerCommand` — captures layer list state for add/remove/reorder. Used by: `asset add_layer`, `asset add_group`, `asset remove_layer`, `asset reorder_layer`.
+  - `FrameCommand` — captures frame list + affected cels + tag shifts. Used by: `asset add_frame`, `asset remove_frame`, `asset set_frame_duration`.
+  - `TagCommand` — captures tag list before-state. Used by: `asset add_tag`, `asset remove_tag`.
+  - `ShapeCommand` — captures shapes array before-state. Used by: `asset add_shape`, `asset update_shape`, `asset remove_shape`, `asset generate_collision_polygon`.
+  - `ResizeCommand` — captures all cel data + dimensions before-state. Used by: `asset resize`.
+  - `AssetDeleteCommand` — captures registry entry (file deletion is not reversible via undo). Used by: `asset delete`.
+  - `RenameCommand` — captures old name, registry key, and filename. Used by: `asset rename`.
 
 ### 1.4 File I/O
 
-- [ ] **1.4.1** **Asset serialization** — `loadAssetFile(path): Asset` reads and validates `.json` asset files. `saveAssetFile(path, asset)` writes them. Handles all cel formats (image, tilemap, shape, linked).
-- [ ] **1.4.2** **Project serialization** — `loadProjectFile(path): ProjectConfig` and `saveProjectFile(path, config)`. Validates schema.
-- [ ] **1.4.3** **Palette file I/O** — `loadPaletteFile(path): Palette` and `savePaletteFile(path, palette, name)`. Validates `{ name, colors }` schema.
+Files under `src/io/`. Models have `toJSON()`/`fromJSON()` for serialization; this layer handles the actual `fs` read/write and schema validation.
+
+- [ ] **1.4.1** **Asset serialization** — `loadAssetFile(path): Asset` reads and validates `.json` asset files using `AssetClass.fromJSON()`. `saveAssetFile(path, asset)` writes them using `asset.toJSON()`. Must handle all cel formats (image, tilemap, shape, linked). Sets `modified` timestamp on save.
+- [ ] **1.4.2** **Project serialization** — `loadProjectFile(path): ProjectConfig` reads and validates `pixelmcp.json` using `ProjectClass.fromJSON()`. `saveProjectFile(path, project)` writes using `project.toJSON()`. Wire into `Workspace.loadAsset()` and `Workspace.save()` to replace any placeholder file I/O.
+- [ ] **1.4.3** **Palette file I/O** — `loadPaletteFile(path): PaletteData` and `savePaletteFile(path, palette, name)`. Validates `{ name, colors }` schema where colors is `Array<[r,g,b,a] | null>`. Returns validation errors for malformed files using the shared error factory.
 
 ### 1.5 Drawing & Geometry Algorithms
 
@@ -89,17 +92,20 @@ Pure functions under `src/algorithms/`, unit tested independently of the model.
 - [ ] **1.5.7** **Banding detection** — monotonic staircase scan for `detect_banding`
 - [ ] **1.5.8** **Export pattern token substitution** — parse `{name}`, `{tag}`, `{direction}`, `{variant}`, `{frame}` tokens with separator-dropping logic for empty token values
 - [ ] **1.5.9** **Bin-packing algorithm** — rectangle packing for `export atlas` (e.g., shelf or maxrects algorithm)
-- [ ] **1.5.10** **Image compositing** — flatten visible layers respecting opacity, resolve linked cels, composite indexed pixels to RGBA output buffer. Prerequisite for all export actions and MCP Resources.
+- [ ] **1.5.10** **Image compositing** — flatten visible layers into an RGBA output buffer. Algorithm: iterate layers bottom-to-top, skip non-visible layers; for each visible layer, resolve linked cels, convert palette indices to RGBA via the asset's palette, then alpha-over composite onto the output buffer respecting the layer's `opacity` (0–255). Group layers affect their children's visibility but produce no pixels themselves. Output is a flat `Uint8Array` of `width × height × 4` (RGBA). Prerequisite for all export actions and MCP Resources.
 
 ### 1.6 Phase 1 Testing
 
-- [ ] **1.6.1** **Palette unit tests** — get/set bounds, `setBulk` overwrites, `swap` correctness, `toJSON()`/`fromJSON()` roundtrip
-- [ ] **1.6.2** **Asset unit tests** — layer CRUD (including group nesting, reorder across groups), frame CRUD with tag index shifting, linked cel resolution chains, link-break-on-write, resize with all 9 anchor positions, `toJSON()`/`fromJSON()` roundtrip fidelity
-- [ ] **1.6.3** **Project unit tests** — `init` creates valid config, `resolveAssetPath` variant resolution, defaults palette slug-vs-path detection
-- [ ] **1.6.4** **Workspace unit tests** — load/unload lifecycle, dirty flag tracking, save clears dirty
-- [ ] **1.6.5** **Command system unit tests** — execute→undo→verify state restored, execute→undo→redo→verify matches, history depth limit enforcement, `push` clears redo stack
-- [ ] **1.6.6** **File I/O roundtrip tests** — load known-good fixture JSON → verify parsed Asset, save→reload→verify roundtrip for assets, projects, and palettes
-- [ ] **1.6.7** **Algorithm unit tests** — Bresenham known pixel coords for various slopes, midpoint circle/ellipse pixel coords, flood fill on bordered regions and edge-touching fills, marching squares + RDP on known silhouettes, color quantization output ≤ 256 entries, banding detection on synthetic staircase patterns, export pattern token substitution with and without empty tokens, bin-packing correctness, image compositing (opacity, layer visibility, linked cel resolution)
+- [x] **1.6.1** **Palette unit tests** — get/set bounds, `setBulk` overwrites, `swap` correctness, `toJSON()`/`fromJSON()` roundtrip (`src/classes/palette.test.ts`)
+- [x] **1.6.2** **Asset unit tests** — layer CRUD (including group nesting, reorder across groups), frame CRUD with tag index shifting, linked cel resolution chains, link-break-on-write, resize with all 9 anchor positions, `toJSON()`/`fromJSON()` roundtrip fidelity (`src/classes/asset.test.ts`)
+- [x] **1.6.3** **Project unit tests** — `init` creates valid config, `resolveAssetPath` variant resolution, defaults palette slug-vs-path detection (`src/classes/project.test.ts`)
+- [x] **1.6.4** **Workspace unit tests** — load/unload lifecycle, dirty flag tracking, save clears dirty (`src/classes/workspace.test.ts`)
+- [ ] **1.6.5** **Command system unit tests** — execute→undo→verify state restored, execute→undo→redo→verify matches, history depth limit enforcement, `push` clears redo stack. Test each concrete command class individually.
+- [ ] **1.6.6** **File I/O roundtrip tests** — load known-good fixture JSON → verify parsed Asset, save→reload→verify roundtrip for assets, projects, and palettes. Create fixture files under `src/io/__fixtures__/`.
+- [ ] **1.6.7** **Drawing algorithm tests** — Bresenham known pixel coords for various slopes (horizontal, vertical, diagonal, steep), midpoint circle pixel coords at various radii, midpoint ellipse pixel coords, flood fill on bordered regions and edge-touching fills
+- [ ] **1.6.8** **Geometry algorithm tests** — marching squares contour on known silhouettes (rectangle, circle, L-shape), RDP simplification at various epsilon values, iso projection formula verification
+- [ ] **1.6.9** **Processing algorithm tests** — color quantization output ≤ 256 entries with round-trip fidelity, banding detection on synthetic staircase patterns (positive and negative cases)
+- [ ] **1.6.10** **Utility algorithm tests** — export pattern token substitution with and without empty tokens and separator-dropping, bin-packing correctness (no overlap, bounds fit), image compositing (opacity blending, layer visibility, linked cel resolution, group layer nesting)
 
 > **Definition of Done — Phase 1:** All types compile, all classes have comprehensive unit tests covering happy paths and edge cases, fixture roundtrip tests pass, all algorithm tests pass.
 
@@ -118,7 +124,7 @@ Wire the core model to MCP tool handlers. Each tool is one file under `src/tools
 ### 2.2 Server Bootstrap
 
 - [ ] **2.2.1** **Refactor `src/index.ts`** — import and call tool registration functions. Remove the `get_status` stub. Keep the file thin.
-- [ ] **2.2.2** **Shared workspace singleton** — expose a module-level `getWorkspace()` accessor that tool handlers import. Initialize on first use.
+- [x] **2.2.2** **Shared workspace singleton** — `getWorkspace()` accessor already implemented in `src/classes/workspace.ts`. Tool handlers import from there.
 
 ### 2.3 Minimum Viable Loop Tools
 
@@ -138,7 +144,7 @@ Focus on the minimum creative loop: create project → create asset → set pale
 - [ ] **2.3.2.2** **`info` action** — return loaded assets, undo/redo depth, selection summary
 - [ ] **2.3.2.3** **`load_asset` / `unload_asset`** — load from registry path, variant resolution (pass optional `variant` parameter), unsaved-changes warning on unload
 - [ ] **2.3.2.4** **`save` / `save_all`** — persist to disk, clear dirty flags
-- [ ] **2.3.2.5** **`undo` / `redo`** — delegate to CommandHistory
+- [ ] **2.3.2.5** **`undo` / `redo`** — delegate to `CommandHistory` (requires [§1.3](#13-command-system-undoredo) to be complete)
 - [ ] **2.3.2.6** **Domain error responses** — "not in registry", "file not found", "not loaded" errors
 
 #### 2.3.3 `palette` Tool (Core Actions)
@@ -156,7 +162,7 @@ Focus on the minimum creative loop: create project → create asset → set pale
 - [ ] **2.3.4.4** **Layer management**: `add_layer` (image, tilemap, shape types), `add_group`, `remove_layer`, `reorder_layer` (with parent reparenting)
 - [ ] **2.3.4.5** **Frame management**: `add_frame`, `remove_frame`, `set_frame_duration` (with tag index cascading on add/remove)
 - [ ] **2.3.4.6** **Tag management**: `add_tag`, `remove_tag` (with `tag_facing` disambiguation)
-- [ ] **2.3.4.7** **Asset lifecycle**: `rename`, `duplicate`, `delete` (with optional `delete_file`), `create_recolor` (clone + palette replacement with layered sources: file → slug → entries; sets `recolor_of` in registry)
+- [ ] **2.3.4.7** **Asset lifecycle**: `rename` (updates asset internal name, renames registry key preserving metadata, renames `.json` file on disk, updates workspace mapping — wrapped in `RenameCommand`), `duplicate`, `delete` (with optional `delete_file`), `create_recolor` (clone + palette replacement with layered sources: file → slug → entries; sets `recolor_of` in registry)
 - [ ] **2.3.4.8** **`resize`** — with all 9 anchor positions, cel origin adjustment
 - [ ] **2.3.4.9** **Domain error responses** — "not loaded", "layer not found", "frame out of range", "not a group", "not a shape layer" errors
 
@@ -198,7 +204,7 @@ Remaining actions that have additional dependencies or are non-essential for the
 
 #### 2.5.2 `palette` — Remaining Actions
 
-- [ ] **2.5.2.1** **`load` / `save`** — palette file I/O (relative path resolution to `pixelmcp.json`)
+- [ ] **2.5.2.1** **`load` / `save`** — palette file I/O (relative path resolution to `pixelmcp.json`). Note: `load` is wrapped in a Command (palette mutation); `save` is NOT wrapped in a Command (file I/O only, per design spec).
 - [ ] **2.5.2.2** **`fetch_lospec`** — HTTP fetch from Lospec API, apply to palette (depends on [§2.1.3](#213-http-client))
 - [ ] **2.5.2.3** **`generate_ramp`** — interpolate between two existing palette entries, validate endpoints exist, require `color1 < color2`
 - [ ] **2.5.2.4** **Palette remaining action tests** — load/save roundtrip, generate_ramp output verification, fetch_lospec error handling
@@ -345,29 +351,31 @@ Maybe. This would add a GUI client. Not committed.
 ## Dependency Graph
 
 ```
-Phase 0 (Prep)
-  ├── 0.4 CLAUDE.md ← done
-  └── 0.7 Error factory ← used by all tool handlers
+Phase 0 (Prep) ✅ COMPLETE
+  ├── 0.4 CLAUDE.md ✅
+  └── 0.7 Error factory ✅ — used by all tool handlers
 
 Phase 1 (Core Model & Algorithms)
-  ├── 1.1 Types ──────────────────────┐
-  ├── 1.2 Classes (depends on 1.1)    │
-  ├── 1.3 Command System (1.1, 1.2)   │
-  ├── 1.4 File I/O (depends on 1.1)   │
-  ├── 1.5 Algorithms (independent)    │
+  ├── 1.1 Types ✅ ─────────────────────┐
+  ├── 1.2 Classes ✅ (depends on 1.1)   │
+  ├── 1.3 Command System (1.1, 1.2)     │  ← next: wire into Workspace
+  ├── 1.4 File I/O (1.1, 1.2)           │  ← uses classes' toJSON/fromJSON
+  ├── 1.5 Algorithms (independent)      │  ← parallelizable with 1.3/1.4
   │     ├── 1.5.1-8 (drawing, geometry, patterns)
   │     ├── 1.5.9 bin-packing (for 3.4.6 atlas)
   │     └── 1.5.10 image compositing (for 3.4.2+ and Phase 4)
-  └── 1.6 Testing (depends on all ↑)  │
-                                      │
+  └── 1.6 Testing (depends on all ↑)    │
+        ├── 1.6.1-4 ✅ (types & classes)
+        └── 1.6.5-10 (commands, I/O, algorithms)
+                                         │
 Phase 2 (Basic Tools — depends on Phase 1)
   ├── 2.1 External deps (install early: pngjs, gifenc)
-  ├── 2.2 Server Bootstrap
-  ├── 2.3 Minimum Viable Loop ────────┤
+  ├── 2.2 Server Bootstrap (2.2.2 ✅ — getWorkspace() exists)
+  ├── 2.3 Minimum Viable Loop ──────────┤
   │     ├── 2.3.1 project (init/open/info) (1.2 Project, 1.4)
-  │     ├── 2.3.2 workspace (1.2 Workspace, 1.3)
+  │     ├── 2.3.2 workspace (1.2 Workspace, 1.3, 1.4)
   │     ├── 2.3.3 palette (core) (1.2 Palette, 1.3)
-  │     ├── 2.3.4 asset (1.2 Asset, 1.3, 1.5) — includes create_recolor
+  │     ├── 2.3.4 asset (1.2 Asset, 1.3, 1.4, 1.5)
   │     ├── 2.3.5 draw (1.2 Asset, 1.3, 1.5)
   │     └── 2.3.6 MVL integration test
   ├── 2.4 selection (1.1.8 SelectionMask, 1.2 Workspace)
@@ -383,7 +391,7 @@ Phase 3 (Advanced Tools — depends on Phase 2)
   ├── 3.1 transform (follows 2.3.5 draw pattern)
   ├── 3.2 effect (follows 2.3.5 draw pattern)
   ├── 3.3 tileset (1.2 Asset tileset fields)
-  └── 3.4 export ─────────────────────┤
+  └── 3.4 export ───────────────────────┤
         ├── 3.4.2 compositing integration (wires 1.5.10 into export pipeline)
         ├── 3.4.3-6 standard exports (2.1.1 PNG, 2.1.2 GIF, 1.5.9 bin-pack)
         ├── 3.4.7 per_tag (1.5.8 pattern substitution)
