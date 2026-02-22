@@ -168,7 +168,7 @@ If the target cel is a linked cel, the link is broken on the first operation in 
 **Purpose:** Querying and modifying the structural hierarchy (layers, frames, tags) and properties of a loaded Asset.
 
 **Arguments:**
-- action (enum: `info`, `get_cel`, `get_cels`, `detect_banding`, `generate_collision_polygon`, `create`, `resize`, `rename`, `duplicate`, `delete`, `add_layer`, `add_group`, `remove_layer`, `reorder_layer`, `add_frame`, `remove_frame`, `set_frame_duration`, `add_tag`, `remove_tag`, `add_shape`, `update_shape`, `remove_shape`, `get_shapes`)
+- action (enum: `info`, `get_cel`, `get_cels`, `detect_banding`, `generate_collision_polygon`, `create`, `resize`, `rename`, `duplicate`, `create_recolor`, `delete`, `add_layer`, `add_group`, `remove_layer`, `reorder_layer`, `add_frame`, `remove_frame`, `set_frame_duration`, `add_tag`, `remove_tag`, `add_shape`, `update_shape`, `remove_shape`, `get_shapes`)
 - asset_name (string, optional — identifies target asset)
 - name (string, optional — for rename, duplicate, new asset/layer/group/tag name)
 - delete_file (boolean, optional — for `delete`: also remove the asset's `.json` file from disk; defaults to false, which only removes the registry entry)
@@ -201,6 +201,9 @@ If the target cel is a linked cel, the link is broken on the first operation in 
 - shape_points (array of [x, y] pairs, optional — geometry for polygon shapes; coordinates in asset-local pixels)
 - epsilon (float, optional — RDP simplification tolerance for `generate_collision_polygon`; smaller = more vertices, more accurate; defaults to 1.0)
 - target_layer_id (integer, optional — shape layer to write the generated polygon into, for `generate_collision_polygon`)
+- palette_file (string, optional — for `create_recolor`: path to a palette `.json` file, relative to `pixelmcp.json`)
+- palette_slug (string, optional — for `create_recolor`: Lospec palette slug, e.g. `"endesga-32"`)
+- palette_entries (array of {index, rgba}, optional — for `create_recolor`: inline palette overrides)
 
 **Behavior:**
 - `info` — returns full structural metadata for the asset: dimensions, perspective, layer tree (IDs, names, types, visibility, opacity, tags), frame list (indices, durations), all tags, and palette summary (color count, entries). This is the LLM's primary way to discover and inspect asset structure.
@@ -214,7 +217,9 @@ If the target cel is a linked cel, the link is broken on the first operation in 
 - `detect_banding` — analyzes a target cel (`layer_id` + `frame_index`) for color banding artifacts: gradient regions that stair-step with visibly distinct parallel bands instead of smooth transitions. Algorithm: scans for adjacent pixel rows/columns where palette indices form a monotonic sequence (staircase pattern) with uniform step width; reports regions where 3+ parallel bands of equal width are detected. Severity is based on band count and contrast between adjacent indices. Read-only — does not modify pixel data and is not wrapped in a Command. Returns either `{ clean: true }` or `{ banding: [{ x, y, width, height, severity: "low"|"medium"|"high", description }] }`. Useful for self-correction after applying gradient or dither effects.
 - `create` — creates a new Asset file on disk, registers it in the Project, and loads it into the Workspace. Accepts optional `palette`, `layers`, `frames`, and `tags` to scaffold the full asset structure in a single call.
 - `resize` — changes the canvas dimensions of the Asset. Accepts `width`, `height`, and optional `anchor` (enum: `top_left`, `top_center`, `top_right`, `center_left`, `center`, `center_right`, `bottom_left`, `bottom_center`, `bottom_right` — defaults to `top_left`). Existing pixel data is positioned relative to the new canvas according to the anchor. If the canvas grows, new pixels are filled with index 0 (transparent). If it shrinks, pixels outside the new bounds are cropped. All cels are resized. Cel origin offsets are adjusted to maintain positioning relative to the anchor. Wrapped in a Command.
+- `rename` — changes the logical name of a loaded Asset. Updates the asset's internal `name` property, renames the registry key in the Project (preserving `type`, `path`/`variants`, and all other metadata), and renames the `.json` file on disk to match the new name (in the same directory). The asset remains loaded in the Workspace under the new name. Wrapped in a Command for undo/redo (undo restores the original name, registry key, and filename).
 - `duplicate` — clones an Asset under a new `name` (required). The new file is saved in the same directory as the source asset's file, registered in the Project, and loaded into the Workspace. Returns the new asset's registry name and file path.
+- `create_recolor` — creates a palette-swap variant of an existing Asset in a single call. Clones the source asset's pixel data, layers, frames, tags, and all cels under a new `name`, then applies a replacement palette. At least one palette source is required: `palette_file` (path to a `.json` palette file, relative to `pixelmcp.json`), `palette_slug` (Lospec slug), or `palette_entries` (inline `{index, rgba}` array). If multiple sources are provided, they layer in order: file → slug → entries (later sources overwrite earlier ones for overlapping indices). The new asset file is saved in the same directory as the source, registered in the Project with a `recolor_of` metadata field pointing to the source asset name, and loaded into the Workspace. Returns the new asset's registry name and file path. Wrapped in a Command for undo/redo.
 - `delete` — removes an Asset from the Project registry. If `delete_file` is true, also deletes the `.json` file from disk. The asset is unloaded from the Workspace if currently loaded. Wrapped in a Command for undo/redo (undo restores the registry entry; file deletion is not reversible via undo).
 - `add_layer` / `add_group` / `remove_layer` / `reorder_layer` — structural layer operations. `reorder_layer` moves the target layer to a new `position` among its siblings (within the same parent group). If `parent_layer_id` is provided, the layer is reparented into that group at `position` within the group's children. Moving a group layer moves all its children with it. All operations are wrapped in Commands.
 - `add_frame` — inserts a new frame at `frame_index` (optional — defaults to appending at the end). New cels for image layers are initialized empty (all index 0); new cels for shape layers have no shapes; new cels for tilemap layers have all cells set to -1. Accepts optional `duration_ms` (defaults to 100). Frame tags with `start` or `end` >= the insertion index shift their indices by +1. Wrapped in a Command.
@@ -249,6 +254,30 @@ If the target cel is a linked cel, the link is broken on the first operation in 
   ],
   "tags": [
     { "name": "idle", "type": "frame", "start": 0, "end": 3, "direction": "ping_pong" }
+  ]
+}
+```
+
+**Example — creating a palette-swap variant from a palette file:**
+```json
+{
+  "action": "create_recolor",
+  "asset_name": "grass_ground",
+  "name": "corrupted_ground",
+  "palette_file": "palettes/corruption.json"
+}
+```
+
+**Example — creating an enemy tier recolor with inline entries:**
+```json
+{
+  "action": "create_recolor",
+  "asset_name": "slime",
+  "name": "fire_slime",
+  "palette_entries": [
+    { "index": 3, "rgba": [220, 50, 30, 255] },
+    { "index": 4, "rgba": [255, 120, 40, 255] },
+    { "index": 5, "rgba": [255, 200, 80, 255] }
   ]
 }
 ```
@@ -960,6 +989,11 @@ This file represents the Project configuration for your entire game or creative 
     "fishing_village_ground": {
       "type": "tileset",
       "path": "assets/art/environments/tilesets/fishing_village/terrain/ground_base.json"
+    },
+    "corrupted_ground": {
+      "type": "tileset",
+      "path": "assets/art/environments/tilesets/fishing_village/terrain/corrupted_ground.json",
+      "recolor_of": "fishing_village_ground"
     }
   }
 }
@@ -982,6 +1016,8 @@ This file represents the Project configuration for your entire game or creative 
   Tokens with no value for a given tag are silently dropped along with their nearest adjacent separator character (`_`, `-`, `.`). For example, `{name}_{tag}_{direction}.png` applied to a tag with no `facing` produces `iron_sword_idle.png`, not `iron_sword_idle_.png`. Only include tokens relevant to your asset structure.
 - **`defaults`** — applied when creating new assets without explicit overrides. `palette` may be a Lospec slug (`"endesga-32"`) or a relative path to a local palette `.json` file (e.g., `"palettes/fishing_village.json"`). Detection: if the value contains `/` or ends with `.json`, it is treated as a file path resolved relative to `pixelmcp.json`; otherwise it is treated as a Lospec slug fetched from the API.
 - **`assets`** — the asset registry. Each entry maps a logical name to either a single `path` or a `variants` map of fit-category name → path. `type` is a free string — the server does not enforce an enum; use whatever classification fits the project (e.g., `character`, `weapon`, `armor`, `tileset`, `prop`, `effect`, `ui`). The `project add_file` action appends entries here. `workspace load_asset` resolves names through this registry; pass an optional `variant` parameter to select a specific fit (e.g., `"slim"`), otherwise the first defined variant is used.
+
+  **`recolor_of` (string, optional)** — records that this asset is a palette-swap variant of another registered asset. Purely informational — the server does not enforce or resolve this field at runtime. The referenced asset does not need to be loaded or even exist. Automatically set by `asset create_recolor`; can also be added manually to any registry entry. Useful for LLM context (avoiding redundant pixel work on known recolors), batch operations (propagating structural changes across all recolors of a base), and human readability.
 
   **Equipment variant convention — fixed canvas, proportional fit categories:** Variant keys for equipment (weapons, armor) represent *proportional canvas categories*, not race names and not gender. The recommended proportional categories are:
 
@@ -1152,6 +1188,7 @@ Domain errors are returned with `{ isError: true, content: [{ type: "text", text
 | asset | `generate_collision_polygon` — `layer_id` not an image layer | `"Layer {id} is not an image layer. Provide an image layer as the pixel source."` |
 | asset | `generate_collision_polygon` — no shape layer found | `"No target shape layer specified and no hitbox shape layer found in asset '{name}'."` |
 | asset | `add_shape` / `update_shape` — `layer_id` not a shape layer | `"Layer {id} is not a shape layer."` |
+| asset | `create_recolor` — no palette source provided | `"At least one palette source (palette_file, palette_slug, or palette_entries) is required for create_recolor."` |
 | draw | any operation — `color` out of range | `"Color index {color} is out of range (0–255)."` |
 | draw | `write_pixels` — data dimensions mismatch | `"write_pixels data dimensions ({dw}×{dh}) do not match declared width×height ({w}×{h})."` |
 | effect | any operation — `color1` / `color2` out of range | `"Color index {color} is out of range (0–255)."` |
@@ -1170,11 +1207,3 @@ Domain errors are returned with `{ isError: true, content: [{ type: "text", text
 | selection | `paste` — `target_asset_name` not loaded | `"Target asset '{name}' is not loaded in the workspace."` |
 
 
-## 3. Open Design Questions
-
-### Palette-Swap Variant Workflow
-
-The recommended workflow for palette-swap variants (corruption recolors, character skin tone rerolls) needs to be documented. The indexed color system supports this natively — the intended workflow (duplicate asset → remap palette entries via `palette set_bulk`) is clear at a high level, but the following details are unresolved:
-
-- Should the server support a dedicated `palette remap` action that accepts a mapping of old index → new index, for bulk index reassignment without touching pixel data?
-- Should palette-swap variants be tracked in the project registry as entries that reference both a base asset path and a palette file override, rather than duplicating the full asset JSON?

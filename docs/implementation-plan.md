@@ -9,9 +9,9 @@ Reference: [design.md](design.md)
 - [x] **0.1** Initialize project structure
 - [x] **0.2** Setup common workflows
 - [x] **0.3** Setup testing and code quality tools
-- [ ] **0.4** Create core claude-code customizations (CLAUDE.md) — complete before Phase 1 so agents have correct context from the start. Should contain project architecture, file layout conventions, and testing commands.
+- [x] **0.4** Create core claude-code customizations (CLAUDE.md) — complete before Phase 1 so agents have correct context from the start. Should contain project architecture, file layout conventions, and testing commands.
 - [x] **0.5** Develop design doc [design.md](design.md)
-- [ ] **0.6** Develop implementation plan doc [implementation-plan.md](implementation-plan.md)
+- [x] **0.6** Develop implementation plan doc [implementation-plan.md](implementation-plan.md)
 - [ ] **0.7** Implement shared error factory (`src/errors.ts`) — typed error constructors for every domain error in [design §2.6](design.md). Each tool handler imports these rather than constructing ad-hoc error strings. Build this early so all phases use consistent error responses.
 
 ---
@@ -30,7 +30,7 @@ Define the core type hierarchy as described in [design §2.1](design.md) and [de
 - [ ] **1.1.4** **Tag types** — discriminated union: `FrameTag` (name, start, end, direction, facing?) and `LayerTag` (name, layers). Direction enum: `forward | reverse | ping_pong`. Facing enum: `N | NE | E | SE | S | SW | W | NW`.
 - [ ] **1.1.5** **Shape types** — discriminated union: `RectShape` (name, x, y, width, height) and `PolygonShape` (name, points as `[number, number][]`).
 - [ ] **1.1.6** **Asset types** — `Asset` interface: name, width, height, `perspective` (free string: `"flat"`, `"top_down"`, `"top_down_3/4"`, `"isometric"`; defaults to `"flat"`), palette, layers, frames, cels (Map keyed by string), tags. Optional tileset fields: `tile_width`, `tile_height`, `tile_count`, `tile_physics`, `tile_terrain`.
-- [ ] **1.1.7** **Project types** — `ProjectConfig` interface matching `pixelmcp.json` schema: version, name, conventions (including `export_pattern`), defaults (including palette slug-vs-file-path detection), assets registry (each entry has `type` + either `path` or `variants` map).
+- [ ] **1.1.7** **Project types** — `ProjectConfig` interface matching `pixelmcp.json` schema: version, name, conventions (including `export_pattern`), defaults (including palette slug-vs-file-path detection), assets registry (each entry has `type` + either `path` or `variants` map + optional `recolor_of` string).
 - [ ] **1.1.8** **Selection types** — `SelectionMask` interface scoped to asset/layer/frame. Bitmask or coordinate-set representation. Separate from the MCP tool wiring (which comes in Phase 2).
 
 ### 1.2 Core Classes
@@ -88,6 +88,8 @@ Pure functions under `src/algorithms/`, unit tested independently of the model.
 - [ ] **1.5.6** **Color quantization** (median cut or octree) — for `project add_file` PNG import
 - [ ] **1.5.7** **Banding detection** — monotonic staircase scan for `detect_banding`
 - [ ] **1.5.8** **Export pattern token substitution** — parse `{name}`, `{tag}`, `{direction}`, `{variant}`, `{frame}` tokens with separator-dropping logic for empty token values
+- [ ] **1.5.9** **Bin-packing algorithm** — rectangle packing for `export atlas` (e.g., shelf or maxrects algorithm)
+- [ ] **1.5.10** **Image compositing** — flatten visible layers respecting opacity, resolve linked cels, composite indexed pixels to RGBA output buffer. Prerequisite for all export actions and MCP Resources.
 
 ### 1.6 Phase 1 Testing
 
@@ -97,7 +99,7 @@ Pure functions under `src/algorithms/`, unit tested independently of the model.
 - [ ] **1.6.4** **Workspace unit tests** — load/unload lifecycle, dirty flag tracking, save clears dirty
 - [ ] **1.6.5** **Command system unit tests** — execute→undo→verify state restored, execute→undo→redo→verify matches, history depth limit enforcement, `push` clears redo stack
 - [ ] **1.6.6** **File I/O roundtrip tests** — load known-good fixture JSON → verify parsed Asset, save→reload→verify roundtrip for assets, projects, and palettes
-- [ ] **1.6.7** **Algorithm unit tests** — Bresenham known pixel coords for various slopes, midpoint circle/ellipse pixel coords, flood fill on bordered regions and edge-touching fills, marching squares + RDP on known silhouettes, color quantization output ≤ 256 entries, banding detection on synthetic staircase patterns, export pattern token substitution with and without empty tokens
+- [ ] **1.6.7** **Algorithm unit tests** — Bresenham known pixel coords for various slopes, midpoint circle/ellipse pixel coords, flood fill on bordered regions and edge-touching fills, marching squares + RDP on known silhouettes, color quantization output ≤ 256 entries, banding detection on synthetic staircase patterns, export pattern token substitution with and without empty tokens, bin-packing correctness, image compositing (opacity, layer visibility, linked cel resolution)
 
 > **Definition of Done — Phase 1:** All types compile, all classes have comprehensive unit tests covering happy paths and edge cases, fixture roundtrip tests pass, all algorithm tests pass.
 
@@ -109,8 +111,8 @@ Wire the core model to MCP tool handlers. Each tool is one file under `src/tools
 
 ### 2.1 External Dependencies
 
-- [ ] **2.1.1** **PNG read/write library** — needed for `project add_file` (import PNG), all `export` actions, and MCP Resources. Evaluate: `sharp` (fast, native), `pngjs` (pure JS, simpler). Prefer `pngjs` to avoid native deps for an MCP server.
-- [ ] **2.1.2** **GIF encoding library** — needed for `export gif` and animation preview resources. Evaluate: `gif-encoder-2`, `gifenc`.
+- [ ] **2.1.1** **PNG read/write library** — needed for `project add_file` (import PNG), all `export` actions, and MCP Resources. Use `pngjs` (pure JS, no native deps — appropriate for an MCP server).
+- [ ] **2.1.2** **GIF encoding library** — needed for `export gif` and animation preview resources. Use `gifenc` (small, no native deps).
 - [ ] **2.1.3** **HTTP client** — for `palette fetch_lospec`. Use Node built-in `fetch` (available since Node 18).
 
 ### 2.2 Server Bootstrap
@@ -148,13 +150,13 @@ Focus on the minimum creative loop: create project → create asset → set pale
 
 #### 2.3.4 `asset` Tool (Read-Only + Create + Structure)
 
-- [ ] **2.3.4.1** **Zod schema** — discriminated union on all 22 actions
+- [ ] **2.3.4.1** **Zod schema** — discriminated union on all 24 actions (including `create_recolor`)
 - [ ] **2.3.4.2** **Read-only actions**: `info`, `get_cel` (with linked cel resolution + `is_linked`/`link_source` metadata), `get_cels` (explicit list + range modes), `get_shapes`
 - [ ] **2.3.4.3** **`create`** — create new Asset with optional `palette`, `layers`, `frames`, `tags` scaffold. Apply `defaults.palette` from project config (Lospec slug vs. file path detection). Store `perspective` property.
 - [ ] **2.3.4.4** **Layer management**: `add_layer` (image, tilemap, shape types), `add_group`, `remove_layer`, `reorder_layer` (with parent reparenting)
 - [ ] **2.3.4.5** **Frame management**: `add_frame`, `remove_frame`, `set_frame_duration` (with tag index cascading on add/remove)
 - [ ] **2.3.4.6** **Tag management**: `add_tag`, `remove_tag` (with `tag_facing` disambiguation)
-- [ ] **2.3.4.7** **Asset lifecycle**: `rename`, `duplicate`, `delete` (with optional `delete_file`)
+- [ ] **2.3.4.7** **Asset lifecycle**: `rename`, `duplicate`, `delete` (with optional `delete_file`), `create_recolor` (clone + palette replacement with layered sources: file → slug → entries; sets `recolor_of` in registry)
 - [ ] **2.3.4.8** **`resize`** — with all 9 anchor positions, cel origin adjustment
 - [ ] **2.3.4.9** **Domain error responses** — "not loaded", "layer not found", "frame out of range", "not a group", "not a shape layer" errors
 
@@ -208,11 +210,19 @@ Remaining actions that have additional dependencies or are non-essential for the
 - [ ] **2.5.3.3** **`generate_collision_polygon`** — marching squares + RDP using algorithms from [§1.5.4](#154-marching-squares-contour-trace) and [§1.5.5](#155-ramer-douglas-peucker-simplification). Validate source is image layer, target is shape layer.
 - [ ] **2.5.3.4** **Asset remaining action tests** — shape CRUD, banding detection on known patterns, collision polygon generation from test silhouettes
 
-#### 2.5.4 `project` — `add_file` Action
+#### 2.5.4 `draw` — Isometric Operations
 
-- [ ] **2.5.4.1** **`add_file` action** — read PNG at `import_path` (depends on [§2.1.1](#211-png-readwrite-library)), quantize to indexed palette (depends on [§1.5.6](#156-color-quantization)), create asset JSON, register in project. Not wrapped in Command.
-- [ ] **2.5.4.2** **Add Zod schema branch** for `add_file` to the existing project tool schema
-- [ ] **2.5.4.3** **`add_file` tests** — import a test PNG, verify palette ≤ 256 entries, verify pixel data matches source, verify registry entry created
+- [ ] **2.5.4.1** **Iso projection helpers** — `isoToPixel(col, row, elevation, tileW, tileH)` using dimetric 2:1 formula from [design §2.2.4](design.md). Add to `src/algorithms/`.
+- [ ] **2.5.4.2** **`iso_tile`** — fill flat rhombus at grid position
+- [ ] **2.5.4.3** **`iso_cube`** — three-face cube with top/left/right colors
+- [ ] **2.5.4.4** **`iso_wall`** — wall segment along x or y axis
+- [ ] **2.5.4.5** **Isometric tests** — projection formula verification, iso_tile pixel output, selection mask in pixel space
+
+#### 2.5.5 `project` — `add_file` Action
+
+- [ ] **2.5.5.1** **`add_file` action** — read PNG at `import_path` (depends on [§2.1.1](#211-png-readwrite-library)), quantize to indexed palette (depends on [§1.5.6](#156-color-quantization)), create asset JSON, register in project. Not wrapped in Command.
+- [ ] **2.5.5.2** **Add Zod schema branch** for `add_file` to the existing project tool schema
+- [ ] **2.5.5.3** **`add_file` tests** — import a test PNG, verify palette ≤ 256 entries, verify pixel data matches source, verify registry entry created
 
 > **Definition of Done — Phase 2:** All 6 basic tools (project, workspace, asset, palette, draw, selection) are wired and functional. Schema validation tests pass for every tool. The minimum viable loop integration test passes. Undo/redo works across all mutation tools.
 
@@ -253,7 +263,7 @@ Build on the foundation from Phase 2. These tools complete the design spec's ful
 ### 3.4 `export` Tool
 
 - [ ] **3.4.1** **Zod schema** — discriminated union on `action`
-- [ ] **3.4.2** **Image compositing engine** — flatten visible layers respecting opacity, resolve linked cels, composite indexed pixels to RGBA. This is a prerequisite for all export actions and MCP Resources (Phase 4).
+- [ ] **3.4.2** **Image compositing integration** — wire the compositing algorithm from [§1.5.10](#1510-image-compositing) into the export pipeline. This is a prerequisite for all export actions and MCP Resources (Phase 4).
 - [ ] **3.4.3** **`png`** — single frame composite at optional scale factor
 - [ ] **3.4.4** **`gif`** — animated GIF from frame sequence (depends on [§2.1.2](#212-gif-encoding-library))
 - [ ] **3.4.5** **`spritesheet_strip`** — horizontal strip of all frames
@@ -263,14 +273,6 @@ Build on the foundation from Phase 2. These tools complete the design spec's ful
 - [ ] **3.4.9** **`godot_tileset`** — export `{name}.png` + `{name}.png.import` + `{name}.tres` (TileSet). Embed collision polygons from `tile_physics`, terrain peering bits from `tile_terrain`.
 - [ ] **3.4.10** **`godot_static`** — export composited PNG + import sidecar for non-animated assets
 - [ ] **3.4.11** **Export tests** — verify PNG output dimensions and pixel spot-checks, GIF frame count, spritesheet strip dimensions, per_tag filename generation, Godot .tres file structure validation, godot_tileset collision polygon embedding
-
-### 3.5 Isometric Draw Operations
-
-- [ ] **3.5.1** **Iso projection helpers** — `isoToPixel(col, row, elevation, tileW, tileH)` using dimetric 2:1 formula
-- [ ] **3.5.2** **`iso_tile`** — fill flat rhombus at grid position
-- [ ] **3.5.3** **`iso_cube`** — three-face cube with top/left/right colors
-- [ ] **3.5.4** **`iso_wall`** — wall segment along x or y axis
-- [ ] **3.5.5** **Isometric tests** — projection formula verification, iso_tile pixel output, selection mask in pixel space
 
 > **Definition of Done — Phase 3:** All 10 MCP tools from the design spec are implemented and tested. Export produces valid output files for each format. Godot .tres resources are structurally valid.
 
@@ -340,20 +342,11 @@ Maybe. This would add a GUI client. Not committed.
 
 ---
 
-## Open Design Questions (Blocking before Phase 2)
-
-These items from [design §3](design.md) should be resolved before implementation reaches the affected areas:
-
-- [ ] **Palette remap action** — should the server support a dedicated `palette remap` action (old index → new index mapping) for bulk index reassignment? If yes, add to palette tool schema.
-- [ ] **Palette-swap variant tracking** — should the project registry support entries that reference a base asset path + palette file override, rather than duplicating full asset JSON? If yes, affects Project types (§1.1.7) and `workspace load_asset` variant resolution.
-
----
-
 ## Dependency Graph
 
 ```
 Phase 0 (Prep)
-  ├── 0.4 CLAUDE.md ← complete before Phase 1
+  ├── 0.4 CLAUDE.md ← done
   └── 0.7 Error factory ← used by all tool handlers
 
 Phase 1 (Core Model & Algorithms)
@@ -362,16 +355,19 @@ Phase 1 (Core Model & Algorithms)
   ├── 1.3 Command System (1.1, 1.2)   │
   ├── 1.4 File I/O (depends on 1.1)   │
   ├── 1.5 Algorithms (independent)    │
+  │     ├── 1.5.1-8 (drawing, geometry, patterns)
+  │     ├── 1.5.9 bin-packing (for 3.4.6 atlas)
+  │     └── 1.5.10 image compositing (for 3.4.2+ and Phase 4)
   └── 1.6 Testing (depends on all ↑)  │
                                       │
 Phase 2 (Basic Tools — depends on Phase 1)
-  ├── 2.1 External deps (independent — install early)
+  ├── 2.1 External deps (install early: pngjs, gifenc)
   ├── 2.2 Server Bootstrap
   ├── 2.3 Minimum Viable Loop ────────┤
   │     ├── 2.3.1 project (init/open/info) (1.2 Project, 1.4)
   │     ├── 2.3.2 workspace (1.2 Workspace, 1.3)
   │     ├── 2.3.3 palette (core) (1.2 Palette, 1.3)
-  │     ├── 2.3.4 asset (1.2 Asset, 1.3, 1.5)
+  │     ├── 2.3.4 asset (1.2 Asset, 1.3, 1.5) — includes create_recolor
   │     ├── 2.3.5 draw (1.2 Asset, 1.3, 1.5)
   │     └── 2.3.6 MVL integration test
   ├── 2.4 selection (1.1.8 SelectionMask, 1.2 Workspace)
@@ -380,18 +376,18 @@ Phase 2 (Basic Tools — depends on Phase 1)
         ├── 2.5.1 draw + selection masking (depends on 2.4)
         ├── 2.5.2 palette remaining (load/save: 1.4; fetch_lospec: 2.1.3)
         ├── 2.5.3 asset remaining (shapes, banding: 1.5.7, collision: 1.5.4+1.5.5)
-        └── 2.5.4 project add_file (2.1.1 PNG lib + 1.5.6 quantization)
+        ├── 2.5.4 draw isometric ops (2.3.5 draw + iso projection)
+        └── 2.5.5 project add_file (2.1.1 PNG lib + 1.5.6 quantization)
 
 Phase 3 (Advanced Tools — depends on Phase 2)
   ├── 3.1 transform (follows 2.3.5 draw pattern)
   ├── 3.2 effect (follows 2.3.5 draw pattern)
   ├── 3.3 tileset (1.2 Asset tileset fields)
-  ├── 3.4 export ─────────────────────┤
-  │     ├── 3.4.2 compositing engine (prerequisite for all export + Phase 4)
-  │     ├── 3.4.3-6 standard exports (2.1.1 PNG, 2.1.2 GIF)
-  │     ├── 3.4.7 per_tag (1.5.8 pattern substitution)
-  │     └── 3.4.8-10 Godot exports
-  └── 3.5 isometric ops (2.3.5 draw)
+  └── 3.4 export ─────────────────────┤
+        ├── 3.4.2 compositing integration (wires 1.5.10 into export pipeline)
+        ├── 3.4.3-6 standard exports (2.1.1 PNG, 2.1.2 GIF, 1.5.9 bin-pack)
+        ├── 3.4.7 per_tag (1.5.8 pattern substitution)
+        └── 3.4.8-10 Godot exports
 
 Phase 4 (Resources & Prompts)
   ├── 4.1 Resources (depends on 3.4.2 compositing)
