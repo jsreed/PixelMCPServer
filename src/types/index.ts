@@ -6,3 +6,4 @@ export * from './shape.js';
 export * from './tag.js';
 export * from './asset.js';
 export * from './project.js';
+export * from './selection.js';
