@@ -48,10 +48,12 @@ export interface ProjectDefaults {
  * The complete structure of the pixelmcp.json file.
  */
 export interface ProjectConfig {
-    /** Schema version, e.g., "1.0.0" */
-    version: string;
+    /** Schema version, e.g., "1.0" */
+    pixelmcp_version: string;
     /** Display name of the project */
     name: string;
+    /** ISO 8601 creation timestamp */
+    created?: string;
 
     /** Project-wide rules and patterns */
     conventions?: ProjectConventions;
