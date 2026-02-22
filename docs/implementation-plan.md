@@ -49,7 +49,7 @@ Stateful classes that manage in-memory data and enforce invariants.
   - Serialization: `toJSON()`, `static fromJSON()`
   - Dirty tracking: `isDirty` flag set on any mutation, cleared on save
 - [x] **1.2.3** **`Project` class** — manages `pixelmcp.json`. Methods: `init(path)`, `open(path)`, `info()`, `registerAsset(name, type, path)`, `resolveAssetPath(name, variant?)` with variant resolution logic, `toJSON()`, `save()`. Path resolution relative to project root. Defaults application logic: detect palette as Lospec slug vs. file path (contains `/` or ends with `.json` → file path, otherwise Lospec slug).
-- [ ] **1.2.4** **`Workspace` class** — the in-memory editing session (singleton per server). Holds:
+- [x] **1.2.4** **`Workspace` class** — the in-memory editing session (singleton per server). Holds:
   - `project: Project | null`
   - `loadedAssets: Map<string, Asset>`
   - `undoStack` / `redoStack` (Command history)
