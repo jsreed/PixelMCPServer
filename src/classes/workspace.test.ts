@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { WorkspaceClass, getWorkspace } from './workspace.js';
 import { ProjectClass } from './project.js';
 import { type Asset } from '../types/asset.js';
+import { type Command } from '../commands/command.js';
 
 /** Minimal valid Asset fixture for testing. */
 function makeTestAsset(name: string): Asset {
@@ -135,10 +136,56 @@ describe('WorkspaceClass', () => {
         expect(ws.getAsset('c').isDirty).toBe(false);
     });
 
-    it('undo and redo throw (stubbed for Phase 1.3)', () => {
-        const ws = WorkspaceClass.instance();
-        expect(() => { ws.undo(); }).toThrow('not yet implemented');
-        expect(() => { ws.redo(); }).toThrow('not yet implemented');
+    describe('undo/redo', () => {
+        function mockCommand(): Command & { executeCalls: number; undoCalls: number } {
+            const cmd = {
+                executeCalls: 0,
+                undoCalls: 0,
+                execute() { cmd.executeCalls++; },
+                undo() { cmd.undoCalls++; },
+            };
+            return cmd;
+        }
+
+        it('pushCommand executes the command and updates undoDepth', () => {
+            const ws = WorkspaceClass.instance();
+            const cmd = mockCommand();
+            ws.pushCommand(cmd);
+            expect(cmd.executeCalls).toBe(1);
+            expect(ws.undoDepth).toBe(1);
+            expect(ws.redoDepth).toBe(0);
+        });
+
+        it('undo reverses a command and moves it to redo stack', () => {
+            const ws = WorkspaceClass.instance();
+            const cmd = mockCommand();
+            ws.pushCommand(cmd);
+            ws.undo();
+            expect(cmd.undoCalls).toBe(1);
+            expect(ws.undoDepth).toBe(0);
+            expect(ws.redoDepth).toBe(1);
+        });
+
+        it('redo re-executes an undone command', () => {
+            const ws = WorkspaceClass.instance();
+            const cmd = mockCommand();
+            ws.pushCommand(cmd);
+            ws.undo();
+            ws.redo();
+            expect(cmd.executeCalls).toBe(2);
+            expect(ws.undoDepth).toBe(1);
+            expect(ws.redoDepth).toBe(0);
+        });
+
+        it('undo throws when nothing to undo', () => {
+            const ws = WorkspaceClass.instance();
+            expect(() => { ws.undo(); }).toThrow('Nothing to undo');
+        });
+
+        it('redo throws when nothing to redo', () => {
+            const ws = WorkspaceClass.instance();
+            expect(() => { ws.redo(); }).toThrow('Nothing to redo');
+        });
     });
 
     it('info returns correct workspace summary', () => {

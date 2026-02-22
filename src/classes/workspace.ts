@@ -1,5 +1,6 @@
 import { type Asset } from '../types/asset.js';
 import { type SelectionMask } from '../types/selection.js';
+import { type Command, CommandHistory } from '../commands/command.js';
 import { AssetClass } from './asset.js';
 import { ProjectClass } from './project.js';
 import * as errors from '../errors.js';
@@ -36,11 +37,8 @@ export class WorkspaceClass {
     /** Active selection mask, or null if no selection. */
     public selection: SelectionMask | null = null;
 
-    /** Stub undo stack — Phase 1.3 will replace with Command objects. */
-    private _undoStack: unknown[] = [];
-
-    /** Stub redo stack — Phase 1.3 will replace with Command objects. */
-    private _redoStack: unknown[] = [];
+    /** Command history for undo/redo. */
+    private _history = new CommandHistory();
 
     private constructor() {
         // Singleton — use WorkspaceClass.instance()
@@ -154,31 +152,39 @@ export class WorkspaceClass {
     }
 
     // ------------------------------------------------------------------------
-    // Undo/Redo (stubbed for Phase 1.3)
+    // Undo/Redo
     // ------------------------------------------------------------------------
 
     /**
-     * Stub: undo the last command. Will be implemented in Phase 1.3.
+     * Executes a command and pushes it onto the undo stack.
+     * Tool handlers construct the command, then call this method.
      */
-    undo(): void {
-        throw new Error('Undo is not yet implemented (Phase 1.3).');
+    pushCommand(cmd: Command): void {
+        this._history.push(cmd);
     }
 
     /**
-     * Stub: redo the last undone command. Will be implemented in Phase 1.3.
+     * Undoes the last command.
+     */
+    undo(): void {
+        this._history.undo();
+    }
+
+    /**
+     * Redoes the last undone command.
      */
     redo(): void {
-        throw new Error('Redo is not yet implemented (Phase 1.3).');
+        this._history.redo();
     }
 
     /** Returns the current undo stack depth. */
     get undoDepth(): number {
-        return this._undoStack.length;
+        return this._history.undoDepth;
     }
 
     /** Returns the current redo stack depth. */
     get redoDepth(): number {
-        return this._redoStack.length;
+        return this._history.redoDepth;
     }
 
     // ------------------------------------------------------------------------
