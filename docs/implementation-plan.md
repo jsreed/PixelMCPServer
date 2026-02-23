@@ -140,12 +140,12 @@ Focus on the minimum creative loop: create project → create asset → set pale
 
 #### 2.3.2 `workspace` Tool
 
-- [ ] **2.3.2.1** **Zod schema** — discriminated union on `action`
-- [ ] **2.3.2.2** **`info` action** — return loaded assets, undo/redo depth, selection summary
-- [ ] **2.3.2.3** **`load_asset` / `unload_asset`** — load from registry path, variant resolution (pass optional `variant` parameter), unsaved-changes warning on unload
-- [ ] **2.3.2.4** **`save` / `save_all`** — persist to disk, clear dirty flags
-- [ ] **2.3.2.5** **`undo` / `redo`** — delegate to `CommandHistory` (requires [§1.3](#13-command-system-undoredo) to be complete)
-- [ ] **2.3.2.6** **Domain error responses** — "not in registry", "file not found", "not loaded" errors
+- [x] **2.3.2.1** **Zod schema** — discriminated union on `action`
+- [x] **2.3.2.2** **`info` action** — return loaded assets, undo/redo depth, selection summary
+- [x] **2.3.2.3** **`load_asset` / `unload_asset`** — load from registry path, variant resolution (pass optional `variant` parameter), unsaved-changes warning on unload
+- [x] **2.3.2.4** **`save` / `save_all`** — persist to disk, clear dirty flags
+- [x] **2.3.2.5** **`undo` / `redo`** — delegate to `CommandHistory` (requires [§1.3](#13-command-system-undoredo) to be complete)
+- [x] **2.3.2.6** **Domain error responses** — "not in registry", "file not found", "not loaded" errors
 
 #### 2.3.3 `palette` Tool (Core Actions)
 
