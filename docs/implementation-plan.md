@@ -91,7 +91,7 @@ Pure functions under `src/algorithms/`, unit tested independently of the model.
 - [x] **1.5.6** **Color quantization** (median cut or octree) — for `project add_file` PNG import
 - [x] **1.5.7** **Banding detection** — monotonic staircase scan for `detect_banding`
 - [x] **1.5.8** **Export pattern token substitution** — parse `{name}`, `{tag}`, `{direction}`, `{variant}`, `{frame}` tokens with separator-dropping logic for empty token values
-- [ ] **1.5.9** **Bin-packing algorithm** — rectangle packing for `export atlas` (e.g., shelf or maxrects algorithm)
+- [x] **1.5.9** **Bin-packing algorithm** — rectangle packing for `export atlas` (e.g., shelf or maxrects algorithm)
 - [ ] **1.5.10** **Image compositing** — flatten visible layers into an RGBA output buffer. Algorithm: iterate layers bottom-to-top, skip non-visible layers; for each visible layer, resolve linked cels, convert palette indices to RGBA via the asset's palette, then alpha-over composite onto the output buffer respecting the layer's `opacity` (0–255). Group layers affect their children's visibility but produce no pixels themselves. Output is a flat `Uint8Array` of `width × height × 4` (RGBA). Prerequisite for all export actions and MCP Resources.
 
 ### 1.6 Phase 1 Testing
