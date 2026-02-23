@@ -98,6 +98,7 @@ export function detectBanding(
             // But we actually only care if it's a null boundary.
             if (curr.color === null || prev.color === null) {
                 sequenceStartIdx = i; // Reset
+                pDelta = 0;
                 continue;
             }
 
