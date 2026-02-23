@@ -114,4 +114,14 @@ describe('resolveExportPattern', () => {
         expect(r2).toBe("run_123.png");
     });
 
+    it('treats numeric 0 as a valid value, not as empty', () => {
+        const pattern = "{name}_{frame:03}.png";
+        const result = resolveExportPattern(pattern, {
+            name: "idle",
+            frame: 0
+        });
+        // frame=0 is falsy but must substitute as "000", not be dropped
+        expect(result).toBe("idle_000.png");
+    });
+
 });

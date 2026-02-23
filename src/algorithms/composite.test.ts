@@ -208,4 +208,113 @@ describe('compositeFrame', () => {
         expect(buf[3]).toBe(64);
     });
 
+    it('supports linked cels via shared getPixel callbacks', () => {
+        // Two layers sharing the same getPixel → simulates linked cels
+        const palette = makePalette({
+            1: { r: 255, g: 0, b: 0, a: 128 }
+        });
+
+        const sharedGetPixel = (x: number, _y: number, _f: number) => x === 0 ? 1 : null;
+
+        const layer1 = makeLayer({ id: 0, opacity: 255, getPixel: sharedGetPixel });
+        const layer2 = makeLayer({ id: 1, opacity: 255, getPixel: sharedGetPixel });
+
+        const buf = compositeFrame(2, 1, [layer1, layer2], palette, 0);
+
+        // Pixel 0: two semi-transparent red layers composited
+        expect(buf[0]).toBe(255);  // Red channel
+        expect(buf[3]).toBeGreaterThan(128); // Alpha built up from two 128-alpha layers
+        // Pixel 1: both layers return null → transparent
+        expect(buf[7]).toBe(0);
+    });
+
+    it('handles sparse cels (getPixel returns null for most pixels)', () => {
+        const palette = makePalette({
+            1: { r: 0, g: 255, b: 0, a: 255 }
+        });
+
+        // Only pixel (1,1) has data
+        const layer = makeLayer({
+            getPixel: (x: number, y: number) => (x === 1 && y === 1) ? 1 : null
+        });
+
+        const buf = compositeFrame(3, 3, [layer], palette, 0);
+
+        // Only pixel (1,1) should have color — offset = (1*3+1)*4 = 16
+        expect(buf[16]).toBe(0);   // R
+        expect(buf[17]).toBe(255); // G
+        expect(buf[18]).toBe(0);   // B
+        expect(buf[19]).toBe(255); // A
+
+        // Pixel (0,0) should be transparent
+        expect(buf[3]).toBe(0);
+        // Pixel (2,2) should be transparent
+        expect(buf[35]).toBe(0);
+    });
+
+    it('composites three layers in correct bottom-to-top order', () => {
+        const palette = makePalette({
+            1: { r: 255, g: 0, b: 0, a: 255 },   // Red
+            2: { r: 0, g: 255, b: 0, a: 255 },   // Green
+            3: { r: 0, g: 0, b: 255, a: 255 }    // Blue
+        });
+
+        // Bottom=red, middle=green, top=blue (all opaque)
+        // The topmost opaque layer should completely cover
+        const bottom = makeLayer({ id: 0, getPixel: () => 1 });
+        const middle = makeLayer({ id: 1, getPixel: () => 2 });
+        const top = makeLayer({ id: 2, getPixel: () => 3 });
+
+        const buf = compositeFrame(1, 1, [bottom, middle, top], palette, 0);
+        // Blue wins (top, fully opaque)
+        expect(buf[0]).toBe(0);
+        expect(buf[1]).toBe(0);
+        expect(buf[2]).toBe(255);
+        expect(buf[3]).toBe(255);
+    });
+
+    it('passes frameIndex to getPixel correctly', () => {
+        const palette = makePalette({
+            1: { r: 255, g: 0, b: 0, a: 255 },
+            2: { r: 0, g: 255, b: 0, a: 255 }
+        });
+
+        // Return different palette index depending on frame
+        const layer = makeLayer({
+            getPixel: (_x: number, _y: number, frame: number) => frame === 0 ? 1 : 2
+        });
+
+        const buf0 = compositeFrame(1, 1, [layer], palette, 0);
+        expect(buf0[0]).toBe(255); // Red for frame 0
+        expect(buf0[1]).toBe(0);
+
+        const buf3 = compositeFrame(1, 1, [layer], palette, 3);
+        expect(buf3[0]).toBe(0);
+        expect(buf3[1]).toBe(255); // Green for frame 3
+    });
+
+    it('visible group with mixed visible/invisible children', () => {
+        const palette = makePalette({
+            1: { r: 255, g: 0, b: 0, a: 255 },
+            2: { r: 0, g: 255, b: 0, a: 255 }
+        });
+
+        const visibleChild = makeLayer({ id: 1, getPixel: () => 1 });
+        const invisibleChild = makeLayer({ id: 2, visible: false, getPixel: () => 2 });
+        const group: CompositeLayer = {
+            id: 0,
+            type: 'group',
+            visible: true,
+            opacity: 255,
+            children: [visibleChild, invisibleChild],
+            getPixel: () => null
+        };
+
+        const buf = compositeFrame(1, 1, [group], palette, 0);
+        // Red (visible child), not green (invisible child)
+        expect(buf[0]).toBe(255);
+        expect(buf[1]).toBe(0);
+        expect(buf[3]).toBe(255);
+    });
+
 });

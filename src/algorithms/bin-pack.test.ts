@@ -147,4 +147,18 @@ describe('packRectangles (Shelf Bin-Packing)', () => {
         }
     });
 
+    it('all placements have non-negative coordinates', () => {
+        const rects = Array.from({ length: 30 }, (_, i) => ({
+            id: `r_${i}`,
+            width: 5 + (i % 7) * 3,
+            height: 5 + (i % 5) * 4
+        }));
+        const result = packRectangles(rects, 2);
+
+        for (const p of result.placements) {
+            expect(p.x).toBeGreaterThanOrEqual(0);
+            expect(p.y).toBeGreaterThanOrEqual(0);
+        }
+    });
+
 });
