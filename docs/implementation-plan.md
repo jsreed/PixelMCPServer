@@ -133,10 +133,10 @@ Focus on the minimum creative loop: create project → create asset → set pale
 #### 2.3.1 `project` Tool (Core Actions)
 
 - [x] **2.3.1.1** **Zod schema** — discriminated union on `action: 'init' | 'open' | 'info'` (defer `add_file` to [§2.5.5](#255-project-add_file))
-- [ ] **2.3.1.2** **`init` action** — create `pixelmcp.json` at path, set as active project
-- [ ] **2.3.1.3** **`open` action** — read existing `pixelmcp.json`, validate, set as active project
-- [ ] **2.3.1.4** **`info` action** — return project config (name, conventions, defaults, asset registry)
-- [ ] **2.3.1.5** **Domain error responses** — implement errors from [design §2.6](design.md) for this tool using shared error factory
+- [x] **2.3.1.2** **`init` action** — create `pixelmcp.json` at path, set as active project
+- [x] **2.3.1.3** **`open` action** — read existing `pixelmcp.json`, validate, set as active project
+- [x] **2.3.1.4** **`info` action** — return project config (name, conventions, defaults, asset registry)
+- [x] **2.3.1.5** **Domain error responses** — implement errors from [design §2.6](design.md) for this tool using shared error factory
 
 #### 2.3.2 `workspace` Tool
 
