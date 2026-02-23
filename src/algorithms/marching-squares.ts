@@ -198,7 +198,7 @@ export function marchingSquares(
  * Strips perfectly straight intermediate vertices.
  * E.g. A(0,0) -> B(1,0) -> C(2,0) becomes A(0,0) -> C(2,0).
  */
-function simplifyOrthogonal(polygon: Polygon): Polygon {
+export function simplifyOrthogonal(polygon: Polygon): Polygon {
     if (polygon.length <= 2) return polygon;
 
     const simplified: Polygon = [polygon[0]];

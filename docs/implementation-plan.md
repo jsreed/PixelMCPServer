@@ -156,15 +156,15 @@ Focus on the minimum creative loop: create project → create asset → set pale
 
 #### 2.3.4 `asset` Tool (Read-Only + Create + Structure)
 
-- [ ] **2.3.4.1** **Zod schema** — discriminated union on all 24 actions (including `create_recolor`)
-- [ ] **2.3.4.2** **Read-only actions**: `info`, `get_cel` (with linked cel resolution + `is_linked`/`link_source` metadata), `get_cels` (explicit list + range modes), `get_shapes`
-- [ ] **2.3.4.3** **`create`** — create new Asset with optional `palette`, `layers`, `frames`, `tags` scaffold. Apply `defaults.palette` from project config (Lospec slug vs. file path detection). Store `perspective` property.
-- [ ] **2.3.4.4** **Layer management**: `add_layer` (image, tilemap, shape types), `add_group`, `remove_layer`, `reorder_layer` (with parent reparenting)
-- [ ] **2.3.4.5** **Frame management**: `add_frame`, `remove_frame`, `set_frame_duration` (with tag index cascading on add/remove)
-- [ ] **2.3.4.6** **Tag management**: `add_tag`, `remove_tag` (with `tag_facing` disambiguation)
-- [ ] **2.3.4.7** **Asset lifecycle**: `rename` (updates asset internal name, renames registry key preserving metadata, renames `.json` file on disk, updates workspace mapping — wrapped in `RenameCommand`), `duplicate`, `delete` (with optional `delete_file`), `create_recolor` (clone + palette replacement with layered sources: file → slug → entries; sets `recolor_of` in registry)
-- [ ] **2.3.4.8** **`resize`** — with all 9 anchor positions, cel origin adjustment
-- [ ] **2.3.4.9** **Domain error responses** — "not loaded", "layer not found", "frame out of range", "not a group", "not a shape layer" errors
+- [x] **2.3.4.1** **Zod schema** — discriminated union on all 24 actions (including `create_recolor`)
+- [x] **2.3.4.2** **Read-only actions**: `info`, `get_cel` (with linked cel resolution + `is_linked`/`link_source` metadata), `get_cels` (explicit list + range modes), `get_shapes`
+- [x] **2.3.4.3** **`create`** — create new Asset with optional `palette`, `layers`, `frames`, `tags` scaffold. Apply `defaults.palette` from project config (Lospec slug vs. file path detection). Store `perspective` property.
+- [x] **2.3.4.4** **Layer management**: `add_layer` (image, tilemap, shape types), `add_group`, `remove_layer`, `reorder_layer` (with parent reparenting)
+- [x] **2.3.4.5** **Frame management**: `add_frame`, `remove_frame`, `set_frame_duration` (with tag index cascading on add/remove)
+- [x] **2.3.4.6** **Tag management**: `add_tag`, `remove_tag` (with `tag_facing` disambiguation)
+- [x] **2.3.4.7** **Asset lifecycle**: `rename` (updates asset internal name, renames registry key preserving metadata, renames `.json` file on disk, updates workspace mapping — wrapped in `RenameCommand`), `duplicate`, `delete` (with optional `delete_file`), `create_recolor` (clone + palette replacement with layered sources: file → slug → entries; sets `recolor_of` in registry)
+- [x] **2.3.4.8** **`resize`** — with all 9 anchor positions, cel origin adjustment
+- [x] **2.3.4.9** **Domain error responses** — "not loaded", "layer not found", "frame out of range", "not a group", "not a shape layer" errors
 
 #### 2.3.5 `draw` Tool (Core Primitives)
 

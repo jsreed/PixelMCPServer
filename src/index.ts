@@ -5,7 +5,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 // Tool registration imports — uncomment as each tool is implemented:
 import { registerProjectTool } from './tools/project.js';
 import { registerWorkspaceTool } from './tools/workspace.js';
-// import { registerAssetTool } from './tools/asset.js';
+import { registerAssetTool } from './tools/asset.js';
 import { registerPaletteTool } from './tools/palette.js';
 // import { registerDrawTool } from './tools/draw.js';
 // import { registerSelectionTool } from './tools/selection.js';
@@ -22,7 +22,7 @@ const server = new McpServer({
 // Register tools — uncomment as each tool is implemented:
 registerProjectTool(server);
 registerWorkspaceTool(server);
-// registerAssetTool(server);
+registerAssetTool(server);
 registerPaletteTool(server);
 // registerDrawTool(server);
 // registerSelectionTool(server);
