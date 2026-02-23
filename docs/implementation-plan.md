@@ -117,7 +117,7 @@ Wire the core model to MCP tool handlers. Each tool is one file under `src/tools
 
 ### 2.1 External Dependencies
 
-- [ ] **2.1.1** **PNG read/write library** — needed for `project add_file` (import PNG), all `export` actions, and MCP Resources. Use `pngjs` (pure JS, no native deps — appropriate for an MCP server).
+- [x] **2.1.1** **PNG read/write library** — needed for `project add_file` (import PNG), all `export` actions, and MCP Resources. Use `pngjs` (pure JS, no native deps — appropriate for an MCP server).
 - [ ] **2.1.2** **GIF encoding library** — needed for `export gif` and animation preview resources. Use `gifenc` (small, no native deps).
 - [ ] **2.1.3** **HTTP client** — for `palette fetch_lospec`. Use Node built-in `fetch` (available since Node 18).
 
