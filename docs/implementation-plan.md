@@ -88,7 +88,7 @@ Pure functions under `src/algorithms/`, unit tested independently of the model.
 - [x] **1.5.3** **Flood fill** (scanline variant) — for `draw fill`
 - [x] **1.5.4** **Marching squares contour trace** — for `generate_collision_polygon`
 - [x] **1.5.5** **Ramer-Douglas-Peucker simplification** — for `generate_collision_polygon`
-- [ ] **1.5.6** **Color quantization** (median cut or octree) — for `project add_file` PNG import
+- [x] **1.5.6** **Color quantization** (median cut or octree) — for `project add_file` PNG import
 - [ ] **1.5.7** **Banding detection** — monotonic staircase scan for `detect_banding`
 - [ ] **1.5.8** **Export pattern token substitution** — parse `{name}`, `{tag}`, `{direction}`, `{variant}`, `{frame}` tokens with separator-dropping logic for empty token values
 - [ ] **1.5.9** **Bin-packing algorithm** — rectangle packing for `export atlas` (e.g., shelf or maxrects algorithm)
