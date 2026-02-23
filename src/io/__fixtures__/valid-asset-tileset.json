@@ -1,0 +1,44 @@
+{
+  "pixelmcp_version": "1.0",
+  "created": "2025-03-01T00:00:00.000Z",
+  "modified": "2025-03-01T00:00:00.000Z",
+  "name": "terrain_tiles",
+  "width": 128,
+  "height": 128,
+  "perspective": "flat",
+  "palette": [
+    [0, 0, 0, 0],
+    [76, 153, 0, 255],
+    [139, 90, 43, 255]
+  ],
+  "layers": [
+    { "id": 1, "name": "tiles", "type": "image", "visible": true, "opacity": 255 }
+  ],
+  "frames": [
+    { "index": 0, "duration_ms": 100 }
+  ],
+  "cels": {
+    "1/0": { "x": 0, "y": 0, "data": [[1, 1, 2], [1, 2, 2], [2, 2, 1]] }
+  },
+  "tags": [],
+  "tile_width": 16,
+  "tile_height": 16,
+  "tile_count": 8,
+  "tile_physics": {
+    "physics_layers": [
+      { "collision_layer": 1, "collision_mask": 1 }
+    ],
+    "tiles": {
+      "0": { "polygon": [[0, 0], [16, 0], [16, 16], [0, 16]] },
+      "3": { "polygon": [[0, 0], [16, 0], [16, 8]], "navigation_polygon": [[2, 2], [14, 2], [14, 6], [2, 6]] }
+    }
+  },
+  "tile_terrain": {
+    "pattern": "blob47",
+    "terrain_name": "grass",
+    "peering_bits": {
+      "0": { "top": 0, "top_right": -1, "right": 0, "bottom_right": -1, "bottom": 0, "bottom_left": -1, "left": 0, "top_left": -1 },
+      "1": { "top": -1, "top_right": -1, "right": -1, "bottom_right": -1, "bottom": -1, "bottom_left": -1, "left": -1, "top_left": -1 }
+    }
+  }
+}

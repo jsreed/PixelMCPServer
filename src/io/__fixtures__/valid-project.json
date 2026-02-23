@@ -1,0 +1,27 @@
+{
+  "pixelmcp_version": "1.0",
+  "name": "dungeon_crawl",
+  "created": "2025-02-01T00:00:00.000Z",
+  "conventions": {
+    "export_pattern": "{name}_{tag}_{direction}.png"
+  },
+  "defaults": {
+    "tile_width": 16,
+    "tile_height": 16,
+    "export_scale": 2,
+    "palette": "endesga-32"
+  },
+  "assets": {
+    "hero": { "type": "character", "path": "assets/hero.json" },
+    "sword": { "type": "weapon", "path": "assets/sword.json" },
+    "armor": {
+      "type": "equipment",
+      "variants": {
+        "standard": "assets/armor/standard.json",
+        "slim": "assets/armor/slim.json"
+      }
+    },
+    "terrain": { "type": "tileset", "path": "assets/terrain.json" },
+    "hero_alt": { "type": "character", "path": "assets/hero_alt.json", "recolor_of": "hero" }
+  }
+}

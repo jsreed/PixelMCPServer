@@ -2,10 +2,15 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
+import { fileURLToPath } from 'url';
 import { loadAssetFile, saveAssetFile, type AssetFileEnvelope } from './asset-io.js';
+import { AssetClass } from '../classes/asset.js';
 import { type Asset } from '../types/asset.js';
 import { type Palette } from '../types/palette.js';
 import { type Direction } from '../types/tag.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const FIXTURES = path.join(__dirname, '__fixtures__');
 
 describe('asset-io', () => {
     let tempDir: string;
@@ -159,5 +164,169 @@ describe('asset-io', () => {
         const parsed = JSON.parse(fileContent) as AssetFileEnvelope;
 
         expect(parsed.created).toBe(mockTime);
+    });
+
+    // --- Fixture-based tests ---
+
+    describe('fixture: valid-asset.json', () => {
+        it('loads and parses all expected fields', async () => {
+            const loaded = await loadAssetFile(path.join(FIXTURES, 'valid-asset.json'));
+
+            expect(loaded.name).toBe('hero_sprite');
+            expect(loaded.width).toBe(32);
+            expect(loaded.height).toBe(32);
+            expect(loaded.perspective).toBe('flat');
+        });
+
+        it('strips envelope fields', async () => {
+            const loaded = await loadAssetFile(path.join(FIXTURES, 'valid-asset.json'));
+
+            expect(loaded).not.toHaveProperty('pixelmcp_version');
+            expect(loaded).not.toHaveProperty('created');
+            expect(loaded).not.toHaveProperty('modified');
+        });
+
+        it('parses palette with correct length and colors', async () => {
+            const loaded = await loadAssetFile(path.join(FIXTURES, 'valid-asset.json'));
+
+            expect(loaded.palette).toHaveLength(5);
+            expect(loaded.palette[0]).toEqual([0, 0, 0, 0]);
+            expect(loaded.palette[4]).toEqual([255, 255, 255, 255]);
+        });
+
+        it('parses all three layer types', async () => {
+            const loaded = await loadAssetFile(path.join(FIXTURES, 'valid-asset.json'));
+
+            expect(loaded.layers).toHaveLength(3);
+            expect(loaded.layers[0].type).toBe('image');
+            expect(loaded.layers[1].type).toBe('image');
+            expect(loaded.layers[2].type).toBe('shape');
+            expect(loaded.layers[1].opacity).toBe(200);
+            expect(loaded.layers[2].visible).toBe(false);
+        });
+
+        it('parses frames with varying durations', async () => {
+            const loaded = await loadAssetFile(path.join(FIXTURES, 'valid-asset.json'));
+
+            expect(loaded.frames).toHaveLength(3);
+            expect(loaded.frames[2].duration_ms).toBe(150);
+        });
+
+        it('parses all cel types: image, linked, shape', async () => {
+            const loaded = await loadAssetFile(path.join(FIXTURES, 'valid-asset.json'));
+
+            // Image cel with origin offset
+            const imgCel = loaded.cels['2/0'] as any;
+            expect(imgCel.x).toBe(2);
+            expect(imgCel.y).toBe(2);
+            expect(imgCel.data).toEqual([[2, 3], [3, 4]]);
+
+            // Linked cel
+            const linkedCel = loaded.cels['2/1'] as any;
+            expect(linkedCel.link).toBe('2/0');
+
+            // Shape cel
+            const shapeCel = loaded.cels['3/0'] as any;
+            expect(shapeCel.shapes).toHaveLength(1);
+            expect(shapeCel.shapes[0].type).toBe('rect');
+        });
+
+        it('parses frame tags, layer tags, and facing', async () => {
+            const loaded = await loadAssetFile(path.join(FIXTURES, 'valid-asset.json'));
+
+            expect(loaded.tags).toHaveLength(3);
+
+            const idle = loaded.tags[0] as any;
+            expect(idle.type).toBe('frame');
+            expect(idle.name).toBe('idle');
+            expect(idle.direction).toBe('forward');
+
+            const attack = loaded.tags[1] as any;
+            expect(attack.facing).toBe('right');
+
+            const layerTag = loaded.tags[2] as any;
+            expect(layerTag.type).toBe('layer');
+            expect(layerTag.layers).toEqual([1, 2]);
+        });
+
+        it('can be constructed into AssetClass', async () => {
+            const loaded = await loadAssetFile(path.join(FIXTURES, 'valid-asset.json'));
+            const asset = new AssetClass(loaded);
+
+            expect(asset.name).toBe('hero_sprite');
+            expect(asset.width).toBe(32);
+            expect(asset.layers).toHaveLength(3);
+            expect(asset.frames).toHaveLength(3);
+        });
+
+        it('save→reload roundtrip preserves all data', async () => {
+            const loaded = await loadAssetFile(path.join(FIXTURES, 'valid-asset.json'));
+            const outPath = path.join(tempDir, 'roundtrip.json');
+
+            await saveAssetFile(outPath, loaded);
+            const reloaded = await loadAssetFile(outPath);
+
+            expect(reloaded).toEqual(loaded);
+        });
+    });
+
+    describe('fixture: valid-asset-tileset.json', () => {
+        it('loads tileset-specific fields', async () => {
+            const loaded = await loadAssetFile(path.join(FIXTURES, 'valid-asset-tileset.json'));
+
+            expect(loaded.tile_width).toBe(16);
+            expect(loaded.tile_height).toBe(16);
+            expect(loaded.tile_count).toBe(8);
+        });
+
+        it('parses tile_physics with polygon and navigation data', async () => {
+            const loaded = await loadAssetFile(path.join(FIXTURES, 'valid-asset-tileset.json'));
+
+            expect(loaded.tile_physics).toBeDefined();
+            expect(loaded.tile_physics!.physics_layers).toHaveLength(1);
+            expect(loaded.tile_physics!.tiles['0'].polygon).toEqual([[0, 0], [16, 0], [16, 16], [0, 16]]);
+            expect(loaded.tile_physics!.tiles['3'].navigation_polygon).toBeDefined();
+        });
+
+        it('parses tile_terrain with peering bits', async () => {
+            const loaded = await loadAssetFile(path.join(FIXTURES, 'valid-asset-tileset.json'));
+
+            expect(loaded.tile_terrain).toBeDefined();
+            expect(loaded.tile_terrain!.pattern).toBe('blob47');
+            expect(loaded.tile_terrain!.terrain_name).toBe('grass');
+            expect(loaded.tile_terrain!.peering_bits['0'].top).toBe(0);
+            expect(loaded.tile_terrain!.peering_bits['1'].top).toBe(-1);
+        });
+
+        it('save→reload roundtrip preserves tileset metadata', async () => {
+            const loaded = await loadAssetFile(path.join(FIXTURES, 'valid-asset-tileset.json'));
+            const outPath = path.join(tempDir, 'tileset-rt.json');
+
+            await saveAssetFile(outPath, loaded);
+            const reloaded = await loadAssetFile(outPath);
+
+            expect(reloaded).toEqual(loaded);
+        });
+    });
+
+    describe('AssetClass toJSON→save→load roundtrip', () => {
+        it('preserves asset after class mutations', async () => {
+            const loaded = await loadAssetFile(path.join(FIXTURES, 'valid-asset.json'));
+            const asset = new AssetClass(loaded);
+
+            // Mutate the asset
+            asset.addLayer({ name: 'overlay', type: 'image', visible: true, opacity: 128 });
+            asset.setCel(asset.layers[3].id, 0, { x: 0, y: 0, data: [[4, 4], [4, 4]] });
+
+            // Serialize, save, reload
+            const json = asset.toJSON();
+            const outPath = path.join(tempDir, 'mutated.json');
+            await saveAssetFile(outPath, json);
+            const reloaded = await loadAssetFile(outPath);
+
+            expect(reloaded.layers).toHaveLength(4);
+            expect(reloaded.layers[3].name).toBe('overlay');
+            expect((reloaded.cels[`${String(asset.layers[3].id)}/0`] as any).data).toEqual([[4, 4], [4, 4]]);
+        });
     });
 });
