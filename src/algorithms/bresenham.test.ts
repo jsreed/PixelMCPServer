@@ -109,6 +109,45 @@ describe('bresenhamLine', () => {
         ]);
     });
 
+    it('generates an anti-diagonal (positive x, negative y)', () => {
+        expect(bresenhamLine(0, 3, 3, 0)).toEqual([
+            { x: 0, y: 3 },
+            { x: 1, y: 2 },
+            { x: 2, y: 1 },
+            { x: 3, y: 0 }
+        ]);
+    });
+
+    it('line length always equals max(|dx|,|dy|) + 1 for arbitrary coords', () => {
+        const cases: [number, number, number, number][] = [
+            [0, 0, 10, 0],   // horizontal
+            [0, 0, 0, 10],   // vertical
+            [0, 0, 10, 10],  // diagonal
+            [0, 0, 10, 3],   // shallow
+            [0, 0, 3, 10],   // steep
+            [-5, -5, 5, 5],  // crossing origin
+            [3, 7, 15, 2],   // arbitrary
+        ];
+        for (const [x0, y0, x1, y1] of cases) {
+            const points = bresenhamLine(x0, y0, x1, y1);
+            const expected = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) + 1;
+            expect(points).toHaveLength(expected);
+        }
+    });
+
+    it('always starts at (x0,y0) and ends at (x1,y1)', () => {
+        const cases: [number, number, number, number][] = [
+            [1, 2, 8, 5],
+            [8, 5, 1, 2],
+            [-3, 4, 6, -2],
+        ];
+        for (const [x0, y0, x1, y1] of cases) {
+            const points = bresenhamLine(x0, y0, x1, y1);
+            expect(points[0]).toEqual({ x: x0, y: y0 });
+            expect(points[points.length - 1]).toEqual({ x: x1, y: y1 });
+        }
+    });
+
     describe('exhaustive octant permutations', () => {
         const testOctant = (name: string, dx: number, dy: number) => {
             it(`draws exactly max(|dx|,|dy|) + 1 pixels and reaches target cleanly for ${name}`, () => {

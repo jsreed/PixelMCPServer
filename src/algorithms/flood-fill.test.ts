@@ -130,4 +130,112 @@ describe('floodFill', () => {
         expect(points[0]).toEqual({ x: 1, y: 1 });
     });
 
+    it('fills from canvas edge correctly', () => {
+        const canvas = createMockCanvas(5, 5, 0);
+        // Wall at y=2 separating top from bottom
+        for (let x = 0; x < 5; x++) canvas[2][x] = 1;
+
+        // Fill from top-left corner
+        const topFill = floodFill(0, 0, 5, 5, canvasValue(canvas));
+        expect(topFill).toHaveLength(10); // rows 0-1, 5 columns each
+
+        // Fill from bottom-right corner
+        const botFill = floodFill(4, 4, 5, 5, canvasValue(canvas));
+        expect(botFill).toHaveLength(10); // rows 3-4, 5 columns each
+    });
+
+    it('fills from all four canvas corners into same region', () => {
+        const canvas = createMockCanvas(4, 4, 0);
+        const fromTL = floodFill(0, 0, 4, 4, canvasValue(canvas));
+        const fromTR = floodFill(3, 0, 4, 4, canvasValue(canvas));
+        const fromBL = floodFill(0, 3, 4, 4, canvasValue(canvas));
+        const fromBR = floodFill(3, 3, 4, 4, canvasValue(canvas));
+
+        // All should fill the entire canvas
+        expect(fromTL).toHaveLength(16);
+        expect(fromTR).toHaveLength(16);
+        expect(fromBL).toHaveLength(16);
+        expect(fromBR).toHaveLength(16);
+    });
+
+    it('does not leak through diagonal gaps (4-way connectivity)', () => {
+        const canvas = createMockCanvas(5, 5, 0);
+        /*  Diagonal barrier of 1s:
+            1 0 0 0 0
+            0 1 0 0 0
+            0 0 1 0 0
+            0 0 0 1 0
+            0 0 0 0 1
+        */
+        for (let i = 0; i < 5; i++) canvas[i][i] = 1;
+
+        // Fill from (1,0) — top-right region. With 4-way fill it shouldn't leak
+        // through the diagonal to (0,1)
+        const fill = floodFill(1, 0, 5, 5, canvasValue(canvas));
+        const set = new Set(fill.map(p => `${p.x},${p.y}`));
+
+        // The diagonal 1s separate via 4-way: (1,0) connects to upper-right zone
+        // (0,1) is below-left of the diagonal — should NOT be reached
+        expect(set.has('1,0')).toBe(true);
+        expect(set.has('0,1')).toBe(false);
+    });
+
+    it('fills a narrow 1-pixel-wide corridor', () => {
+        const canvas = createMockCanvas(7, 5, 1);
+        // Carve a 1-pixel corridor: row 2, all columns
+        for (let y = 0; y < 5; y++) {
+            for (let x = 0; x < 7; x++) {
+                canvas[y][x] = 1;
+            }
+        }
+        // Clear a winding path of 0s
+        canvas[0][0] = 0;
+        canvas[1][0] = 0;
+        canvas[2][0] = 0;
+        canvas[2][1] = 0;
+        canvas[2][2] = 0;
+        canvas[2][3] = 0;
+        canvas[1][3] = 0;
+        canvas[0][3] = 0;
+
+        const fill = floodFill(0, 0, 7, 5, canvasValue(canvas));
+        expect(fill).toHaveLength(8);
+    });
+
+    it('fills an L-shaped region', () => {
+        const canvas = createMockCanvas(5, 5, 1);
+        /*  L-shape of 0s:
+            0 0 1 1 1
+            0 0 1 1 1
+            0 0 1 1 1
+            0 0 0 0 1
+            0 0 0 0 1
+        */
+        for (let y = 0; y < 5; y++) {
+            for (let x = 0; x < 2; x++) canvas[y][x] = 0;
+        }
+        for (let x = 2; x < 4; x++) {
+            canvas[3][x] = 0;
+            canvas[4][x] = 0;
+        }
+
+        const fill = floodFill(0, 0, 5, 5, canvasValue(canvas));
+        expect(fill).toHaveLength(14); // 10 (left col) + 4 (bottom extension)
+    });
+
+    it('handles single-row canvas', () => {
+        const canvas = [[0, 0, 1, 0, 0]];
+        const fill = floodFill(0, 0, 5, 1, canvasValue(canvas));
+        expect(fill).toHaveLength(2);
+        const set = new Set(fill.map(p => `${p.x},${p.y}`));
+        expect(set.has('0,0')).toBe(true);
+        expect(set.has('1,0')).toBe(true);
+    });
+
+    it('handles single-column canvas', () => {
+        const canvas = [[0], [0], [1], [0], [0]];
+        const fill = floodFill(0, 0, 1, 5, canvasValue(canvas));
+        expect(fill).toHaveLength(2);
+    });
+
 });

@@ -64,6 +64,61 @@ describe('midpoint algorithms', () => {
 
             expect(setP1).toEqual(setP2);
         });
+
+        it('known pixel coords for radius 1', () => {
+            const points = midpointCircle(0, 0, 1);
+            const set = new Set(points.map(p => `${p.x},${p.y}`));
+            // R=1 circle: the 4 cardinal pixels
+            expect(set).toContain('1,0');
+            expect(set).toContain('-1,0');
+            expect(set).toContain('0,1');
+            expect(set).toContain('0,-1');
+            expect(points).toHaveLength(4);
+        });
+
+        it('known pixel coords for radius 3', () => {
+            const points = midpointCircle(0, 0, 3);
+            const set = new Set(points.map(p => `${p.x},${p.y}`));
+            // Cardinal poles
+            expect(set).toContain('3,0');
+            expect(set).toContain('-3,0');
+            expect(set).toContain('0,3');
+            expect(set).toContain('0,-3');
+            // Known octant pixel (3,1) and its reflections
+            expect(set).toContain('3,1');
+            expect(set).toContain('-3,1');
+            expect(set).toContain('1,3');
+            expect(set).toContain('-1,3');
+        });
+
+        it('all points lie within expected distance from center', () => {
+            for (const r of [2, 5, 10, 20]) {
+                const points = midpointCircle(0, 0, r);
+                for (const p of points) {
+                    const dist = Math.sqrt(p.x * p.x + p.y * p.y);
+                    // Discrete circle points should be within 1 pixel of the ideal radius
+                    expect(dist).toBeGreaterThanOrEqual(r - 1);
+                    expect(dist).toBeLessThanOrEqual(r + 1);
+                }
+            }
+        });
+
+        it('no duplicate points', () => {
+            for (const r of [1, 3, 5, 8, 12]) {
+                const points = midpointCircle(0, 0, r);
+                const set = new Set(points.map(p => `${p.x},${p.y}`));
+                expect(set.size).toBe(points.length);
+            }
+        });
+
+        it('pixel count increases with radius', () => {
+            let prevCount = 0;
+            for (const r of [1, 2, 3, 5, 8, 12]) {
+                const count = midpointCircle(0, 0, r).length;
+                expect(count).toBeGreaterThan(prevCount);
+                prevCount = count;
+            }
+        });
     });
 
     describe('midpointEllipse', () => {
@@ -128,6 +183,45 @@ describe('midpoint algorithms', () => {
             // Ensure no duplicates exist
             const uniqueStr = new Set(elli.map(p => `${p.x},${p.y}`));
             expect(uniqueStr.size).toEqual(elli.length);
+        });
+
+        it('known poles for rx=4, ry=2 ellipse', () => {
+            const points = midpointEllipse(0, 0, 4, 2);
+            const set = new Set(points.map(p => `${p.x},${p.y}`));
+            // Cardinal poles must be present
+            expect(set).toContain('4,0');
+            expect(set).toContain('-4,0');
+            expect(set).toContain('0,2');
+            expect(set).toContain('0,-2');
+        });
+
+        it('all points lie near the ideal ellipse boundary', () => {
+            const rx = 10, ry = 6;
+            const points = midpointEllipse(0, 0, rx, ry);
+            for (const p of points) {
+                // Ellipse equation: (x/rx)^2 + (y/ry)^2 should be close to 1
+                const norm = (p.x / rx) ** 2 + (p.y / ry) ** 2;
+                // Allow discrete rasterization tolerance
+                expect(norm).toBeGreaterThanOrEqual(0.5);
+                expect(norm).toBeLessThanOrEqual(1.6);
+            }
+        });
+
+        it('no duplicate points for various sizes', () => {
+            const cases: [number, number][] = [[3, 2], [5, 8], [10, 4], [7, 7]];
+            for (const [rx, ry] of cases) {
+                const points = midpointEllipse(0, 0, rx, ry);
+                const set = new Set(points.map(p => `${p.x},${p.y}`));
+                expect(set.size).toBe(points.length);
+            }
+        });
+
+        it('center offset shifts all points uniformly', () => {
+            const base = midpointEllipse(0, 0, 6, 3);
+            const shifted = midpointEllipse(10, 20, 6, 3);
+            const baseSet = new Set(base.map(p => `${p.x},${p.y}`));
+            const shiftedBack = new Set(shifted.map(p => `${p.x - 10},${p.y - 20}`));
+            expect(baseSet).toEqual(shiftedBack);
         });
 
         it('guarantees 8-way physical connectivity for continuous outlines', () => {
