@@ -133,4 +133,79 @@ describe('compositeFrame', () => {
         expect(buf[3]).toBe(0); // Shape layers produce no pixels
     });
 
+    it('zero-opacity layer is entirely invisible', () => {
+        const palette = makePalette({
+            1: { r: 255, g: 0, b: 0, a: 255 }
+        });
+
+        const layer = makeLayer({
+            opacity: 0,
+            getPixel: () => 1
+        });
+
+        const buf = compositeFrame(1, 1, [layer], palette, 0);
+        expect(buf[3]).toBe(0);
+    });
+
+    it('propagates visibility through nested groups (2+ levels deep)', () => {
+        const palette = makePalette({
+            1: { r: 255, g: 0, b: 0, a: 255 }
+        });
+
+        const child = makeLayer({ id: 2, getPixel: () => 1 });
+        const innerGroup: CompositeLayer = {
+            id: 1,
+            type: 'group',
+            visible: true,
+            opacity: 255,
+            children: [child],
+            getPixel: () => null
+        };
+        const outerGroup: CompositeLayer = {
+            id: 0,
+            type: 'group',
+            visible: false, // This should hide everything
+            opacity: 255,
+            children: [innerGroup],
+            getPixel: () => null
+        };
+
+        const buf = compositeFrame(1, 1, [outerGroup], palette, 0);
+        expect(buf[3]).toBe(0); // Invisible outer group hides nested child
+    });
+
+    it('composites tilemap layers (not just image layers)', () => {
+        const palette = makePalette({
+            1: { r: 0, g: 255, b: 0, a: 255 }
+        });
+
+        const tilemapLayer = makeLayer({
+            type: 'tilemap',
+            getPixel: () => 1
+        });
+
+        const buf = compositeFrame(1, 1, [tilemapLayer], palette, 0);
+        expect(buf[0]).toBe(0);
+        expect(buf[1]).toBe(255);
+        expect(buf[2]).toBe(0);
+        expect(buf[3]).toBe(255);
+    });
+
+    it('correctly double-scales palette alpha with layer opacity', () => {
+        const palette = makePalette({
+            1: { r: 255, g: 255, b: 255, a: 128 } // Semi-transparent white
+        });
+
+        // Layer at 50% opacity
+        const layer = makeLayer({
+            opacity: 128,
+            getPixel: () => 1
+        });
+
+        const buf = compositeFrame(1, 1, [layer], palette, 0);
+        // srcA = round(128 * 128 / 255) = round(64.25) = 64
+        expect(buf[0]).toBe(255);
+        expect(buf[3]).toBe(64);
+    });
+
 });

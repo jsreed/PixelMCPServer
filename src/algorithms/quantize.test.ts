@@ -80,4 +80,57 @@ describe('quantize (Median Cut Color Quantization)', () => {
             expect(idx).toBeLessThan(3);
         }
     });
+
+    it('handles a single pixel image', () => {
+        const pixels = [255, 0, 0, 255];
+        const result = quantize(pixels, 256);
+        expect(result.palette.size).toBe(1);
+        expect(result.indices).toEqual([0]);
+        expect(result.palette.get(0)).toBe('#ff0000ff');
+    });
+
+    it('handles maxColors=1 with transparency — only transparent index fits', () => {
+        const pixels = [
+            0, 0, 0, 0,       // Transparent
+            255, 0, 0, 255     // Red (cannot fit)
+        ];
+        const result = quantize(pixels, 1);
+        // Only index 0 (transparent) fits; red pixel has no slot
+        expect(result.palette.get(0)).toBe('#00000000');
+        expect(result.indices[0]).toBe(0);
+    });
+
+    it('handles 1000 identical pixels as a single palette entry', () => {
+        const pixels: number[] = [];
+        for (let i = 0; i < 1000; i++) {
+            pixels.push(42, 128, 200, 255);
+        }
+        const result = quantize(pixels, 256);
+        expect(result.palette.size).toBe(1);
+        expect(result.indices).toHaveLength(1000);
+        // All indices should be the same
+        const uniqueIndices = new Set(result.indices);
+        expect(uniqueIndices.size).toBe(1);
+    });
+
+    it('quantizes 256+ distinct colors via median cut without wild inaccuracy', () => {
+        // Generate 512 distinct colors spanning the RGB cube
+        const pixels: number[] = [];
+        for (let i = 0; i < 512; i++) {
+            pixels.push(
+                (i * 37) % 256,
+                (i * 73) % 256,
+                (i * 113) % 256,
+                255
+            );
+        }
+        const result = quantize(pixels, 16);
+        expect(result.palette.size).toBe(16);
+        expect(result.indices).toHaveLength(512);
+
+        // Each index should point to a valid palette entry
+        for (const idx of result.indices) {
+            expect(result.palette.has(idx)).toBe(true);
+        }
+    });
 });

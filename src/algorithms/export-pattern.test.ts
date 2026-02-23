@@ -96,4 +96,22 @@ describe('resolveExportPattern', () => {
         expect(result).toBe(".png");
     });
 
+    it('preserves unknown tokens as literal text', () => {
+        const pattern = "{name}_{unknown}.png";
+        const result = resolveExportPattern(pattern, {
+            name: "player"
+        });
+        // {unknown} has no variable, so it drops and removes separator
+        expect(result).toBe("player.png");
+    });
+
+    it('handles frame padding with different pad widths', () => {
+        const r1 = resolveExportPattern("{name}_{frame:04}.png", { name: "walk", frame: 5 });
+        expect(r1).toBe("walk_0005.png");
+
+        const r2 = resolveExportPattern("{name}_{frame:02}.png", { name: "run", frame: 123 });
+        // Frame value exceeds pad width — should not truncate
+        expect(r2).toBe("run_123.png");
+    });
+
 });

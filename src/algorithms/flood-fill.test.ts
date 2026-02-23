@@ -122,4 +122,12 @@ describe('floodFill', () => {
         expect(validFill).toHaveLength(9);
     });
 
+    it('fills only the start pixel when surrounded by different colors', () => {
+        const canvas = createMockCanvas(3, 3, 1);
+        canvas[1][1] = 5; // Center pixel is unique
+        const points = floodFill(1, 1, 3, 3, canvasValue(canvas));
+        expect(points).toHaveLength(1);
+        expect(points[0]).toEqual({ x: 1, y: 1 });
+    });
+
 });

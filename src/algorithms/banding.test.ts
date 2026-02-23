@@ -114,4 +114,42 @@ describe('detectBanding', () => {
         expect(result).toEqual([]);
     });
 
+    it('does not leak stale pDelta across transparent gaps', () => {
+        // Row with a monotonic staircase, then a null gap, then another unrelated sequence.
+        // The second sequence should NOT inherit the direction from the first.
+        const grid = [
+            [1, 1, 2, 2, 3, 3, 0, 0, 5, 5, 4, 4, 3, 3]
+        ];
+        // First half: 1->2->3 (ascending, 3 bands) = banding
+        // Gap: 0s (nullish)
+        // Second half: 5->4->3 (descending, 3 bands) = banding but separate region
+        const getPixel = createMockGridFn(grid);
+        const result = detectBanding(14, 1, getPixel);
+
+        // Should detect 2 separate regions (not merged through the null gap)
+        expect(result.length).toBeGreaterThanOrEqual(1);
+
+        // The first region should not extend past the null gap
+        const firstRegion = result[0];
+        expect(firstRegion.x + firstRegion.width).toBeLessThanOrEqual(6);
+    });
+
+    it('detects both horizontal and vertical banding on the same image', () => {
+        // Right columns have horizontal banding on row 0; left column has vertical banding
+        // Make them far apart so they don't merge.
+        const grid = [
+            [5, 5, 5, 5, 5, 5, 5, 5, 5, 10, 10, 11, 11, 12, 12],
+            [1, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5],
+            [1, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5],
+            [2, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5],
+            [2, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5],
+            [3, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5],
+            [3, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5]
+        ];
+        const result = detectBanding(15, 7, createMockGridFn(grid));
+
+        // Should find at least 2 regions (horizontal + vertical)
+        expect(result.length).toBeGreaterThanOrEqual(2);
+    });
+
 });

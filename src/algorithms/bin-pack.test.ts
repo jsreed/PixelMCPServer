@@ -109,4 +109,42 @@ describe('packRectangles (Shelf Bin-Packing)', () => {
         }
     });
 
+    it('handles a single rect wider than the calculated target width', () => {
+        const rects = [
+            { id: 'huge', width: 500, height: 10 },
+            { id: 'small', width: 10, height: 10 }
+        ];
+        const result = packRectangles(rects);
+
+        expect(result.placements).toHaveLength(2);
+        // The huge rect should still be placed
+        const huge = result.placements.find(p => p.id === 'huge')!;
+        expect(huge.x).toBe(0);
+        expect(huge.y).toBe(0);
+        expect(huge.x + huge.width).toBeLessThanOrEqual(result.width);
+    });
+
+    it('packs one giant and many tiny rects without overlaps', () => {
+        const rects = [
+            { id: 'giant', width: 64, height: 64 },
+            ...Array.from({ length: 16 }, (_, i) => ({
+                id: `tiny_${i}`, width: 4, height: 4
+            }))
+        ];
+        const result = packRectangles(rects);
+        expect(result.placements).toHaveLength(17);
+
+        // Verify no overlaps
+        for (let i = 0; i < result.placements.length; i++) {
+            for (let j = i + 1; j < result.placements.length; j++) {
+                const a = result.placements[i];
+                const b = result.placements[j];
+                const overlaps =
+                    a.x < b.x + b.width && a.x + a.width > b.x &&
+                    a.y < b.y + b.height && a.y + a.height > b.y;
+                expect(overlaps, `Rects ${a.id} and ${b.id} overlap`).toBe(false);
+            }
+        }
+    });
+
 });
