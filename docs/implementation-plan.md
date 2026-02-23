@@ -84,7 +84,7 @@ Files under `src/io/`. Models have `toJSON()`/`fromJSON()` for serialization; th
 Pure functions under `src/algorithms/`, unit tested independently of the model.
 
 - [x] **1.5.1** **Bresenham's line** — for `draw line`
-- [ ] **1.5.2** **Midpoint circle / ellipse** — for `draw circle`, `draw ellipse`
+- [x] **1.5.2** **Midpoint circle / ellipse** — for `draw circle`, `draw ellipse`
 - [ ] **1.5.3** **Flood fill** (scanline variant) — for `draw fill`
 - [ ] **1.5.4** **Marching squares contour trace** — for `generate_collision_polygon`
 - [ ] **1.5.5** **Ramer-Douglas-Peucker simplification** — for `generate_collision_polygon`
