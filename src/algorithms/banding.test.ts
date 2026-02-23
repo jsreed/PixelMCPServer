@@ -1,0 +1,117 @@
+import { describe, it, expect } from 'vitest';
+import { detectBanding } from './banding.js';
+
+describe('detectBanding', () => {
+
+    const createMockGridFn = (grid: number[][]) => {
+        const h = grid.length;
+        const w = h > 0 ? grid[0].length : 0;
+        return (x: number, y: number) => {
+            if (x < 0 || x >= w || y < 0 || y >= h) return null;
+            return grid[y][x];
+        };
+    };
+
+    it('returns empty array for clean solid images', () => {
+        const grid = [
+            [1, 1, 1],
+            [1, 1, 1]
+        ];
+        const result = detectBanding(3, 2, createMockGridFn(grid));
+        expect(result).toEqual([]);
+    });
+
+    it('returns empty array for high-frequency noise/dither', () => {
+        // Alternating 1s and 2s (checkerboard dither)
+        const grid = [
+            [1, 2, 1, 2, 1],
+            [2, 1, 2, 1, 2]
+        ];
+        // Run lengths are all 1, which the scanner rejects immediately.
+        const result = detectBanding(3, 2, createMockGridFn(grid));
+        expect(result).toEqual([]);
+    });
+
+    it('flags horizontal banding correctly forming a bounding box', () => {
+        // A rigid staircase: [1,1,1] -> [2,2,2] -> [3,3,3]
+        // This is 3 consecutive bands.
+        const grid = [
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 1, 1, 1, 2, 2, 2, 3, 3, 3], // Band sequence starts at x=1, ends at x=9
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        ];
+
+        const result = detectBanding(10, 3, createMockGridFn(grid));
+
+        expect(result).toHaveLength(1); // One bounding region found
+
+        const region = result[0];
+        expect(region.x).toBe(1);
+        expect(region.y).toBe(1);
+        expect(region.width).toBe(9); // Spans 3 runs of length 3 = 9 pixels
+        expect(region.height).toBe(1);
+        expect(region.severity).toBe('low'); // Since it's only 3 bands
+    });
+
+    it('detects high-severity vertical banding scaling', () => {
+        // 6 distinct vertical chunks stepping downwards
+        // 5 is the background color, so index shifts are 1->2->3->4->5->6 monotonic
+        const grid = [
+            [1, 5, 5],
+            [1, 5, 5],
+            [2, 5, 5],
+            [2, 5, 5],
+            [3, 5, 5],
+            [3, 5, 5],
+            [4, 5, 5],
+            [4, 5, 5],
+            [5, 5, 5],
+            [5, 5, 5],
+            [6, 5, 5],
+            [6, 5, 5]
+        ];
+
+        const result = detectBanding(3, 12, createMockGridFn(grid));
+
+        expect(result).toHaveLength(1);
+        const region = result[0];
+        expect(region.x).toBe(0);
+        expect(region.y).toBe(0);
+        expect(region.width).toBe(1);
+        expect(region.height).toBe(12);
+        expect(region.severity).toBe('high'); // >= 6 bands = high
+    });
+
+    it('merges adjacent banding rows into a single taller bounding box', () => {
+        // Two consecutive rows doing the exact same horizontal banding artifact.
+        // It should merge them into a height=2 block.
+        const grid = [
+            [1, 1, 2, 2, 3, 3],
+            [1, 1, 2, 2, 3, 3],
+            [0, 0, 0, 0, 0, 0]
+        ];
+
+        const result = detectBanding(6, 3, createMockGridFn(grid));
+
+        // Horizontal scan will detect row 0 and row 1 individually.
+        // The algorithm should merge.
+        expect(result).toHaveLength(1);
+        const r = result[0];
+        expect(r.x).toBe(0);
+        expect(r.y).toBe(0);
+        expect(r.width).toBe(6);
+        expect(r.height).toBe(2);
+    });
+
+    it('ignores non-monotonic sequences', () => {
+        // E.g. 1 -> 2 -> 1 -> 2
+        // Since the indices don't step uniformly in one direction, it's not a gradient
+        const grid = [
+            [1, 1, 1, 2, 2, 2, 1, 1, 1, 2, 2, 2]
+        ];
+
+        const result = detectBanding(12, 1, createMockGridFn(grid));
+        expect(result).toEqual([]);
+    });
+
+});
