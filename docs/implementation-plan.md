@@ -149,10 +149,10 @@ Focus on the minimum creative loop: create project → create asset → set pale
 
 #### 2.3.3 `palette` Tool (Core Actions)
 
-- [ ] **2.3.3.1** **Zod schema** — discriminated union on `action`
-- [ ] **2.3.3.2** **`info`** — return full palette with usage counts (scan all cels)
-- [ ] **2.3.3.3** **`set` / `set_bulk` / `swap`** — palette mutations wrapped in Commands
-- [ ] **2.3.3.4** **Domain error responses** — index out of range errors
+- [x] **2.3.3.1** **Zod schema** — discriminated union on `action`
+- [x] **2.3.3.2** **`info`** — return full palette with usage counts (scan all cels)
+- [x] **2.3.3.3** **`set` / `set_bulk` / `swap`** — palette mutations wrapped in Commands
+- [x] **2.3.3.4** **Domain error responses** — index out of range errors
 
 #### 2.3.4 `asset` Tool (Read-Only + Create + Structure)
 

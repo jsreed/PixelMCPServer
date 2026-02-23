@@ -73,6 +73,40 @@ export class PaletteClass {
     }
 
     /**
+     * Linearly interpolates RGBA between two palette indices, filling all entries
+     * between start and end inclusive. The colors at start and end are preserved.
+     * Requires start < end and both endpoints to have defined (non-transparent) colors.
+     */
+    generateRamp(start: number, end: number): void {
+        this.validateIndex(start);
+        this.validateIndex(end);
+        if (start >= end) {
+            throw new Error(errors.generateRampInvalidOrder().content[0].text);
+        }
+
+        const c1 = this.get(start);
+        const c2 = this.get(end);
+
+        // Check that endpoints have actual colors defined
+        if (c1[0] === 0 && c1[1] === 0 && c1[2] === 0 && c1[3] === 0) {
+            throw new Error(errors.paletteIndexNoColor(start).content[0].text);
+        }
+        if (c2[0] === 0 && c2[1] === 0 && c2[2] === 0 && c2[3] === 0) {
+            throw new Error(errors.paletteIndexNoColor(end).content[0].text);
+        }
+
+        const steps = end - start;
+        for (let i = 1; i < steps; i++) {
+            const t = i / steps;
+            const r = Math.round(c1[0] + (c2[0] - c1[0]) * t);
+            const g = Math.round(c1[1] + (c2[1] - c1[1]) * t);
+            const b = Math.round(c1[2] + (c2[2] - c1[2]) * t);
+            const a = Math.round(c1[3] + (c2[3] - c1[3]) * t);
+            this.colors[start + i] = [r, g, b, a] as Color;
+        }
+    }
+
+    /**
      * Returns the raw JSON-serializable array.
      */
     toJSON(): Palette {

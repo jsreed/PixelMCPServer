@@ -6,7 +6,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { registerProjectTool } from './tools/project.js';
 import { registerWorkspaceTool } from './tools/workspace.js';
 // import { registerAssetTool } from './tools/asset.js';
-// import { registerPaletteTool } from './tools/palette.js';
+import { registerPaletteTool } from './tools/palette.js';
 // import { registerDrawTool } from './tools/draw.js';
 // import { registerSelectionTool } from './tools/selection.js';
 // import { registerTransformTool } from './tools/transform.js';
@@ -23,7 +23,7 @@ const server = new McpServer({
 registerProjectTool(server);
 registerWorkspaceTool(server);
 // registerAssetTool(server);
-// registerPaletteTool(server);
+registerPaletteTool(server);
 // registerDrawTool(server);
 // registerSelectionTool(server);
 // registerTransformTool(server);

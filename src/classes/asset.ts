@@ -551,6 +551,26 @@ export class AssetClass {
     // Meta / Global
     // ------------------------------------------------------------------------
 
+    /**
+     * Counts how many pixels reference each palette index across all cels.
+     * Returns a 256-entry array where counts[i] = number of pixels using index i.
+     */
+    paletteUsageCounts(): number[] {
+        const counts = new Array<number>(256).fill(0);
+        for (const cel of Object.values(this._data.cels)) {
+            if ('data' in cel && Array.isArray(cel.data)) {
+                for (const row of cel.data as number[][]) {
+                    for (const idx of row) {
+                        if (idx >= 0 && idx < 256) {
+                            counts[idx]++;
+                        }
+                    }
+                }
+            }
+        }
+        return counts;
+    }
+
     setPerspective(perspective: Perspective): void {
         this._data.perspective = perspective;
         this.markDirty();
