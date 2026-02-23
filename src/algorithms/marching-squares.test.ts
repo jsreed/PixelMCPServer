@@ -145,4 +145,124 @@ describe('marchingSquares', () => {
         // ... and so on
     });
 
+    it('traces a discrete circle silhouette as a single closed contour', () => {
+        // 9x9 grid with a rough circle of radius ~3 centered at (4,4)
+        const grid = [
+            [0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 1, 1, 1, 0, 0, 0],
+            [0, 0, 1, 1, 1, 1, 1, 0, 0],
+            [0, 1, 1, 1, 1, 1, 1, 1, 0],
+            [0, 1, 1, 1, 1, 1, 1, 1, 0],
+            [0, 1, 1, 1, 1, 1, 1, 1, 0],
+            [0, 0, 1, 1, 1, 1, 1, 0, 0],
+            [0, 0, 0, 1, 1, 1, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        ];
+        const polygons = marchingSquares(9, 9, createMockSolidFn(grid));
+
+        // Single contour, no holes
+        expect(polygons).toHaveLength(1);
+        const poly = polygons[0];
+
+        // Must be closed
+        expect(poly[0]).toEqual(poly[poly.length - 1]);
+
+        // All vertices should be on the boundary of the solid region
+        // (vertex coords are pixel-corner coords, so they range 0..9)
+        for (const v of poly) {
+            expect(v.x).toBeGreaterThanOrEqual(0);
+            expect(v.x).toBeLessThanOrEqual(9);
+            expect(v.y).toBeGreaterThanOrEqual(0);
+            expect(v.y).toBeLessThanOrEqual(9);
+        }
+
+        // Circle contour has more corners than a rectangle — at least 8 direction changes
+        expect(poly.length).toBeGreaterThan(8);
+    });
+
+    it('traces an L-shape silhouette correctly', () => {
+        const grid = [
+            [1, 1, 0, 0],
+            [1, 1, 0, 0],
+            [1, 1, 1, 1],
+            [1, 1, 1, 1],
+        ];
+        const polygons = marchingSquares(4, 4, createMockSolidFn(grid));
+
+        expect(polygons).toHaveLength(1);
+        const poly = polygons[0];
+
+        // Must be closed
+        expect(poly[0]).toEqual(poly[poly.length - 1]);
+
+        // L-shape has 6 corners + closure = 7 vertices
+        expect(poly).toHaveLength(7);
+
+        // Verify expected corner vertices (clockwise from top-left)
+        expect(poly[0]).toEqual({ x: 0, y: 0 });
+        expect(poly[1]).toEqual({ x: 2, y: 0 });
+        expect(poly[2]).toEqual({ x: 2, y: 2 });
+        expect(poly[3]).toEqual({ x: 4, y: 2 });
+        expect(poly[4]).toEqual({ x: 4, y: 4 });
+        expect(poly[5]).toEqual({ x: 0, y: 4 });
+        expect(poly[6]).toEqual({ x: 0, y: 0 });
+    });
+
+    it('traces a T-shape with correct vertex count', () => {
+        const grid = [
+            [1, 1, 1, 1, 1],
+            [0, 0, 1, 0, 0],
+            [0, 0, 1, 0, 0],
+        ];
+        const polygons = marchingSquares(5, 3, createMockSolidFn(grid));
+
+        expect(polygons).toHaveLength(1);
+        const poly = polygons[0];
+        expect(poly[0]).toEqual(poly[poly.length - 1]);
+        // T-shape has 8 corners + closure = 9 vertices
+        expect(poly).toHaveLength(9);
+    });
+
+    it('handles a single row of pixels', () => {
+        const grid = [[1, 1, 1, 1]];
+        const polygons = marchingSquares(4, 1, createMockSolidFn(grid));
+
+        expect(polygons).toHaveLength(1);
+        const poly = polygons[0];
+        expect(poly).toHaveLength(5); // Rectangle: 4 corners + closure
+        expect(poly[0]).toEqual({ x: 0, y: 0 });
+        expect(poly[1]).toEqual({ x: 4, y: 0 });
+        expect(poly[2]).toEqual({ x: 4, y: 1 });
+        expect(poly[3]).toEqual({ x: 0, y: 1 });
+    });
+
+    it('handles a single column of pixels', () => {
+        const grid = [[1], [1], [1]];
+        const polygons = marchingSquares(1, 3, createMockSolidFn(grid));
+
+        expect(polygons).toHaveLength(1);
+        const poly = polygons[0];
+        expect(poly).toHaveLength(5);
+        expect(poly[0]).toEqual({ x: 0, y: 0 });
+        expect(poly[1]).toEqual({ x: 1, y: 0 });
+        expect(poly[2]).toEqual({ x: 1, y: 3 });
+        expect(poly[3]).toEqual({ x: 0, y: 3 });
+    });
+
+    it('all contour vertices lie on pixel boundaries', () => {
+        const grid = [
+            [0, 1, 1, 0],
+            [1, 1, 1, 1],
+            [1, 1, 1, 1],
+            [0, 1, 1, 0],
+        ];
+        const polygons = marchingSquares(4, 4, createMockSolidFn(grid));
+        for (const poly of polygons) {
+            for (const v of poly) {
+                expect(Number.isInteger(v.x)).toBe(true);
+                expect(Number.isInteger(v.y)).toBe(true);
+            }
+        }
+    });
+
 });

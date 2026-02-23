@@ -110,4 +110,109 @@ describe('simplifyPolygon (Ramer-Douglas-Peucker)', () => {
         expect(square).toHaveLength(5);
     });
 
+    it('increasing epsilon monotonically reduces or maintains vertex count', () => {
+        // Zigzag polyline with known deviations
+        const zigzag = [
+            { x: 0, y: 0 },
+            { x: 2, y: 3 },
+            { x: 4, y: 0 },
+            { x: 6, y: 5 },
+            { x: 8, y: 0 },
+            { x: 10, y: 4 },
+            { x: 12, y: 0 },
+        ];
+
+        let prevCount = zigzag.length;
+        for (const eps of [0.5, 1.0, 2.0, 3.0, 5.0, 10.0]) {
+            const simplified = simplifyPolygon(zigzag, eps);
+            expect(simplified.length).toBeLessThanOrEqual(prevCount);
+            // Must always retain start and end
+            expect(simplified[0]).toEqual(zigzag[0]);
+            expect(simplified[simplified.length - 1]).toEqual(zigzag[zigzag.length - 1]);
+            prevCount = simplified.length;
+        }
+    });
+
+    it('very small epsilon preserves all structural vertices', () => {
+        const triangle = [
+            { x: 0, y: 0 },
+            { x: 5, y: 10 },
+            { x: 10, y: 0 },
+        ];
+        // Epsilon tiny but > 0
+        const result = simplifyPolygon(triangle, 0.001);
+        expect(result).toHaveLength(3);
+        expect(result).toEqual(triangle);
+    });
+
+    it('very large epsilon reduces to just endpoints (open polyline)', () => {
+        const wavy = [
+            { x: 0, y: 0 },
+            { x: 2, y: 1 },
+            { x: 4, y: -1 },
+            { x: 6, y: 2 },
+            { x: 8, y: -2 },
+            { x: 10, y: 0 },
+        ];
+        const result = simplifyPolygon(wavy, 100);
+        expect(result).toHaveLength(2);
+        expect(result[0]).toEqual({ x: 0, y: 0 });
+        expect(result[1]).toEqual({ x: 10, y: 0 });
+    });
+
+    it('simplifies a closed polygon with many collinear edges to just corners', () => {
+        // Rectangle with many intermediate points on each edge
+        const rect = [
+            { x: 0, y: 0 }, { x: 2, y: 0 }, { x: 4, y: 0 }, { x: 6, y: 0 }, { x: 8, y: 0 },
+            { x: 8, y: 2 }, { x: 8, y: 4 }, { x: 8, y: 6 },
+            { x: 6, y: 6 }, { x: 4, y: 6 }, { x: 2, y: 6 }, { x: 0, y: 6 },
+            { x: 0, y: 4 }, { x: 0, y: 2 },
+            { x: 0, y: 0 }, // closed
+        ];
+        const simplified = simplifyPolygon(rect, 0.1);
+        expect(simplified).toHaveLength(5); // 4 corners + closure
+    });
+
+    it('handles single-point and two-point inputs gracefully', () => {
+        const single = [{ x: 5, y: 5 }];
+        expect(simplifyPolygon(single, 1.0)).toEqual([{ x: 5, y: 5 }]);
+
+        const two = [{ x: 0, y: 0 }, { x: 10, y: 10 }];
+        expect(simplifyPolygon(two, 1.0)).toEqual(two);
+    });
+
+    it('no simplified point deviates more than epsilon from original segments', () => {
+        const points = [
+            { x: 0, y: 0 },
+            { x: 3, y: 4 },
+            { x: 5, y: 1 },
+            { x: 8, y: 6 },
+            { x: 10, y: 0 },
+        ];
+        const eps = 2.0;
+        const simplified = simplifyPolygon(points, eps);
+
+        // Every original point must be within eps of some segment of the simplified polyline
+        for (const p of points) {
+            let minDist = Infinity;
+            for (let i = 0; i < simplified.length - 1; i++) {
+                const a = simplified[i];
+                const b = simplified[i + 1];
+                const dx = b.x - a.x;
+                const dy = b.y - a.y;
+                const len2 = dx * dx + dy * dy;
+                if (len2 === 0) {
+                    minDist = Math.min(minDist, Math.sqrt((p.x - a.x) ** 2 + (p.y - a.y) ** 2));
+                } else {
+                    const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+                    const projX = a.x + t * dx;
+                    const projY = a.y + t * dy;
+                    minDist = Math.min(minDist, Math.sqrt((p.x - projX) ** 2 + (p.y - projY) ** 2));
+                }
+            }
+            // Allow small floating point tolerance
+            expect(minDist).toBeLessThanOrEqual(eps + 0.001);
+        }
+    });
+
 });
