@@ -143,7 +143,12 @@ export function registerDrawTool(server: any) {
             // Command wrapping - cel modifications are batched
             try {
                 const cmd = new CelWriteCommand(asset, layerId, frameIndex, () => {
-                    const cel = asset.getMutableCel(layerId, frameIndex);
+                    let cel = asset.getMutableCel(layerId, frameIndex);
+                    if (!cel) {
+                        const data = Array.from({ length: asset.height }, () => new Array(asset.width).fill(0));
+                        asset.setCel(layerId, frameIndex, { x: 0, y: 0, data });
+                        cel = asset.getMutableCel(layerId, frameIndex);
+                    }
                     if (!cel || !('data' in cel)) {
                         throw new Error('Could not resolve mutable image cel.');
                     }

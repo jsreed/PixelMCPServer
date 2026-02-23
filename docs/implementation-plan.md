@@ -176,10 +176,10 @@ Focus on the minimum creative loop: create project → create asset → set pale
 
 #### 2.3.6 Minimum Viable Loop Testing
 
-- [ ] **2.3.6.1** **Tool schema validation tests** — each tool rejects malformed input
-- [ ] **2.3.6.2** **Tool action dispatch tests** — each action returns expected result shape
-- [ ] **2.3.6.3** **Integration test: minimum viable loop** — `project init` → `asset create` (with palette, layers, frames) → `palette set_bulk` → `draw` (rect + fill + write_pixels) → `asset get_cel` (verify pixel data) → `workspace save` → `workspace unload_asset` → `workspace load_asset` → `asset get_cel` (verify persistence)
-- [ ] **2.3.6.4** **Undo/redo integration test** — draw → undo → get_cel (verify reverted) → redo → get_cel (verify re-applied)
+- [x] **2.3.6.1** **Tool schema validation tests** — each tool rejects malformed input
+- [x] **2.3.6.2** **Tool action dispatch tests** — each action returns expected result shape
+- [x] **2.3.6.3** **Integration test: minimum viable loop** — `project init` → `asset create` (with palette, layers, frames) → `palette set_bulk` → `draw` (rect + fill + write_pixels) → `asset get_cel` (verify pixel data) → `workspace save` → `workspace unload_asset` → `workspace load_asset` → `asset get_cel` (verify persistence)
+- [x] **2.3.6.4** **Undo/redo integration test** — draw → undo → get_cel (verify reverted) → redo → get_cel (verify re-applied)
 
 > 🎯 **Milestone — Minimum Viable Loop:** Can create project → create asset → set palette → draw → read back → save → reload and verify.
 
