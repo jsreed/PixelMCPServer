@@ -133,4 +133,116 @@ describe('quantize (Median Cut Color Quantization)', () => {
             expect(result.palette.has(idx)).toBe(true);
         }
     });
+
+    it('round-trip fidelity: re-quantizing the reconstructed RGBA produces the same palette', () => {
+        // Create a 6-color image
+        const pixels = [
+            255, 0, 0, 255,
+            0, 255, 0, 255,
+            0, 0, 255, 255,
+            255, 255, 0, 255,
+            0, 255, 255, 255,
+            255, 0, 255, 255
+        ];
+
+        const result1 = quantize(pixels, 256);
+
+        // Reconstruct RGBA from the quantized result
+        const reconstructed: number[] = [];
+        for (const idx of result1.indices) {
+            const hex = result1.palette.get(idx)!;
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            const a = parseInt(hex.slice(7, 9), 16);
+            reconstructed.push(r, g, b, a);
+        }
+
+        // Re-quantize — should produce identical palette and indices
+        const result2 = quantize(reconstructed, 256);
+        expect(result2.palette.size).toBe(result1.palette.size);
+        expect(result2.indices).toEqual(result1.indices);
+    });
+
+    it('never exceeds 256 palette entries even with massive color diversity', () => {
+        // 4096 pixels with unique colors
+        const pixels: number[] = [];
+        for (let r = 0; r < 16; r++) {
+            for (let g = 0; g < 16; g++) {
+                for (let b = 0; b < 16; b++) {
+                    pixels.push(r * 17, g * 17, b * 17, 255);
+                }
+            }
+        }
+        // 4096 distinct colors → must reduce to ≤ 256
+        const result = quantize(pixels, 256);
+        expect(result.palette.size).toBeLessThanOrEqual(256);
+        expect(result.indices).toHaveLength(4096);
+
+        // Every index must be valid
+        for (const idx of result.indices) {
+            expect(result.palette.has(idx)).toBe(true);
+        }
+    });
+
+    it('handles an all-transparent image — only index 0 in palette', () => {
+        const pixels = [
+            0, 0, 0, 0,
+            0, 0, 0, 0,
+            50, 50, 50, 50,  // alpha < 128 → transparent
+            100, 100, 100, 100  // alpha < 128 → transparent
+        ];
+        const result = quantize(pixels, 256);
+        expect(result.palette.size).toBe(1);
+        expect(result.palette.get(0)).toBe('#00000000');
+        expect(result.indices).toEqual([0, 0, 0, 0]);
+    });
+
+    it('treats pixels with alpha ≥ 128 as solid (threshold boundary)', () => {
+        const pixels = [
+            255, 0, 0, 127,   // alpha < 128 → transparent
+            255, 0, 0, 128,   // alpha >= 128 → solid red
+            0, 255, 0, 200    // alpha >= 128 → solid green
+        ];
+        const result = quantize(pixels, 256);
+        // Index 0 = transparent, then red and green as solid entries
+        expect(result.palette.get(0)).toBe('#00000000');
+        expect(result.palette.size).toBe(3); // transparent + red + green
+        expect(result.indices[0]).toBe(0); // Transparent
+        expect(result.indices[1]).not.toBe(0); // Solid red
+        expect(result.indices[2]).not.toBe(0); // Solid green
+    });
+
+    it('handles maxColors=2 with transparency — exactly 1 slot for solid', () => {
+        const pixels = [
+            0, 0, 0, 0,         // Transparent
+            255, 0, 0, 255,     // Red
+            0, 0, 255, 255      // Blue — will be merged with red into a single slot
+        ];
+        const result = quantize(pixels, 2);
+        expect(result.palette.size).toBe(2);
+        expect(result.palette.get(0)).toBe('#00000000');
+        expect(result.indices[0]).toBe(0);
+        // Both red and blue must map to the single solid slot (index 1)
+        expect(result.indices[1]).toBe(1);
+        expect(result.indices[2]).toBe(1);
+    });
+
+    it('produces deterministic output for identical inputs', () => {
+        const pixels = [
+            255, 0, 0, 255,
+            0, 255, 0, 255,
+            0, 0, 255, 255,
+            128, 128, 0, 255,
+            0, 128, 128, 255
+        ];
+        const result1 = quantize(pixels, 4);
+        const result2 = quantize(pixels, 4);
+
+        expect(result2.palette.size).toBe(result1.palette.size);
+        expect(result2.indices).toEqual(result1.indices);
+        for (const [key, val] of result1.palette) {
+            expect(result2.palette.get(key)).toBe(val);
+        }
+    });
 });

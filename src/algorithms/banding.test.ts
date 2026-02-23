@@ -152,4 +152,37 @@ describe('detectBanding', () => {
         expect(result.length).toBeGreaterThanOrEqual(2);
     });
 
+    it('detects descending monotonic staircases', () => {
+        // 3→2→1 (descending, 3 bands)
+        const grid = [
+            [3, 3, 3, 2, 2, 2, 1, 1, 1]
+        ];
+        const result = detectBanding(9, 1, createMockGridFn(grid));
+        expect(result).toHaveLength(1);
+        expect(result[0].severity).toBe('low');
+    });
+
+    it('does not flag 2-band sequences (below MIN_BANDS threshold)', () => {
+        // Only 2 bands → should NOT be detected
+        const grid = [
+            [1, 1, 1, 2, 2, 2]
+        ];
+        const result = detectBanding(6, 1, createMockGridFn(grid));
+        expect(result).toEqual([]);
+    });
+
+    it('does not flag large contrast gaps (delta ≥ 10 between adjacent bands)', () => {
+        // [1,1, 12,12, 23,23] — jumps of 11 between bands are intentional transitions
+        const grid = [
+            [1, 1, 12, 12, 23, 23]
+        ];
+        const result = detectBanding(6, 1, createMockGridFn(grid));
+        expect(result).toEqual([]);
+    });
+
+    it('returns empty array for a 0×0 image without crashing', () => {
+        const result = detectBanding(0, 0, () => null);
+        expect(result).toEqual([]);
+    });
+
 });
