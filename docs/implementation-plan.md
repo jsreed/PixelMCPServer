@@ -123,7 +123,7 @@ Wire the core model to MCP tool handlers. Each tool is one file under `src/tools
 
 ### 2.2 Server Bootstrap
 
-- [ ] **2.2.1** **Refactor `src/index.ts`** — import and call tool registration functions. Remove the `get_status` stub. Keep the file thin.
+- [x] **2.2.1** **Refactor `src/index.ts`** — import and call tool registration functions. Remove the `get_status` stub. Keep the file thin.
 - [x] **2.2.2** **Shared workspace singleton** — `getWorkspace()` accessor already implemented in `src/classes/workspace.ts`. Tool handlers import from there.
 
 ### 2.3 Minimum Viable Loop Tools
