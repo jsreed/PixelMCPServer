@@ -168,11 +168,11 @@ Focus on the minimum creative loop: create project → create asset → set pale
 
 #### 2.3.5 `draw` Tool (Core Primitives)
 
-- [ ] **2.3.5.1** **Zod schema** — top-level targeting + operations array
-- [ ] **2.3.5.2** **Drawing primitives**: `pixel`, `line` (Bresenham), `rect`, `circle` (midpoint), `ellipse` (midpoint), `fill` (flood fill)
-- [ ] **2.3.5.3** **`write_pixels`** — bulk pixel data write with dimension validation
-- [ ] **2.3.5.4** **Batched command wrapping** — single Command for entire operations array, linked cel break on first op
-- [ ] **2.3.5.5** **Domain error responses** — color out of range, data dimension mismatch
+- [x] **2.3.5.1** **Zod schema** — top-level targeting + operations array
+- [x] **2.3.5.2** **Drawing primitives**: `pixel`, `line` (Bresenham), `rect`, `circle` (midpoint), `ellipse` (midpoint), `fill` (flood fill)
+- [x] **2.3.5.3** **`write_pixels`** — bulk pixel data write with dimension validation
+- [x] **2.3.5.4** **Batched command wrapping** — single Command for entire operations array, linked cel break on first op
+- [x] **2.3.5.5** **Domain error responses** — color out of range, data dimension mismatch
 
 #### 2.3.6 Minimum Viable Loop Testing
 

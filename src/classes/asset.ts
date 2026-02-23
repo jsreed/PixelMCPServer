@@ -438,7 +438,7 @@ export class AssetClass {
      * is deep-copied into an independent cel, and the copy is returned.
      * Returns undefined if no cel exists at the position.
      */
-    private getMutableCel(layerId: number, frameIndex: number): Cel | undefined {
+    public getMutableCel(layerId: number, frameIndex: number): Cel | undefined {
         const key = packCelKey(layerId, frameIndex);
         const raw = this._data.cels[key] as Cel | undefined;
         if (raw === undefined) return undefined;
