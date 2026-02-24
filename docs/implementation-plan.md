@@ -187,11 +187,11 @@ Focus on the minimum creative loop: create project → create asset → set pale
 
 Implement after draw so clipboard operations (paste) can reuse the draw/write pattern.
 
-- [ ] **2.4.1** **Zod schema** — discriminated union on `action`
-- [ ] **2.4.2** **Mask operations**: `rect`, `all`, `clear`, `invert`, `by_color` — operate on the `SelectionMask` in Workspace
-- [ ] **2.4.3** **Clipboard operations**: `copy`, `cut`, `paste` — with cross-asset support, offset positioning
-- [ ] **2.4.4** **Domain error responses** — "clipboard empty", "target not loaded"
-- [ ] **2.4.5** **Selection tests** — mask operations, clipboard roundtrip, cross-asset paste
+- [x] **2.4.1** **Zod schema** — discriminated union on `action`
+- [x] **2.4.2** **Mask operations**: `rect`, `all`, `clear`, `invert`, `by_color` — operate on the `SelectionMask` in Workspace
+- [x] **2.4.3** **Clipboard operations**: `copy`, `cut`, `paste` — with cross-asset support, offset positioning
+- [x] **2.4.4** **Domain error responses** — "clipboard empty", "target not loaded"
+- [x] **2.4.5** **Selection tests** — mask operations, clipboard roundtrip, cross-asset paste
 
 ### 2.5 Complete Basic Tools
 

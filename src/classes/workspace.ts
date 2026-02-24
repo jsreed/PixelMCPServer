@@ -13,6 +13,8 @@ export interface ClipboardData {
     data: number[][];
     width: number;
     height: number;
+    originalX: number;
+    originalY: number;
 }
 
 /**

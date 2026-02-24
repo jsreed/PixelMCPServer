@@ -144,14 +144,14 @@ export function registerAssetTool(server: McpServer): void {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function requireAsset(workspace: Workspace, assetName: string | undefined): LoadedAsset | ReturnType<typeof errors.domainError> {
+export function requireAsset(workspace: Workspace, assetName: string | undefined): LoadedAsset | ReturnType<typeof errors.domainError> {
     if (!assetName) return errors.invalidArgument('asset requires "asset_name".');
     const asset = workspace.loadedAssets.get(assetName);
     if (!asset) return errors.assetNotLoaded(assetName);
     return asset;
 }
 
-function isError(val: unknown): val is { isError: true } {
+export function isError(val: unknown): val is { isError: true } {
     return typeof val === 'object' && val !== null && 'isError' in val;
 }
 
