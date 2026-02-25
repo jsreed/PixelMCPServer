@@ -271,8 +271,35 @@ export function registerDrawTool(server: any) {
                                 break;
                             }
                             case 'fill': {
+                                if (activeSelection) {
+                                    // Bail early if seed is outside the selection
+                                    const seedSx = op.x - activeSelection.x;
+                                    const seedSy = op.y - activeSelection.y;
+                                    if (
+                                        seedSx < 0 || seedSx >= activeSelection.width ||
+                                        seedSy < 0 || seedSy >= activeSelection.height ||
+                                        !activeSelection.mask[seedSy][seedSx]
+                                    ) {
+                                        break;
+                                    }
+                                }
+
                                 const points = floodFill(op.x, op.y, w, h, (x, y) => {
                                     if (x < 0 || x >= w || y < 0 || y >= h) return null;
+
+                                    // Treat pixels outside the selection as a hard boundary
+                                    if (activeSelection) {
+                                        const sx = x - activeSelection.x;
+                                        const sy = y - activeSelection.y;
+                                        if (
+                                            sx < 0 || sx >= activeSelection.width ||
+                                            sy < 0 || sy >= activeSelection.height ||
+                                            !activeSelection.mask[sy][sx]
+                                        ) {
+                                            return null;
+                                        }
+                                    }
+
                                     return data[y][x];
                                 });
                                 for (const p of points) putPixel(p.x, p.y, op.color);

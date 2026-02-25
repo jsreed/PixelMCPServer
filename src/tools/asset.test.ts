@@ -290,4 +290,151 @@ describe('asset tool', () => {
         const info = workspace.project!.info();
         expect(info.assets['sprite']).toBeUndefined();
     });
+
+    // ─── update_shape ─────────────────────────────────────────────────
+
+    it('update_shape replaces a shape', async () => {
+        // Add a shape first
+        await handler({
+            action: 'add_shape', asset_name: 'sprite',
+            layer_id: 2, frame_index: 0,
+            shape_name: 'box', shape_type: 'rect',
+            shape_x: 0, shape_y: 0, shape_width: 4, shape_height: 4,
+        });
+
+        // Update it
+        const r = await handler({
+            action: 'update_shape', asset_name: 'sprite',
+            layer_id: 2, frame_index: 0,
+            shape_name: 'box', shape_type: 'rect',
+            shape_x: 1, shape_y: 1, shape_width: 6, shape_height: 6,
+        }) as any;
+
+        expect(r.isError).toBeUndefined();
+        const shapes = workspace.loadedAssets.get('sprite')!.getShapes(2, 0);
+        const updated = shapes.find(s => s.name === 'box');
+        expect(updated).toBeDefined();
+        expect(updated!.type).toBe('rect');
+        if (updated!.type === 'rect') {
+            expect(updated!.x).toBe(1);
+            expect(updated!.width).toBe(6);
+        }
+    });
+
+    it('update_shape is undoable', async () => {
+        await handler({
+            action: 'add_shape', asset_name: 'sprite',
+            layer_id: 2, frame_index: 0,
+            shape_name: 'box', shape_type: 'rect',
+            shape_x: 0, shape_y: 0, shape_width: 4, shape_height: 4,
+        });
+        await handler({
+            action: 'update_shape', asset_name: 'sprite',
+            layer_id: 2, frame_index: 0,
+            shape_name: 'box', shape_type: 'rect',
+            shape_x: 2, shape_y: 2, shape_width: 6, shape_height: 6,
+        });
+
+        workspace.undo(); // undo update
+        const shapes = workspace.loadedAssets.get('sprite')!.getShapes(2, 0);
+        const box = shapes.find(s => s.name === 'box');
+        expect(box).toBeDefined();
+        if (box?.type === 'rect') {
+            expect(box.x).toBe(0); // Original position restored
+        }
+    });
+
+    // ─── detect_banding (positive case) ─────────────────────────────
+
+    it('detect_banding finds banding in staircase pattern', async () => {
+        // Build a 16-wide row asset with a synthetic horizontal staircase:
+        // each of 4 colors occupies 4 pixels in monotonic index order: 1,1,1,1,3,3,3,3,5,5,5,5,7,7,7,7
+        const bandingAsset = AssetClass.fromJSON({
+            name: 'banding_test',
+            width: 16, height: 4,
+            perspective: 'flat' as const,
+            palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]) as any,
+            layers: [{ id: 1, name: 'Layer 1', type: 'image' as const, opacity: 255, visible: true }],
+            frames: [{ index: 0, duration_ms: 100 }],
+            tags: [],
+            cels: {
+                '1/0': {
+                    x: 0, y: 0,
+                    data: Array.from({ length: 4 }, () =>
+                        [1, 1, 1, 1, 3, 3, 3, 3, 5, 5, 5, 5, 7, 7, 7, 7]
+                    ),
+                },
+            },
+        });
+        workspace.loadedAssets.set('banding_test', bandingAsset);
+
+        const r = await handler({
+            action: 'detect_banding', asset_name: 'banding_test',
+            layer_id: 1, frame_index: 0,
+        }) as any;
+        const data = JSON.parse(r.content[0].text);
+        expect(data.banding).toBeDefined();
+        expect(data.banding.length).toBeGreaterThan(0);
+    });
+
+    // ─── generate_collision_polygon ───────────────────────────────────
+
+    it('generate_collision_polygon traces a solid 2x2 rectangle', async () => {
+        // The mock asset has a 2x2 solid block at (0,0) in layer 1
+        const r = await handler({
+            action: 'generate_collision_polygon', asset_name: 'sprite',
+            layer_id: 1, frame_index: 0,
+            target_layer_id: 2,
+            epsilon: 0.5,
+        }) as any;
+
+        expect(r.isError).toBeUndefined();
+        const data = JSON.parse(r.content[0].text);
+        expect(data.vertices).toBeGreaterThan(0);
+        expect(data.target_layer_id).toBe(2);
+
+        // Shape should have been added to layer 2
+        const shapes = workspace.loadedAssets.get('sprite')!.getShapes(2, 0);
+        const collision = shapes.find(s => s.name === 'collision');
+        expect(collision).toBeDefined();
+        expect(collision!.type).toBe('polygon');
+    });
+
+    it('generate_collision_polygon auto-detects shape layer', async () => {
+        // Don't pass target_layer_id — should auto-find the 'hitbox' shape layer (id=2)
+        const r = await handler({
+            action: 'generate_collision_polygon', asset_name: 'sprite',
+            layer_id: 1, frame_index: 0,
+        }) as any;
+
+        expect(r.isError).toBeUndefined();
+        const data = JSON.parse(r.content[0].text);
+        expect(data.target_layer_id).toBe(2); // auto-resolved hitbox layer
+    });
+
+    it('generate_collision_polygon returns error for empty canvas', async () => {
+        // Create an asset with no solid pixels
+        const emptyAsset = AssetClass.fromJSON({
+            name: 'empty_sprite',
+            width: 4, height: 4,
+            perspective: 'flat' as const,
+            palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]) as any,
+            layers: [
+                { id: 1, name: 'Base', type: 'image' as const, opacity: 255, visible: true },
+                { id: 2, name: 'Hitbox', type: 'shape' as const, opacity: 255, visible: true, role: 'hitbox', physics_layer: 1 },
+            ],
+            frames: [{ index: 0, duration_ms: 100 }],
+            tags: [],
+            cels: { '1/0': { x: 0, y: 0, data: Array.from({ length: 4 }, () => [0, 0, 0, 0]) } },
+        });
+        workspace.loadedAssets.set('empty_sprite', emptyAsset);
+
+        const r = await handler({
+            action: 'generate_collision_polygon', asset_name: 'empty_sprite',
+            layer_id: 1, frame_index: 0, target_layer_id: 2,
+        }) as any;
+        const data = JSON.parse(r.content[0].text);
+        // When there are no solid pixels, the handler returns { vertices: [] }
+        expect(data.vertices).toHaveLength(0);
+    });
 });
