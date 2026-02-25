@@ -15,8 +15,8 @@
  */
 
 export interface IsoPoint {
-    x: number;
-    y: number;
+  x: number;
+  y: number;
 }
 
 /**
@@ -24,15 +24,15 @@ export interface IsoPoint {
  * All results are rounded to integer pixels for crisp drawing.
  */
 export function isoToPixel(
-    col: number,
-    row: number,
-    elevation: number,
-    tileWidth: number,
-    tileHeight: number,
+  col: number,
+  row: number,
+  elevation: number,
+  tileWidth: number,
+  tileHeight: number,
 ): IsoPoint {
-    const x = Math.round((col - row) * (tileWidth / 2));
-    const y = Math.round((col + row) * (tileHeight / 2) - elevation * tileHeight);
-    return { x, y };
+  const x = Math.round((col - row) * (tileWidth / 2));
+  const y = Math.round((col + row) * (tileHeight / 2) - elevation * tileHeight);
+  return { x, y };
 }
 
 /**
@@ -45,19 +45,19 @@ export function isoToPixel(
  * @param tileHeight Full pixel height of one tile (the vertical span of the rhombus)
  */
 export function isoRhombusVertices(
-    origin: IsoPoint,
-    tileWidth: number,
-    tileHeight: number,
+  origin: IsoPoint,
+  tileWidth: number,
+  tileHeight: number,
 ): [IsoPoint, IsoPoint, IsoPoint, IsoPoint] {
-    const hw = Math.floor(tileWidth / 2);
-    const hh = Math.floor(tileHeight / 2);
+  const hw = Math.floor(tileWidth / 2);
+  const hh = Math.floor(tileHeight / 2);
 
-    return [
-        { x: origin.x, y: origin.y + hh },   // left tip
-        { x: origin.x + hw, y: origin.y }, // top tip
-        { x: origin.x + tileWidth - 1, y: origin.y + hh }, // right tip
-        { x: origin.x + hw, y: origin.y + tileHeight - 1 }, // bottom tip
-    ];
+  return [
+    { x: origin.x, y: origin.y + hh }, // left tip
+    { x: origin.x + hw, y: origin.y }, // top tip
+    { x: origin.x + tileWidth - 1, y: origin.y + hh }, // right tip
+    { x: origin.x + hw, y: origin.y + tileHeight - 1 }, // bottom tip
+  ];
 }
 
 /**
@@ -65,28 +65,29 @@ export function isoRhombusVertices(
  * using horizontal scanline filling between the four rhombus edges.
  */
 export function isoFillRhombus(
-    origin: IsoPoint,
-    tileWidth: number,
-    tileHeight: number,
+  origin: IsoPoint,
+  tileWidth: number,
+  tileHeight: number,
 ): IsoPoint[] {
-    const hw = tileWidth / 2;
-    const hh = tileHeight / 2;
+  const hw = tileWidth / 2;
+  const hh = tileHeight / 2;
 
-    const pixels: IsoPoint[] = [];
+  const pixels: IsoPoint[] = [];
 
-    for (let dy = 0; dy < tileHeight; dy++) {
-        // Horizontal half-width at this row (linear interpolation through the diamond)
-        const halfW = (dy < hh)
-            ? (dy + 1) * (hw / hh)               // upper half: widening
-            : (tileHeight - dy) * (hw / hh);      // lower half: narrowing
+  for (let dy = 0; dy < tileHeight; dy++) {
+    // Horizontal half-width at this row (linear interpolation through the diamond)
+    const halfW =
+      dy < hh
+        ? (dy + 1) * (hw / hh) // upper half: widening
+        : (tileHeight - dy) * (hw / hh); // lower half: narrowing
 
-        const startX = Math.round(origin.x + hw - halfW);
-        const endX = Math.round(origin.x + hw + halfW) - 1;
+    const startX = Math.round(origin.x + hw - halfW);
+    const endX = Math.round(origin.x + hw + halfW) - 1;
 
-        for (let px = startX; px <= endX; px++) {
-            pixels.push({ x: px, y: origin.y + dy });
-        }
+    for (let px = startX; px <= endX; px++) {
+      pixels.push({ x: px, y: origin.y + dy });
     }
+  }
 
-    return pixels;
+  return pixels;
 }

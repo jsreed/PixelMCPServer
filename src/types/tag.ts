@@ -20,28 +20,28 @@ export type Facing = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
  * A label applied to a contiguous sequence of frames.
  */
 export interface FrameTag {
-    type: 'frame';
-    /** Name of the sequence (e.g. "idle", "walk") */
-    name: string;
-    /** 0-based index of the first frame in the sequence */
-    start: number;
-    /** 0-based index of the last frame in the sequence (inclusive) */
-    end: number;
-    /** Playback progression */
-    direction: Direction;
-    /** Optional orientation indicator for directional sprites */
-    facing?: Facing;
+  type: 'frame';
+  /** Name of the sequence (e.g. "idle", "walk") */
+  name: string;
+  /** 0-based index of the first frame in the sequence */
+  start: number;
+  /** 0-based index of the last frame in the sequence (inclusive) */
+  end: number;
+  /** Playback progression */
+  direction: Direction;
+  /** Optional orientation indicator for directional sprites */
+  facing?: Facing;
 }
 
 /**
  * A label applied to an arbitrary set of layers.
  */
 export interface LayerTag {
-    type: 'layer';
-    /** Name of the layer group (e.g. "armor", "base_body") */
-    name: string;
-    /** Array of layer IDs included in this tag */
-    layers: number[];
+  type: 'layer';
+  /** Name of the layer group (e.g. "armor", "base_body") */
+  name: string;
+  /** Array of layer IDs included in this tag */
+  layers: number[];
 }
 
 /**
