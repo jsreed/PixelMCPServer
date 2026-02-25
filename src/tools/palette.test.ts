@@ -247,4 +247,42 @@ describe('palette tool', () => {
 
         expect(result.isError).toBe(true);
     });
+
+    // ─── fetch_lospec action ─────────────────────────────────────────
+
+    it('fetch_lospec fetches and applies palette from Lospec API', async () => {
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                name: 'test-palette',
+                colors: ['ff0000', '00ff00', '0000ff']
+            })
+        } as Response);
+
+        const result = await handler({
+            action: 'fetch_lospec', asset_name: 'sprite', name: 'test-palette',
+        }) as any;
+
+        expect(result.isError).toBeUndefined();
+
+        const asset = workspace.loadedAssets.get('sprite')!;
+        expect(asset.palette.get(0)).toEqual([0, 0, 0, 0]); // Index 0 is transparency
+        expect(asset.palette.get(1)).toEqual([255, 0, 0, 255]);
+        expect(asset.palette.get(2)).toEqual([0, 255, 0, 255]);
+        expect(asset.palette.get(3)).toEqual([0, 0, 255, 255]);
+    });
+
+    it('fetch_lospec handles API errors', async () => {
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: false,
+            status: 404
+        } as Response);
+
+        const result = await handler({
+            action: 'fetch_lospec', asset_name: 'sprite', name: 'missing-palette',
+        }) as any;
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain('missing-palette');
+    });
 });
