@@ -5,6 +5,7 @@ import { CelWriteCommand } from '../commands/cel-write-command.js';
 import { bresenhamLine } from '../algorithms/bresenham.js';
 import { midpointCircle, midpointEllipse } from '../algorithms/midpoint.js';
 import { floodFill } from '../algorithms/flood-fill.js';
+import { isoToPixel, isoFillRhombus } from '../algorithms/isometric.js';
 
 // ---------------------------------------------------------------------------
 // Zod Schema
@@ -75,8 +76,37 @@ const writePixelsOp = z.object({
     data: z.array(z.array(z.number().int().min(0).max(255))),
 });
 
+const isoTileOp = z.object({
+    action: z.literal('iso_tile'),
+    col: z.number().int(),
+    row: z.number().int(),
+    elevation: z.number().int().optional().default(0),
+    ...baseOp,
+});
+
+const isoCubeOp = z.object({
+    action: z.literal('iso_cube'),
+    col: z.number().int(),
+    row: z.number().int(),
+    elevation: z.number().int().optional().default(0),
+    top_color: z.number().int().min(0).max(255),
+    left_color: z.number().int().min(0).max(255),
+    right_color: z.number().int().min(0).max(255),
+});
+
+const isoWallOp = z.object({
+    action: z.literal('iso_wall'),
+    col: z.number().int(),
+    row: z.number().int(),
+    length: z.number().int().min(1),
+    axis: z.enum(['x', 'y']),
+    height: z.number().int().min(1).optional().default(1),
+    ...baseOp,
+});
+
 const drawOperationSchema = z.discriminatedUnion('action', [
     pixelOp, lineOp, rectOp, circleOp, ellipseOp, fillOp, writePixelsOp,
+    isoTileOp, isoCubeOp, isoWallOp,
 ]);
 
 const drawInputSchema = {
@@ -267,6 +297,103 @@ export function registerDrawTool(server: any) {
                                     }
                                 } else {
                                     for (const p of points) putPixel(p.x, p.y, op.color);
+                                }
+                                break;
+                            }
+                            case 'iso_tile': {
+                                if (asset.perspective !== 'isometric') {
+                                    throw new Error('iso_tile requires asset perspective = "isometric".');
+                                }
+                                const tw = asset.tile_width;
+                                const th = asset.tile_height;
+                                if (!tw || !th) throw new Error('iso_tile requires asset tile_width and tile_height.');
+                                const origin = isoToPixel(op.col, op.row, op.elevation ?? 0, tw, th);
+                                for (const px of isoFillRhombus(origin, tw, th)) {
+                                    putPixel(px.x, px.y, op.color);
+                                }
+                                break;
+                            }
+                            case 'iso_cube': {
+                                if (asset.perspective !== 'isometric') {
+                                    throw new Error('iso_cube requires asset perspective = "isometric".');
+                                }
+                                const tw = asset.tile_width;
+                                const th = asset.tile_height;
+                                if (!tw || !th) throw new Error('iso_cube requires asset tile_width and tile_height.');
+                                const elev = op.elevation ?? 0;
+                                const hw = Math.floor(tw / 2);
+                                const hh = Math.floor(th / 2);
+
+                                // Top face — flat rhombus lifted by one tile height
+                                const topOrigin = isoToPixel(op.col, op.row, elev + 1, tw, th);
+                                for (const px of isoFillRhombus(topOrigin, tw, th)) {
+                                    putPixel(px.x, px.y, op.top_color);
+                                }
+
+                                // Left face — parallelogram on the SW side of the cube
+                                // Top edge = bottom edge of the top-face
+                                const leftTopLeft = { x: topOrigin.x + hw, y: topOrigin.y + th - 1 };
+                                const leftTopRight = { x: topOrigin.x + tw - 1, y: topOrigin.y + hh };
+                                for (let vy = 0; vy < th; vy++) {
+                                    const x1 = leftTopLeft.x - Math.round(vy * (hw / th));
+                                    const x2 = leftTopRight.x - Math.round(vy * (hw / th));
+                                    for (let px = Math.min(x1, x2); px <= Math.max(x1, x2); px++) {
+                                        putPixel(px, leftTopLeft.y + vy, op.left_color);
+                                    }
+                                }
+
+                                // Right face — parallelogram on the SE side of the cube
+                                for (let vy = 0; vy < th; vy++) {
+                                    const x1 = leftTopLeft.x + Math.round(vy * (hw / th));
+                                    const x2 = (topOrigin.x) + Math.round(vy * (hw / th));
+                                    for (let px = Math.min(x1, x2); px <= Math.max(x1, x2); px++) {
+                                        putPixel(px, leftTopLeft.y + vy, op.right_color);
+                                    }
+                                }
+                                break;
+                            }
+                            case 'iso_wall': {
+                                if (asset.perspective !== 'isometric') {
+                                    throw new Error('iso_wall requires asset perspective = "isometric".');
+                                }
+                                const tw = asset.tile_width;
+                                const th = asset.tile_height;
+                                if (!tw || !th) throw new Error('iso_wall requires asset tile_width and tile_height.');
+                                const elev = 0;
+                                const wallH = op.height ?? 1;
+
+                                // Draw one tile-wide segment at each grid position along the axis
+                                for (let i = 0; i < op.length; i++) {
+                                    const c = op.axis === 'x' ? op.col + i : op.col;
+                                    const r = op.axis === 'y' ? op.row + i : op.row;
+
+                                    // Stack wall face panels vertically for each elevation step
+                                    for (let e = elev; e < elev + wallH; e++) {
+                                        // Origin of this wall segment = top face at this elevation
+                                        const origin = isoToPixel(c, r, e + 1, tw, th);
+                                        const hw = Math.floor(tw / 2);
+                                        const hh = Math.floor(th / 2);
+
+                                        if (op.axis === 'x') {
+                                            // x-axis wall: left face of the tile (SW slope)
+                                            for (let vy = 0; vy < th; vy++) {
+                                                const x1 = origin.x + hw - Math.round(vy * (hw / th));
+                                                const x2 = origin.x + tw - Math.round(vy * (hw / th));
+                                                for (let px = x1; px < x2; px++) {
+                                                    putPixel(px, origin.y + hh + vy, op.color);
+                                                }
+                                            }
+                                        } else {
+                                            // y-axis wall: right face of the tile (SE slope)
+                                            for (let vy = 0; vy < th; vy++) {
+                                                const x1 = origin.x + Math.round(vy * (hw / th));
+                                                const x2 = origin.x + hw + Math.round(vy * (hw / th));
+                                                for (let px = x1; px < x2; px++) {
+                                                    putPixel(px, origin.y + hh + vy, op.color);
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                                 break;
                             }

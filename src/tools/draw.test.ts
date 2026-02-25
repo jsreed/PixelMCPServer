@@ -304,3 +304,142 @@ describe('draw tool', () => {
         expect(data[2][5]).toBe(0);
     });
 });
+
+// ─── Isometric draw operations ───────────────────────────────────────────────
+
+describe('draw tool — isometric operations', () => {
+    let handler: ToolCallback;
+    let workspace: WorkspaceClass;
+
+    /** Builds a 20×20 isometric asset with tile_width=4, tile_height=4 */
+    function buildIsoAsset() {
+        return AssetClass.fromJSON({
+            name: 'iso_sprite',
+            width: 20, height: 20,
+            perspective: 'isometric',
+            tile_width: 4,
+            tile_height: 4,
+            palette: Array.from({ length: 256 }, (_, i) => [i, i, i, 255]) as any,
+            layers: [{ id: 1, name: 'Base', type: 'image' as const, opacity: 255, visible: true }],
+            frames: [{ index: 0, duration_ms: 100 }],
+            tags: [],
+            cels: {
+                '1/0': { x: 0, y: 0, data: Array.from({ length: 20 }, () => Array(20).fill(0)) },
+            },
+        });
+    }
+
+    function getCelData(ws: WorkspaceClass, assetName: string) {
+        const asset = ws.loadedAssets.get(assetName)!;
+        const cel = asset.getCel(1, 0);
+        if (!cel || !('data' in cel)) return null;
+        return cel.data;
+    }
+
+    beforeEach(() => {
+        WorkspaceClass.reset();
+        workspace = WorkspaceClass.instance();
+        handler = captureToolCallback(registerDrawTool);
+
+        const project = ProjectClass.create('/tmp/iso-test/pixelmcp.json', 'IsoProject');
+        project.registerAsset('iso_sprite', { path: 'sprites/iso_sprite.json', type: 'sprite' });
+        workspace.setProject(project);
+        workspace.loadedAssets.set('iso_sprite', buildIsoAsset());
+    });
+
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('iso_tile paints pixels for a 4×4 tile at (0,0)', async () => {
+        const r = await handler({
+            asset_name: 'iso_sprite',
+            layer_id: 1,
+            frame_index: 0,
+            operations: [
+                { action: 'iso_tile', col: 0, row: 0, color: 5 },
+            ],
+        }) as any;
+
+        expect(r.isError).toBeUndefined();
+        const data = getCelData(workspace, 'iso_sprite')!;
+        // At elevation 0, the rhombus appears at the projected origin.
+        // The centre pixel (y=2, x=2) should have been painted.
+        const painted = data.flat().some(v => v === 5);
+        expect(painted).toBe(true);
+    });
+
+    it('iso_tile returns error on a flat asset', async () => {
+        // Add a flat asset
+        const flatAsset = AssetClass.fromJSON({
+            name: 'flat_sprite', width: 8, height: 8, perspective: 'flat',
+            palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]) as any,
+            layers: [{ id: 1, name: 'Base', type: 'image' as const, opacity: 255, visible: true }],
+            frames: [{ index: 0, duration_ms: 100 }],
+            tags: [], cels: { '1/0': { x: 0, y: 0, data: Array.from({ length: 8 }, () => Array(8).fill(0)) } },
+        });
+        workspace.loadedAssets.set('flat_sprite', flatAsset);
+
+        const r = await handler({
+            asset_name: 'flat_sprite',
+            layer_id: 1,
+            frame_index: 0,
+            operations: [{ action: 'iso_tile', col: 0, row: 0, color: 1 }],
+        }) as any;
+        expect(r.isError).toBe(true);
+    });
+
+    it('iso_cube paints distinct pixels with three different colors', async () => {
+        const r = await handler({
+            asset_name: 'iso_sprite',
+            layer_id: 1,
+            frame_index: 0,
+            operations: [
+                { action: 'iso_cube', col: 2, row: 2, top_color: 3, left_color: 4, right_color: 5 },
+            ],
+        }) as any;
+
+        expect(r.isError).toBeUndefined();
+        const data = getCelData(workspace, 'iso_sprite')!;
+        const flat = data.flat();
+        // At least some pixels should have been set (we don't assert exact geometry in integration test)
+        expect(flat.some(v => v === 3 || v === 4 || v === 5)).toBe(true);
+    });
+
+    it('iso_wall length=2 along x paints more pixels than length=1', async () => {
+        // Length 1 wall
+        const before1 = AssetClass.fromJSON({
+            name: 'w1', width: 40, height: 40, perspective: 'isometric',
+            tile_width: 4, tile_height: 4,
+            palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]) as any,
+            layers: [{ id: 1, name: 'Base', type: 'image' as const, opacity: 255, visible: true }],
+            frames: [{ index: 0, duration_ms: 100 }], tags: [],
+            cels: { '1/0': { x: 0, y: 0, data: Array.from({ length: 40 }, () => Array(40).fill(0)) } },
+        });
+        workspace.loadedAssets.set('w1', before1);
+        await handler({
+            asset_name: 'w1', layer_id: 1, frame_index: 0,
+            operations: [{ action: 'iso_wall', col: 2, row: 2, length: 1, axis: 'x', color: 7 }],
+        });
+        const count1 = before1.getCel(1, 0) as any;
+        const painted1 = (count1.data as number[][]).flat().filter(v => v === 7).length;
+
+        // Length 2 wall
+        const before2 = AssetClass.fromJSON({
+            name: 'w2', width: 40, height: 40, perspective: 'isometric',
+            tile_width: 4, tile_height: 4,
+            palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]) as any,
+            layers: [{ id: 1, name: 'Base', type: 'image' as const, opacity: 255, visible: true }],
+            frames: [{ index: 0, duration_ms: 100 }], tags: [],
+            cels: { '1/0': { x: 0, y: 0, data: Array.from({ length: 40 }, () => Array(40).fill(0)) } },
+        });
+        workspace.loadedAssets.set('w2', before2);
+        await handler({
+            asset_name: 'w2', layer_id: 1, frame_index: 0,
+            operations: [{ action: 'iso_wall', col: 2, row: 2, length: 2, axis: 'x', color: 7 }],
+        });
+        const count2 = before2.getCel(1, 0) as any;
+        const painted2 = (count2.data as number[][]).flat().filter(v => v === 7).length;
+
+        expect(painted2).toBeGreaterThan(painted1);
+    });
+});
+

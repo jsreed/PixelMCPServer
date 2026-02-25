@@ -211,18 +211,18 @@ Remaining actions that have additional dependencies or are non-essential for the
 
 #### 2.5.3 `asset` — Remaining Actions
 
-- [ ] **2.5.3.1** **Shape management**: `add_shape`, `update_shape`, `remove_shape`
-- [ ] **2.5.3.2** **`detect_banding`** — read-only analysis using banding detection algorithm ([§1.5.7](#157-banding-detection))
-- [ ] **2.5.3.3** **`generate_collision_polygon`** — marching squares + RDP using algorithms from [§1.5.4](#154-marching-squares-contour-trace) and [§1.5.5](#155-ramer-douglas-peucker-simplification). Validate source is image layer, target is shape layer.
-- [ ] **2.5.3.4** **Asset remaining action tests** — shape CRUD, banding detection on known patterns, collision polygon generation from test silhouettes
+- [x] **2.5.3.1** **Shape management**: `add_shape`, `update_shape`, `remove_shape`
+- [x] **2.5.3.2** **`detect_banding`** — read-only analysis using banding detection algorithm ([§1.5.7](#157-banding-detection))
+- [x] **2.5.3.3** **`generate_collision_polygon`** — marching squares + RDP using algorithms from [§1.5.4](#154-marching-squares-contour-trace) and [§1.5.5](#155-ramer-douglas-peucker-simplification). Validate source is image layer, target is shape layer.
+- [x] **2.5.3.4** **Asset remaining action tests** — shape CRUD, banding detection on known patterns, collision polygon generation from test silhouettes
 
 #### 2.5.4 `draw` — Isometric Operations
 
-- [ ] **2.5.4.1** **Iso projection helpers** — `isoToPixel(col, row, elevation, tileW, tileH)` using dimetric 2:1 formula from [design §2.2.4](design.md). Add to `src/algorithms/`.
-- [ ] **2.5.4.2** **`iso_tile`** — fill flat rhombus at grid position
-- [ ] **2.5.4.3** **`iso_cube`** — three-face cube with top/left/right colors
-- [ ] **2.5.4.4** **`iso_wall`** — wall segment along x or y axis
-- [ ] **2.5.4.5** **Isometric tests** — projection formula verification, iso_tile pixel output, selection mask in pixel space
+- [x] **2.5.4.1** **Iso projection helpers** — `isoToPixel(col, row, elevation, tileW, tileH)` using dimetric 2:1 formula from [design §2.2.4](design.md). Add to `src/algorithms/`.
+- [x] **2.5.4.2** **`iso_tile`** — fill flat rhombus at grid position
+- [x] **2.5.4.3** **`iso_cube`** — three-face cube with top/left/right colors
+- [x] **2.5.4.4** **`iso_wall`** — wall segment along x or y axis
+- [x] **2.5.4.5** **Isometric tests** — projection formula verification, iso_tile pixel output, selection mask in pixel space
 
 #### 2.5.5 `project` — `add_file` Action
 

@@ -60,6 +60,14 @@ export class AssetClass {
         return this._data.perspective;
     }
 
+    get tile_width(): number | undefined {
+        return this._data.tile_width;
+    }
+
+    get tile_height(): number | undefined {
+        return this._data.tile_height;
+    }
+
     // Returns a copy of the layers array
     get layers(): Layer[] {
         return [...this._data.layers];
