@@ -209,4 +209,98 @@ describe('draw tool', () => {
         workspace.redo();
         expect(getCelData()![0][0]).toBe(1); // Redone
     });
+
+    it('respects the active selection mask', async () => {
+        workspace.selection = {
+            asset_name: 'test_sprite',
+            layer_id: 1,
+            frame_index: 0,
+            x: 2, y: 2,
+            width: 3, height: 3,
+            mask: [
+                [true, true, true],
+                [true, false, true],
+                [true, true, true]
+            ]
+        };
+
+        // Try to draw a large filled rect covering the selection and beyond
+        await handler({
+            layer_id: 1, frame_index: 0,
+            operations: [{ action: 'rect', x: 0, y: 0, width: 10, height: 10, color: 1, filled: true }]
+        });
+
+        const data = getCelData()!;
+
+        // Inside selection, mask is true
+        expect(data[2][2]).toBe(1);
+        expect(data[2][3]).toBe(1);
+        expect(data[4][4]).toBe(1);
+
+        // Inside selection bounds, but mask is false
+        expect(data[3][3]).toBe(0);
+
+        // Outside selection bounds entirely
+        expect(data[0][0]).toBe(0);
+        expect(data[5][5]).toBe(0);
+    });
+
+    it('ignores selection mask if it targets a different asset', async () => {
+        workspace.selection = {
+            asset_name: 'different_sprite', // Different asset
+            layer_id: 1,
+            frame_index: 0,
+            x: 2, y: 2,
+            width: 3, height: 3,
+            mask: [
+                [true, true, true],
+                [true, false, true],
+                [true, true, true]
+            ]
+        };
+
+        await handler({
+            layer_id: 1, frame_index: 0,
+            operations: [{ action: 'pixel', x: 3, y: 3, color: 1 }]
+        });
+
+        const data = getCelData()!;
+
+        // Should draw because the selection mask doesn't apply to this asset
+        expect(data[3][3]).toBe(1);
+    });
+
+    it('flood fill respects selection boundaries', async () => {
+        workspace.selection = {
+            asset_name: 'test_sprite',
+            layer_id: 1,
+            frame_index: 0,
+            x: 0, y: 0,
+            width: 5, height: 5,
+            mask: Array.from({ length: 5 }, () => new Array(5).fill(true))
+        };
+
+        // Make the right edge of mask false
+        for (let y = 0; y < 5; y++) {
+            workspace.selection.mask[y][4] = false;
+        }
+
+        await handler({
+            layer_id: 1, frame_index: 0,
+            operations: [
+                { action: 'fill', x: 2, y: 2, color: 8 }
+            ]
+        });
+
+        const data = getCelData()!;
+
+        expect(data[2][2]).toBe(8); // inside selection
+        expect(data[2][3]).toBe(8); // inside selection
+
+        // At x=4, mask is false. So fill should treat it as boundary
+        expect(data[2][4]).toBe(0);
+
+        // At x=5, outside the bounding box of selection. Fill should never reach it
+        expect(data[2][5]).toBe(0);
+    });
 });

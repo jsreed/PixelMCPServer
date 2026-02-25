@@ -199,8 +199,8 @@ Remaining actions that have additional dependencies or are non-essential for the
 
 #### 2.5.1 `draw` — Selection Mask Support
 
-- [ ] **2.5.1.1** **Retrofit selection masking into draw** — skip pixels outside active selection for all primitives and `write_pixels`
-- [ ] **2.5.1.2** **Selection mask tests for draw** — draw with active selection, verify only selected pixels modified
+- [x] **2.5.1.1** **Retrofit selection masking into draw** — skip pixels outside active selection for all primitives and `write_pixels`
+- [x] **2.5.1.2** **Selection mask tests for draw** — draw with active selection, verify only selected pixels modified
 
 #### 2.5.2 `palette` — Remaining Actions
 

@@ -157,6 +157,12 @@ export function registerDrawTool(server: any) {
                     const w = asset.width;  // Use asset dimensions to constrain drawing
                     const h = asset.height;
 
+                    const activeSelection = workspace.selection &&
+                        workspace.selection.asset_name === assetName &&
+                        workspace.selection.layer_id === layerId &&
+                        workspace.selection.frame_index === frameIndex
+                        ? workspace.selection : null;
+
                     // Ensure cel data is initialized to full size
                     // (getMutableCel should handle this generally, but ensure safety)
                     while (data.length < h) data.push(new Array(w).fill(0));
@@ -168,6 +174,18 @@ export function registerDrawTool(server: any) {
                     const putPixel = (px: number, py: number, color: number) => {
                         px = Math.round(px);
                         py = Math.round(py);
+
+                        if (activeSelection) {
+                            const sx = px - activeSelection.x;
+                            const sy = py - activeSelection.y;
+                            if (sx < 0 || sx >= activeSelection.width || sy < 0 || sy >= activeSelection.height) {
+                                return; // Outside selection bounds
+                            }
+                            if (!activeSelection.mask[sy][sx]) {
+                                return; // Not selected
+                            }
+                        }
+
                         if (px >= 0 && px < w && py >= 0 && py < h) {
                             data[py][px] = color;
                         }
