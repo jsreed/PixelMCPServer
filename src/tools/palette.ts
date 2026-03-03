@@ -62,7 +62,7 @@ export function registerPaletteTool(server: McpServer): void {
         case 'info':
           return handleInfo(asset);
         case 'set':
-          return handleSet(workspace, asset, args.index, args.rgba as number[] | undefined);
+          return handleSet(workspace, asset, args.index, args.rgba);
         case 'set_bulk':
           return handleSetBulk(
             workspace,
@@ -280,7 +280,7 @@ async function handleLoad(workspace: Workspace, asset: Asset, filePath: string |
   for (let i = 0; i < paletteData.colors.length && i < 256; i++) {
     const c = paletteData.colors[i];
     if (c) {
-      bulkEntries.push([i, c as Color]);
+      bulkEntries.push([i, c]);
     }
   }
 
@@ -355,7 +355,7 @@ async function handleFetchLospec(workspace: Workspace, asset: Asset, slug: strin
     return errors.lospecNotFound(slug);
   }
 
-  if (!data.colors || !Array.isArray(data.colors)) {
+  if (!Array.isArray(data.colors)) {
     return errors.lospecNotFound(slug);
   }
 

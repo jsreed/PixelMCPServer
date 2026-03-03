@@ -54,7 +54,8 @@ describe('packRectangles (Shelf Bin-Packing)', () => {
     expect(result.placements).toHaveLength(3);
 
     // The tallest rect should be placed first due to sorting
-    const tallPlacement = result.placements.find((p) => p.id === 'tall')!;
+    const tallPlacement = result.placements.find((p) => p.id === 'tall');
+    if (!tallPlacement) throw new Error('tall not found');
     expect(tallPlacement.x).toBe(0);
     expect(tallPlacement.y).toBe(0);
 
@@ -79,8 +80,9 @@ describe('packRectangles (Shelf Bin-Packing)', () => {
     expect(withPadArea).toBeGreaterThan(noPadArea);
 
     // Verify the gap between the two placements
-    const a = withPad.placements.find((p) => p.id === 'a')!;
-    const b = withPad.placements.find((p) => p.id === 'b')!;
+    const a = withPad.placements.find((p) => p.id === 'a');
+    const b = withPad.placements.find((p) => p.id === 'b');
+    if (!a || !b) throw new Error('a or b not found');
 
     // They should be separated by at least `padding` pixels
     if (a.y === b.y) {
@@ -96,7 +98,7 @@ describe('packRectangles (Shelf Bin-Packing)', () => {
 
   it('includes all input rectangles in the output', () => {
     const rects = Array.from({ length: 20 }, (_, i) => ({
-      id: `rect_${i}`,
+      id: `rect_${String(i)}`,
       width: 8 + (i % 5) * 4,
       height: 8 + (i % 3) * 8,
     }));
@@ -119,7 +121,8 @@ describe('packRectangles (Shelf Bin-Packing)', () => {
 
     expect(result.placements).toHaveLength(2);
     // The huge rect should still be placed
-    const huge = result.placements.find((p) => p.id === 'huge')!;
+    const huge = result.placements.find((p) => p.id === 'huge');
+    if (!huge) throw new Error('huge not found');
     expect(huge.x).toBe(0);
     expect(huge.y).toBe(0);
     expect(huge.x + huge.width).toBeLessThanOrEqual(result.width);
@@ -129,7 +132,7 @@ describe('packRectangles (Shelf Bin-Packing)', () => {
     const rects = [
       { id: 'giant', width: 64, height: 64 },
       ...Array.from({ length: 16 }, (_, i) => ({
-        id: `tiny_${i}`,
+        id: `tiny_${String(i)}`,
         width: 4,
         height: 4,
       })),
@@ -154,7 +157,7 @@ describe('packRectangles (Shelf Bin-Packing)', () => {
 
   it('all placements have non-negative coordinates', () => {
     const rects = Array.from({ length: 30 }, (_, i) => ({
-      id: `r_${i}`,
+      id: `r_${String(i)}`,
       width: 5 + (i % 7) * 3,
       height: 5 + (i % 5) * 4,
     }));

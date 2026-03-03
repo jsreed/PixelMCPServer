@@ -7,28 +7,29 @@ import { registerAssetTool } from './asset.js';
 import { registerPaletteTool } from './palette.js';
 import { registerDrawTool } from './draw.js';
 import { saveAssetFile } from '../io/asset-io.js';
-import * as fs from 'node:fs';
 
 // Mock IO
-const virtualFs = new Map<string, any>();
+const virtualFs = new Map<string, unknown>();
 
 vi.mock('../io/asset-io.js', () => ({
-  loadAssetFile: vi.fn().mockImplementation(async (path: string) => {
-    if (!virtualFs.has(path)) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
-    return virtualFs.get(path);
+  loadAssetFile: vi.fn().mockImplementation((path: string) => {
+    if (!virtualFs.has(path)) return Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+    return Promise.resolve(virtualFs.get(path));
   }),
-  saveAssetFile: vi.fn().mockImplementation(async (path: string, asset: any) => {
+  saveAssetFile: vi.fn().mockImplementation((path: string, asset: unknown) => {
     virtualFs.set(path, JSON.parse(JSON.stringify(asset)));
+    return Promise.resolve();
   }),
 }));
 
 vi.mock('../io/project-io.js', () => ({
-  loadProjectFile: vi.fn().mockImplementation(async (path: string) => {
-    if (!virtualFs.has(path)) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
-    return virtualFs.get(path);
+  loadProjectFile: vi.fn().mockImplementation((path: string) => {
+    if (!virtualFs.has(path)) return Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+    return Promise.resolve(virtualFs.get(path));
   }),
-  saveProjectFile: vi.fn().mockImplementation(async (path: string, data: any) => {
+  saveProjectFile: vi.fn().mockImplementation((path: string, data: unknown) => {
     virtualFs.set(path, JSON.parse(JSON.stringify(data)));
+    return Promise.resolve();
   }),
 }));
 
@@ -37,58 +38,77 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
 }));
 
-type ToolDef = {
+interface ToolResult {
+  content: Array<{ type: string; text: string }>;
+  isError?: boolean;
+}
+
+type ToolHandler = (args: Record<string, unknown>) => Promise<ToolResult>;
+
+interface ToolDef {
   name: string;
   description: string;
-  schema: z.ZodTypeAny;
-  handler: (args: any) => Promise<any>;
-};
+  schema: z.ZodType;
+  handler: ToolHandler;
+}
 
 function createMockServer() {
   const tools = new Map<string, ToolDef>();
   const mockServer = {
-    registerTool(name: string, arg2: any, arg3: any, arg4?: any) {
-      let config;
-      let callback;
+    registerTool(
+      name: string,
+      arg2: string | Record<string, unknown>,
+      arg3: Record<string, unknown> | ToolHandler,
+      arg4?: ToolHandler,
+    ) {
+      let config: Record<string, unknown>;
+      let callback: ToolHandler;
       if (typeof arg2 === 'string') {
-        config = arg3;
-        callback = arg4;
+        config = arg3 as Record<string, unknown>;
+        callback = arg4 as ToolHandler;
       } else {
         config = arg2;
-        callback = arg3;
+        callback = arg3 as ToolHandler;
       }
 
       // If the schema is a plain object, wrap it in z.object()
-      let schema = config.inputSchema;
+      let schema = config.inputSchema as z.ZodType | Record<string, z.ZodType>;
       if (!(schema instanceof z.ZodType)) {
         schema = z.object(schema);
       }
 
-      tools.set(name, { name, description: config.description || '', schema, handler: callback });
+      tools.set(name, {
+        name,
+        description: (config.description as string) || '',
+        schema,
+        handler: callback,
+      });
     },
   };
+  /* eslint-disable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any */
   registerProjectTool(mockServer as any);
   registerWorkspaceTool(mockServer as any);
   registerAssetTool(mockServer as any);
   registerPaletteTool(mockServer as any);
   registerDrawTool(mockServer as any);
+  /* eslint-enable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any */
 
   return {
     tools,
-    dispatch: async (toolName: string, args: any) => {
+    dispatch: async (toolName: string, args: Record<string, unknown>): Promise<ToolResult> => {
       const tool = tools.get(toolName);
       if (!tool) throw new Error(`Tool not found: ${toolName}`);
 
       // Simulating MCP SDK Zod validation
-      const parsedArgs = tool.schema.parse(args);
+      const parsedArgs = tool.schema.parse(args) as Record<string, unknown>;
 
       return await tool.handler(parsedArgs);
     },
   };
 }
 
-function unwrap(res: any) {
-  if (res && res.isError) {
+function unwrap(res: ToolResult): ToolResult {
+  if (res.isError) {
     throw new Error(`Domain Error: ${res.content[0].text}`);
   }
   return res;
@@ -96,7 +116,7 @@ function unwrap(res: any) {
 
 describe('Minimum Viable Loop Integration', () => {
   let mockServer: ReturnType<typeof createMockServer>;
-  let dispatch: (toolName: string, args: any) => Promise<any>;
+  let dispatch: (toolName: string, args: Record<string, unknown>) => Promise<ToolResult>;
 
   beforeEach(() => {
     WorkspaceClass.reset();
@@ -121,10 +141,10 @@ describe('Minimum Viable Loop Integration', () => {
 
     it('returns expected error shapes when domain constraints fail', async () => {
       // Trying to use workspace tools before initializing a project
-      const result = (await dispatch('workspace', {
+      const result = await dispatch('workspace', {
         action: 'load_asset',
         asset_name: 'dummy',
-      })) as any;
+      });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('No project loaded');
     });
@@ -189,7 +209,7 @@ describe('Minimum Viable Loop Integration', () => {
         }),
       );
 
-      const celData = JSON.parse(res.content[0].text).data;
+      const celData = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
       expect(celData[2][2]).toBe(1); // rect corner
       expect(celData[3][3]).toBe(2); // inner pixel
       expect(celData[0][0]).toBe(0); // transparent background
@@ -202,14 +222,14 @@ describe('Minimum Viable Loop Integration', () => {
       unwrap(await dispatch('workspace', { action: 'unload_asset', asset_name: 'hero' }));
 
       res = unwrap(await dispatch('workspace', { action: 'info' }));
-      let info = JSON.parse(res.content[0].text);
+      let info = JSON.parse(res.content[0].text) as { loadedAssets: unknown[] };
       expect(info.loadedAssets.length).toBe(0);
 
       // 8. Load Asset
       unwrap(await dispatch('workspace', { action: 'load_asset', asset_name: 'hero' }));
 
       res = unwrap(await dispatch('workspace', { action: 'info' }));
-      info = JSON.parse(res.content[0].text);
+      info = JSON.parse(res.content[0].text) as { loadedAssets: unknown[] };
       expect(info.loadedAssets.length).toBe(1);
 
       // 9. Read back to verify persistence
@@ -222,7 +242,7 @@ describe('Minimum Viable Loop Integration', () => {
         }),
       );
 
-      const loadedData = JSON.parse(res.content[0].text).data;
+      const loadedData = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
       expect(loadedData[2][2]).toBe(1); // rect corner
       expect(loadedData[3][3]).toBe(2); // inner pixel
     });
@@ -263,7 +283,7 @@ describe('Minimum Viable Loop Integration', () => {
           frame_index: 0,
         }),
       );
-      expect(JSON.parse(res.content[0].text).data[0][0]).toBe(1);
+      expect((JSON.parse(res.content[0].text) as { data: number[][] }).data[0][0]).toBe(1);
 
       // Undo
       unwrap(await dispatch('workspace', { action: 'undo' }));
@@ -277,7 +297,7 @@ describe('Minimum Viable Loop Integration', () => {
           frame_index: 0,
         }),
       );
-      expect(JSON.parse(res.content[0].text).data == null).toBe(true);
+      expect((JSON.parse(res.content[0].text) as { data: unknown }).data == null).toBe(true);
 
       // Redo
       unwrap(await dispatch('workspace', { action: 'redo' }));
@@ -291,7 +311,7 @@ describe('Minimum Viable Loop Integration', () => {
           frame_index: 0,
         }),
       );
-      expect(JSON.parse(res.content[0].text).data[0][0]).toBe(1);
+      expect((JSON.parse(res.content[0].text) as { data: number[][] }).data[0][0]).toBe(1);
     });
   });
 });

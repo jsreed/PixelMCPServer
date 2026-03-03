@@ -1,10 +1,9 @@
 import { z } from 'zod';
 import { type McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { getWorkspace } from '../classes/workspace.js';
-import { requireAsset } from './asset.js';
+import { requireAsset, isError } from './asset.js';
 import { CelWriteCommand } from '../commands/cel-write-command.js';
 import * as errors from '../errors.js';
-import { type SelectionMask } from '../types/selection.js';
 
 /**
  * Zod schema for selection tool.
@@ -64,6 +63,25 @@ const selectionInputSchema = z.discriminatedUnion('action', [
   }),
 ]);
 
+type SelectionInput = z.infer<typeof selectionInputSchema>;
+
+/** Get the first key from loaded assets map, or undefined. */
+function firstLoadedAssetName(map: Map<string, unknown>): string | undefined {
+  for (const key of map.keys()) {
+    return key;
+  }
+  return undefined;
+}
+
+/** Extract asset_name from non-paste/clear variants. */
+function getSharedFields(args: Exclude<SelectionInput, { action: 'paste' } | { action: 'clear' }>) {
+  return {
+    assetName: args.asset_name,
+    layerId: args.layer_id ?? 0,
+    frameIndex: args.frame_index ?? 0,
+  };
+}
+
 export function registerSelectionTool(server: McpServer): void {
   server.registerTool(
     'selection',
@@ -72,7 +90,7 @@ export function registerSelectionTool(server: McpServer): void {
       description: 'Edit selection masks and perform clipboard operations.',
       inputSchema: selectionInputSchema,
     },
-    async (args) => {
+    (args: SelectionInput) => {
       const workspace = getWorkspace();
 
       // Clear does not require an asset
@@ -93,11 +111,11 @@ export function registerSelectionTool(server: McpServer): void {
 
         const targetAsset =
           args.target_asset_name ??
-          (workspace.loadedAssets.keys().next().value as string | undefined);
+          firstLoadedAssetName(workspace.loadedAssets);
         if (!targetAsset) return errors.invalidArgument('No asset loaded to paste into.');
 
         const assetOrError = requireAsset(workspace, targetAsset);
-        if ('isError' in assetOrError) return assetOrError as any;
+        if (isError(assetOrError)) return assetOrError;
         const asset = assetOrError;
 
         const layerId = args.target_layer_id ?? 0;
@@ -114,8 +132,8 @@ export function registerSelectionTool(server: McpServer): void {
           const cmd = new CelWriteCommand(asset, layerId, frameIndex, () => {
             let cel = asset.getMutableCel(layerId, frameIndex);
             if (!cel) {
-              const data = Array.from({ length: asset.height }, () =>
-                new Array(asset.width).fill(0),
+              const data: number[][] = Array.from({ length: asset.height }, () =>
+                new Array<number>(asset.width).fill(0),
               );
               asset.setCel(layerId, frameIndex, { x: 0, y: 0, data });
               cel = asset.getMutableCel(layerId, frameIndex);
@@ -143,7 +161,6 @@ export function registerSelectionTool(server: McpServer): void {
             }
           });
 
-          cmd.execute();
           workspace.pushCommand(cmd);
 
           return {
@@ -151,28 +168,25 @@ export function registerSelectionTool(server: McpServer): void {
               {
                 type: 'text' as const,
                 text: JSON.stringify({
-                  message: `Pasted clipboard to layer ${layerId} frame ${frameIndex} at (${pasteX}, ${pasteY}).`,
+                  message: `Pasted clipboard to layer ${String(layerId)} frame ${String(frameIndex)} at (${String(pasteX)}, ${String(pasteY)}).`,
                 }),
               },
             ],
           };
-        } catch (e: any) {
-          return errors.domainError(e.message);
+        } catch (e: unknown) {
+          return errors.domainError(e instanceof Error ? e.message : String(e));
         }
       }
 
       // All other actions require a target asset
+      const { assetName: rawAssetName, layerId, frameIndex } = getSharedFields(args);
       const assetName =
-        (args as any).asset_name ??
-        (workspace.loadedAssets.keys().next().value as string | undefined);
+        rawAssetName ?? firstLoadedAssetName(workspace.loadedAssets);
       if (!assetName) return errors.invalidArgument('No asset loaded for selection target.');
 
       const assetOrError = requireAsset(workspace, assetName);
-      if ('isError' in assetOrError) return assetOrError as any;
+      if (isError(assetOrError)) return assetOrError;
       const asset = assetOrError;
-
-      const layerId = (args as any).layer_id ?? 0;
-      const frameIndex = (args as any).frame_index ?? 0;
 
       const maskW = asset.width;
       const maskH = asset.height;
@@ -199,7 +213,9 @@ export function registerSelectionTool(server: McpServer): void {
             if (cw <= 0 || ch <= 0) {
               workspace.selection = null;
             } else {
-              const mask = Array.from({ length: ch }, () => new Array(cw).fill(true));
+              const mask: boolean[][] = Array.from({ length: ch }, () =>
+                new Array<boolean>(cw).fill(true),
+              );
               workspace.selection = {
                 asset_name: assetName,
                 layer_id: layerId,
@@ -222,7 +238,9 @@ export function registerSelectionTool(server: McpServer): void {
           };
         }
         case 'all': {
-          const mask = Array.from({ length: maskH }, () => new Array(maskW).fill(true));
+          const mask: boolean[][] = Array.from({ length: maskH }, () =>
+            new Array<boolean>(maskW).fill(true),
+          );
           workspace.selection = {
             asset_name: assetName,
             layer_id: layerId,
@@ -248,12 +266,16 @@ export function registerSelectionTool(server: McpServer): void {
             workspace.selection.frame_index !== frameIndex
           ) {
             // Inverse of nothing is everything
-            newMask = Array.from({ length: maskH }, () => new Array(maskW).fill(true));
+            newMask = Array.from({ length: maskH }, () =>
+              new Array<boolean>(maskW).fill(true),
+            );
           } else {
             const s = workspace.selection;
             // Inverse of a masked region implies we now select everything, but "unselect" what was selected.
             // So the new bounds is the whole image.
-            newMask = Array.from({ length: maskH }, () => new Array(maskW).fill(true));
+            newMask = Array.from({ length: maskH }, () =>
+              new Array<boolean>(maskW).fill(true),
+            );
             for (let dy = 0; dy < s.height; dy++) {
               for (let dx = 0; dx < s.width; dx++) {
                 if (s.mask[dy][dx]) {
@@ -282,8 +304,8 @@ export function registerSelectionTool(server: McpServer): void {
           const targetColor = args.color;
           const cel = asset.getCel(layerId, frameIndex);
 
-          let newMask: boolean[][] = Array.from({ length: maskH }, () =>
-            new Array(maskW).fill(false),
+          const newMask: boolean[][] = Array.from({ length: maskH }, () =>
+            new Array<boolean>(maskW).fill(false),
           );
           let found = false;
 
@@ -316,7 +338,9 @@ export function registerSelectionTool(server: McpServer): void {
             content: [
               {
                 type: 'text' as const,
-                text: JSON.stringify({ message: `Selection by color ${targetColor} complete.` }),
+                text: JSON.stringify({
+                  message: `Selection by color ${String(targetColor)} complete.`,
+                }),
               },
             ],
           };
@@ -334,7 +358,7 @@ export function registerSelectionTool(server: McpServer): void {
 
           const cel = asset.getCel(layerId, frameIndex);
           const clipData: number[][] = Array.from({ length: s.height }, () =>
-            new Array(s.width).fill(0),
+            new Array<number>(s.width).fill(0),
           );
 
           if (cel && 'data' in cel) {
@@ -357,7 +381,10 @@ export function registerSelectionTool(server: McpServer): void {
 
           return {
             content: [
-              { type: 'text' as const, text: JSON.stringify({ message: 'Copied to clipboard.' }) },
+              {
+                type: 'text' as const,
+                text: JSON.stringify({ message: 'Copied to clipboard.' }),
+              },
             ],
           };
         }
@@ -374,7 +401,7 @@ export function registerSelectionTool(server: McpServer): void {
 
           const cel = asset.getCel(layerId, frameIndex);
           const clipData: number[][] = Array.from({ length: s.height }, () =>
-            new Array(s.width).fill(0),
+            new Array<number>(s.width).fill(0),
           );
 
           if (cel && 'data' in cel) {
@@ -399,8 +426,8 @@ export function registerSelectionTool(server: McpServer): void {
             const cmd = new CelWriteCommand(asset, layerId, frameIndex, () => {
               let mutCel = asset.getMutableCel(layerId, frameIndex);
               if (!mutCel) {
-                const data = Array.from({ length: asset.height }, () =>
-                  new Array(asset.width).fill(0),
+                const data: number[][] = Array.from({ length: asset.height }, () =>
+                  new Array<number>(asset.width).fill(0),
                 );
                 asset.setCel(layerId, frameIndex, { x: 0, y: 0, data });
                 mutCel = asset.getMutableCel(layerId, frameIndex);
@@ -417,24 +444,26 @@ export function registerSelectionTool(server: McpServer): void {
                 }
               }
             });
-            cmd.execute();
             workspace.pushCommand(cmd);
 
             // Cutting also clears the selection mask? The design says: "copies and then clears the selected region."
             // meaning clears the PIXELS, does it clear the selection mask? Assume it keeps the selection active unless specified otherwise.
-          } catch (e: any) {
-            return errors.domainError(e.message);
+          } catch (e: unknown) {
+            return errors.domainError(e instanceof Error ? e.message : String(e));
           }
 
           return {
             content: [
-              { type: 'text' as const, text: JSON.stringify({ message: 'Cut to clipboard.' }) },
+              {
+                type: 'text' as const,
+                text: JSON.stringify({ message: 'Cut to clipboard.' }),
+              },
             ],
           };
         }
       }
 
-      return errors.invalidArgument(`Unhandled selection action`);
+      return errors.invalidArgument('Unhandled selection action');
     },
   );
 }

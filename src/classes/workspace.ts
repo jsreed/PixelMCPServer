@@ -1,4 +1,3 @@
-import { type Asset } from '../types/asset.js';
 import { type SelectionMask } from '../types/selection.js';
 import { loadAssetFile, saveAssetFile } from '../io/index.js';
 import { type Command, CommandHistory } from '../commands/command.js';
@@ -229,10 +228,10 @@ export class WorkspaceClass {
       redoDepth: this.redoDepth,
       selection: this.selection
         ? {
-            asset_name: this.selection.asset_name,
-            layer_id: this.selection.layer_id,
-            frame_index: this.selection.frame_index,
-          }
+          asset_name: this.selection.asset_name,
+          layer_id: this.selection.layer_id,
+          frame_index: this.selection.frame_index,
+        }
         : null,
     };
   }

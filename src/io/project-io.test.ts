@@ -99,17 +99,17 @@ describe('project-io', () => {
       const loaded = await loadProjectFile(path.join(FIXTURES, 'valid-project.json'));
 
       expect(loaded.conventions).toBeDefined();
-      expect(loaded.conventions!.export_pattern).toBe('{name}_{tag}_{direction}.png');
+      expect(loaded.conventions?.export_pattern).toBe('{name}_{tag}_{direction}.png');
     });
 
     it('parses defaults', async () => {
       const loaded = await loadProjectFile(path.join(FIXTURES, 'valid-project.json'));
 
       expect(loaded.defaults).toBeDefined();
-      expect(loaded.defaults!.tile_width).toBe(16);
-      expect(loaded.defaults!.tile_height).toBe(16);
-      expect(loaded.defaults!.export_scale).toBe(2);
-      expect(loaded.defaults!.palette).toBe('endesga-32');
+      expect(loaded.defaults?.tile_width).toBe(16);
+      expect(loaded.defaults?.tile_height).toBe(16);
+      expect(loaded.defaults?.export_scale).toBe(2);
+      expect(loaded.defaults?.palette).toBe('endesga-32');
     });
 
     it('parses path-based and variant-based asset entries', async () => {
@@ -124,8 +124,8 @@ describe('project-io', () => {
       // Variant-based
       expect(loaded.assets['armor'].type).toBe('equipment');
       expect(loaded.assets['armor'].variants).toBeDefined();
-      expect(loaded.assets['armor'].variants!['standard']).toBe('assets/armor/standard.json');
-      expect(loaded.assets['armor'].variants!['slim']).toBe('assets/armor/slim.json');
+      expect(loaded.assets['armor'].variants?.['standard']).toBe('assets/armor/standard.json');
+      expect(loaded.assets['armor'].variants?.['slim']).toBe('assets/armor/slim.json');
     });
 
     it('parses recolor_of field', async () => {

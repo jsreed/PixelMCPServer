@@ -50,12 +50,12 @@ describe('WorkspaceClass', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     WorkspaceClass.reset();
-    (loadAssetFile as any).mockImplementation(async (path: string) => {
+    vi.mocked(loadAssetFile).mockImplementation((path: string) => {
       const name = path.split('/').pop()?.replace('.json', '') || 'unknown';
       const cleanName = name.replace('_slim', '').replace('_large', '');
-      return makeTestAsset(cleanName);
+      return Promise.resolve(makeTestAsset(cleanName));
     });
-    (saveAssetFile as any).mockResolvedValue(undefined);
+    vi.mocked(saveAssetFile).mockResolvedValue(undefined);
   });
 
   it('returns the same singleton instance', () => {

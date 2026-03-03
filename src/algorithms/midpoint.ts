@@ -50,7 +50,7 @@ export function midpointCircle(xc: number, yc: number, r: number): Array<{ x: nu
   // Deduplicate the array (points exactly on the axes/diagonals get pushed multiple times with naive symmetry)
   const unique = new Map<string, { x: number; y: number }>();
   for (const p of points) {
-    unique.set(`${p.x},${p.y}`, p);
+    unique.set(`${String(p.x)},${String(p.y)}`, p);
   }
 
   return Array.from(unique.values());
@@ -148,7 +148,7 @@ export function midpointEllipse(
 
   const unique = new Map<string, { x: number; y: number }>();
   for (const p of points) {
-    unique.set(`${p.x},${p.y}`, p);
+    unique.set(`${String(p.x)},${String(p.y)}`, p);
   }
 
   return Array.from(unique.values());

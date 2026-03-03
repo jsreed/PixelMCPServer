@@ -29,11 +29,11 @@ export function floodFill(
   const visited = new Set<string>();
 
   const markVisited = (x: number, y: number) => {
-    visited.add(`${x},${y}`);
+    visited.add(`${String(x)},${String(y)}`);
     filledPoints.push({ x, y });
   };
 
-  const hasVisited = (x: number, y: number) => visited.has(`${x},${y}`);
+  const hasVisited = (x: number, y: number) => visited.has(`${String(x)},${String(y)}`);
   const isValid = (x: number, y: number) =>
     x >= 0 &&
     x < width &&
@@ -51,7 +51,9 @@ export function floodFill(
   const queue: Array<[number, number]> = [[startX, startY]];
 
   while (queue.length > 0) {
-    let [x, y] = queue.shift()!;
+    const entry = queue.shift();
+    if (!entry) continue;
+    const [x, y] = entry;
 
     if (!isValid(x, y)) continue;
 

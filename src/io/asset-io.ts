@@ -1,7 +1,6 @@
 import * as fs from 'fs/promises';
 import { type Asset } from '../types/asset.js';
 import * as errors from '../errors.js';
-import { type Cel } from '../types/cel.js';
 
 export interface AssetFileEnvelope extends Asset {
   pixelmcp_version: string;
@@ -12,30 +11,33 @@ export interface AssetFileEnvelope extends Asset {
 /**
  * Validates that an object is structurally a valid Asset.
  */
-function validateAssetStructure(data: any): data is AssetFileEnvelope {
+function validateAssetStructure(data: unknown): data is AssetFileEnvelope {
   if (!data || typeof data !== 'object') return false;
 
+  const obj = data as Record<string, unknown>;
+
   // Required fields
-  if (typeof data.pixelmcp_version !== 'string') return false;
-  if (typeof data.name !== 'string') return false;
-  if (typeof data.width !== 'number' || typeof data.height !== 'number') return false;
-  if (typeof data.perspective !== 'string') return false;
+  if (typeof obj.pixelmcp_version !== 'string') return false;
+  if (typeof obj.name !== 'string') return false;
+  if (typeof obj.width !== 'number' || typeof obj.height !== 'number') return false;
+  if (typeof obj.perspective !== 'string') return false;
 
-  if (!Array.isArray(data.palette)) return false;
-  if (!Array.isArray(data.layers)) return false;
-  if (!Array.isArray(data.frames)) return false;
-  if (!Array.isArray(data.tags)) return false;
+  if (!Array.isArray(obj.palette)) return false;
+  if (!Array.isArray(obj.layers)) return false;
+  if (!Array.isArray(obj.frames)) return false;
+  if (!Array.isArray(obj.tags)) return false;
 
-  if (!data.cels || typeof data.cels !== 'object') return false;
+  if (!obj.cels || typeof obj.cels !== 'object') return false;
 
   // Validate cel formats
-  for (const [key, cel] of Object.entries(data.cels as Record<string, any>)) {
+  for (const cel of Object.values(obj.cels as Record<string, unknown>)) {
     if (!cel || typeof cel !== 'object') return false;
 
-    const isImage = 'data' in cel && Array.isArray(cel.data);
-    const isTilemap = 'grid' in cel && Array.isArray(cel.grid);
-    const isShape = 'shapes' in cel && Array.isArray(cel.shapes);
-    const isLinked = 'link' in cel && typeof cel.link === 'string';
+    const celObj = cel as Record<string, unknown>;
+    const isImage = 'data' in celObj && Array.isArray(celObj.data);
+    const isTilemap = 'grid' in celObj && Array.isArray(celObj.grid);
+    const isShape = 'shapes' in celObj && Array.isArray(celObj.shapes);
+    const isLinked = 'link' in celObj && typeof celObj.link === 'string';
 
     if (!isImage && !isTilemap && !isShape && !isLinked) return false;
   }
@@ -53,11 +55,12 @@ function validateAssetStructure(data: any): data is AssetFileEnvelope {
 export async function loadAssetFile(path: string): Promise<Asset> {
   try {
     const fileContent = await fs.readFile(path, 'utf8');
-    let parsed: any;
+    let parsed: unknown;
     try {
-      parsed = JSON.parse(fileContent);
-    } catch (e: any) {
-      throw new Error(`Invalid JSON in asset file: ${path}. ${e?.message ?? ''}`);
+      parsed = JSON.parse(fileContent) as unknown;
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : '';
+      throw new Error(`Invalid JSON in asset file: ${path}. ${message}`);
     }
 
     if (!validateAssetStructure(parsed)) {
@@ -65,10 +68,11 @@ export async function loadAssetFile(path: string): Promise<Asset> {
     }
 
     // Strip the envelope fields to return a pure Asset
-    const { pixelmcp_version, created, modified, ...coreAsset } = parsed;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { pixelmcp_version: _version, created: _created, modified: _modified, ...coreAsset } = parsed;
     return coreAsset as Asset;
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
       throw new Error(errors.assetFileNotFound(path).content[0].text);
     }
     throw error;

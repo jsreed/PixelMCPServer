@@ -63,7 +63,7 @@ export function compositeFrame(
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const paletteIndex = layer.getPixel(x, y, frameIndex);
-        if (paletteIndex === null || paletteIndex === undefined) continue;
+        if (paletteIndex === null) continue;
 
         const color = palette.get(paletteIndex);
         if (!color || color.a === 0) continue;

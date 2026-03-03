@@ -13,7 +13,7 @@ export class RenameCommand implements Command {
     private undoAction: () => void,
   ) {
     const info = project.info();
-    this.registryEntry = JSON.parse(JSON.stringify(info.assets[oldName]));
+    this.registryEntry = JSON.parse(JSON.stringify(info.assets[oldName])) as AssetRegistryEntry;
   }
 
   execute(): void {

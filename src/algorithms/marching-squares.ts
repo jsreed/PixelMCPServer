@@ -42,15 +42,10 @@ export function marchingSquares(
     return isSolid(x, y);
   };
 
-  // Edge tracking keys
-  const edgeKey = (px: number, py: number, dir: number) => `${px},${py},${dir}`;
-
   // Helper to trace a single continuous contour starting from a known unvisited edge
   const traceContour = (startX: number, startY: number, startDir: number): Polygon => {
     const polygon: Polygon = [];
 
-    let cx = startX;
-    let cy = startY;
     let dir = startDir;
 
     // Wall follower logic:
@@ -71,57 +66,14 @@ export function marchingSquares(
     let vx = startX;
     let vy = startY;
 
-    while (true) {
+    let isTracing = true;
+    while (isTracing) {
       // Add vertex to polygon. (We will simplify collinear points later).
       polygon.push({ x: vx, y: vy });
 
-      // Depending on current direction, identify the pixel we are "holding onto" (the wall)
-      // and the pixel "in front" of the wall.
-      let wallPx = -1,
-        wallPy = -1;
-      let frontPx = -1,
-        frontPy = -1;
-      let diagPx = -1,
-        diagPy = -1; // The pixel diagonal to the current vertex
-
-      if (dir === 1) {
-        // Moving Right on Top edge
-        wallPx = vx;
-        wallPy = vy; // Pixel below the edge (the solid wall we found)
-        frontPx = vx;
-        frontPy = vy - 1; // Pixel above the edge
-        diagPx = vx + 1;
-        diagPy = vy - 1;
-      } else if (dir === 2) {
-        // Moving Down on Right edge
-        wallPx = vx - 1;
-        wallPy = vy; // Pixel left of edge
-        frontPx = vx;
-        frontPy = vy; // Pixel right of edge
-        diagPx = vx;
-        diagPy = vy + 1;
-      } else if (dir === 3) {
-        // Moving Left on Bottom edge
-        wallPx = vx - 1;
-        wallPy = vy - 1; // Pixel above edge
-        frontPx = vx - 1;
-        frontPy = vy; // Pixel below edge
-        diagPx = vx - 2;
-        diagPy = vy;
-      } else if (dir === 0) {
-        // Moving Up on Left edge
-        wallPx = vx;
-        wallPy = vy - 1; // Pixel right of edge
-        frontPx = vx - 1;
-        frontPy = vy - 1; // Pixel left of edge
-        diagPx = vx - 1;
-        diagPy = vy - 2;
-      }
-
-      // Mark the *wall pixel's* appropriate edge as visited to prevent retracing
-      // Which edge of wallPx is this? It's the one corresponding to dir.
-      // (If moving Right (1), it's the Top edge of wallPx. Let's just store the vertex + direction)
-      visitedEdges.add(`${vx},${vy},${dir}`);
+      // Mark the edge as visited to prevent retracing
+      // Store the vertex + direction as the edge key
+      visitedEdges.add(`${String(vx)},${String(vy)},${String(dir)}`);
 
       // Move the vertex forward
       if (dir === 0) vy--;
@@ -163,7 +115,8 @@ export function marchingSquares(
 
       // Check if we have returned to the start
       if (vx === startX && vy === startY && dir === startDir) {
-        break;
+        isTracing = false;
+        continue;
       }
     }
 
@@ -188,7 +141,7 @@ export function marchingSquares(
         if (!checkSolid(x, y - 1)) {
           // The vertex for the "top" edge starts at the Top-Left corner of the pixel, which is (x, y)
           // The direction is Right (1).
-          if (!visitedEdges.has(`${x},${y},1`)) {
+          if (!visitedEdges.has(`${String(x)},${String(y)},1`)) {
             polygons.push(traceContour(x, y, 1));
           }
         }
@@ -199,7 +152,7 @@ export function marchingSquares(
           // The vertex for the "bottom" edge starts at the Bottom-Right corner, which is (x+1, y+1)
           // The direction is Left (3).
           // This creates a counter-clockwise winding for holes.
-          if (!visitedEdges.has(`${x + 1},${y + 1},3`)) {
+          if (!visitedEdges.has(`${String(x + 1)},${String(y + 1)},3`)) {
             polygons.push(traceContour(x + 1, y + 1, 3));
           }
         }

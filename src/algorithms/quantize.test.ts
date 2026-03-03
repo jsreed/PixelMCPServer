@@ -150,7 +150,7 @@ describe('quantize (Median Cut Color Quantization)', () => {
     // Reconstruct RGBA from the quantized result
     const reconstructed: number[] = [];
     for (const idx of result1.indices) {
-      const hex = result1.palette.get(idx)!;
+      const hex = result1.palette.get(idx) ?? '#00000000';
       const r = parseInt(hex.slice(1, 3), 16);
       const g = parseInt(hex.slice(3, 5), 16);
       const b = parseInt(hex.slice(5, 7), 16);

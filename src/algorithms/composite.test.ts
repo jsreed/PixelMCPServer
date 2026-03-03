@@ -215,6 +215,7 @@ describe('compositeFrame', () => {
       1: { r: 255, g: 0, b: 0, a: 128 },
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const sharedGetPixel = (x: number, _y: number, _f: number) => (x === 0 ? 1 : null);
 
     const layer1 = makeLayer({ id: 0, opacity: 255, getPixel: sharedGetPixel });

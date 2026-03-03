@@ -1,6 +1,5 @@
 import * as fs from 'fs/promises';
 import { type Palette, isValidColor } from '../types/palette.js';
-import * as errors from '../errors.js';
 
 export interface PaletteFileData {
   name: string;
@@ -11,16 +10,19 @@ export interface PaletteFileData {
  * Validates that an object structurally matches PaletteFileData.
  * Also strictly validates the color array up to 256 entries.
  */
-function validatePaletteStructure(data: any): data is PaletteFileData {
+function validatePaletteStructure(data: unknown): data is PaletteFileData {
   if (!data || typeof data !== 'object') return false;
-  if (typeof data.name !== 'string') return false;
+
+  const obj = data as Record<string, unknown>;
+
+  if (typeof obj.name !== 'string') return false;
 
   // Check colors array
-  if (!Array.isArray(data.colors)) return false;
-  if (data.colors.length > 256) return false;
+  if (!Array.isArray(obj.colors)) return false;
+  if (obj.colors.length > 256) return false;
 
   // Validate each color tuple
-  return data.colors.every((color: unknown) => {
+  return (obj.colors as unknown[]).every((color: unknown) => {
     // Sparse palettes allow null
     if (color === null) return true;
     // Otherwise it must be a valid 0-255 [r, g, b, a] tuple
@@ -38,11 +40,12 @@ function validatePaletteStructure(data: any): data is PaletteFileData {
 export async function loadPaletteFile(path: string): Promise<PaletteFileData> {
   try {
     const fileContent = await fs.readFile(path, 'utf8');
-    let parsed: any;
+    let parsed: unknown;
     try {
-      parsed = JSON.parse(fileContent);
-    } catch (e: any) {
-      throw new Error(`Invalid JSON in palette file: ${path}. ${e?.message ?? ''}`);
+      parsed = JSON.parse(fileContent) as unknown;
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : '';
+      throw new Error(`Invalid JSON in palette file: ${path}. ${message}`);
     }
 
     if (!validatePaletteStructure(parsed)) {
@@ -55,8 +58,8 @@ export async function loadPaletteFile(path: string): Promise<PaletteFileData> {
     }
 
     return parsed;
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
       // Ideally we'd have a specific error for 'paletteFileNotFound' in errors.ts
       // but we can just use a standard Error and the tool handler will wrap it.
       throw new Error(`Palette file not found: ${path}`);

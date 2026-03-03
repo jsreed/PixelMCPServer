@@ -2,3 +2,7 @@ node_modules/
 dist/
 .env
 coverage/
+eslint_output.txt
+eslint_report.json
+eslint_report.html
+**/*.py

@@ -81,7 +81,7 @@ export function detectBanding(
         width: w,
         height: h,
         severity,
-        description: `Detected ${numBands} flat ${direction} bands forming a rigid staircase gradient (contrast delta: ${contrast}).`,
+        description: `Detected ${String(numBands)} flat ${direction} bands forming a rigid staircase gradient (contrast delta: ${String(contrast)}).`,
       });
     }
   };
@@ -100,9 +100,8 @@ export function detectBanding(
       const prev = runs[i - 1];
       const curr = runs[i];
 
-      // Ignore transparent or null pixels (assuming index 0 usually transparent, or null)
-      // But we actually only care if it's a null boundary.
-      if (curr.color === null || prev.color === null) {
+      // A null region (transparent part) means the runs are not adjacent. Break the sequence.
+      if (prev.start + prev.length !== curr.start) {
         sequenceStartIdx = i; // Reset
         pDelta = 0;
         continue;

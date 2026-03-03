@@ -175,8 +175,8 @@ describe('asset-io', () => {
 
   it('throws on invalid cel structure (not an object)', async () => {
     const filePath = path.join(tempDir, 'bad_cel.json');
-    const original = makeTestAsset() as any;
-    original.cels['0/0'] = 'just a string'; // Invalid cel
+    const original = makeTestAsset();
+    (original as unknown as { cels: Record<string, unknown> }).cels['0/0'] = 'just a string'; // Invalid cel
 
     await saveAssetFile(filePath, original);
     await expect(loadAssetFile(filePath)).rejects.toThrow('required Asset format');
@@ -184,8 +184,8 @@ describe('asset-io', () => {
 
   it('throws on cel with no valid discriminator (data/grid/shapes/link)', async () => {
     const filePath = path.join(tempDir, 'bad_cel2.json');
-    const original = makeTestAsset() as any;
-    original.cels['0/0'] = { x: 0, y: 0, wrongField: [] };
+    const original = makeTestAsset();
+    (original as unknown as { cels: Record<string, unknown> }).cels['0/0'] = { x: 0, y: 0, wrongField: [] };
 
     await saveAssetFile(filePath, original);
     await expect(loadAssetFile(filePath)).rejects.toThrow('required Asset format');
@@ -255,7 +255,7 @@ describe('asset-io', () => {
       const loaded = await loadAssetFile(path.join(FIXTURES, 'valid-asset.json'));
 
       // Image cel with origin offset
-      const imgCel = loaded.cels['2/0'] as any;
+      const imgCel = loaded.cels['2/0'] as unknown as { x: number; y: number; data: number[][] };
       expect(imgCel.x).toBe(2);
       expect(imgCel.y).toBe(2);
       expect(imgCel.data).toEqual([
@@ -264,11 +264,11 @@ describe('asset-io', () => {
       ]);
 
       // Linked cel
-      const linkedCel = loaded.cels['2/1'] as any;
+      const linkedCel = loaded.cels['2/1'] as unknown as { link: string };
       expect(linkedCel.link).toBe('2/0');
 
       // Shape cel
-      const shapeCel = loaded.cels['3/0'] as any;
+      const shapeCel = loaded.cels['3/0'] as unknown as { shapes: { type: string }[] };
       expect(shapeCel.shapes).toHaveLength(1);
       expect(shapeCel.shapes[0].type).toBe('rect');
     });
@@ -278,15 +278,15 @@ describe('asset-io', () => {
 
       expect(loaded.tags).toHaveLength(3);
 
-      const idle = loaded.tags[0] as any;
+      const idle = loaded.tags[0] as unknown as { type: string; name: string; direction: string };
       expect(idle.type).toBe('frame');
       expect(idle.name).toBe('idle');
       expect(idle.direction).toBe('forward');
 
-      const attack = loaded.tags[1] as any;
+      const attack = loaded.tags[1] as unknown as { facing: string };
       expect(attack.facing).toBe('right');
 
-      const layerTag = loaded.tags[2] as any;
+      const layerTag = loaded.tags[2] as unknown as { type: string; layers: number[] };
       expect(layerTag.type).toBe('layer');
       expect(layerTag.layers).toEqual([1, 2]);
     });
@@ -325,24 +325,24 @@ describe('asset-io', () => {
       const loaded = await loadAssetFile(path.join(FIXTURES, 'valid-asset-tileset.json'));
 
       expect(loaded.tile_physics).toBeDefined();
-      expect(loaded.tile_physics!.physics_layers).toHaveLength(1);
-      expect(loaded.tile_physics!.tiles['0'].polygon).toEqual([
+      expect(loaded.tile_physics?.physics_layers).toHaveLength(1);
+      expect(loaded.tile_physics?.tiles['0']?.polygon).toEqual([
         [0, 0],
         [16, 0],
         [16, 16],
         [0, 16],
       ]);
-      expect(loaded.tile_physics!.tiles['3'].navigation_polygon).toBeDefined();
+      expect(loaded.tile_physics?.tiles['3']?.navigation_polygon).toBeDefined();
     });
 
     it('parses tile_terrain with peering bits', async () => {
       const loaded = await loadAssetFile(path.join(FIXTURES, 'valid-asset-tileset.json'));
 
       expect(loaded.tile_terrain).toBeDefined();
-      expect(loaded.tile_terrain!.pattern).toBe('blob47');
-      expect(loaded.tile_terrain!.terrain_name).toBe('grass');
-      expect(loaded.tile_terrain!.peering_bits['0'].top).toBe(0);
-      expect(loaded.tile_terrain!.peering_bits['1'].top).toBe(-1);
+      expect(loaded.tile_terrain?.pattern).toBe('blob47');
+      expect(loaded.tile_terrain?.terrain_name).toBe('grass');
+      expect(loaded.tile_terrain?.peering_bits['0']?.top).toBe(0);
+      expect(loaded.tile_terrain?.peering_bits['1']?.top).toBe(-1);
     });
 
     it('save→reload roundtrip preserves tileset metadata', async () => {
@@ -379,8 +379,8 @@ describe('asset-io', () => {
       const reloaded = await loadAssetFile(outPath);
 
       expect(reloaded.layers).toHaveLength(4);
-      expect(reloaded.layers[3].name).toBe('overlay');
-      expect((reloaded.cels[`${String(asset.layers[3].id)}/0`] as any).data).toEqual([
+      expect(reloaded.layers[3]?.name).toBe('overlay');
+      expect((reloaded.cels[`${String(asset.layers[3]?.id ?? '')}/0`] as unknown as { data: number[][] }).data).toEqual([
         [4, 4],
         [4, 4],
       ]);

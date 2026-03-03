@@ -12,8 +12,8 @@ describe('midpoint algorithms', () => {
       const negative = midpointCircle(0, 0, -5);
 
       // Map to string form for order-agnostic comparison
-      const setP = new Set(positive.map((p) => `${p.x},${p.y}`));
-      const setN = new Set(negative.map((p) => `${p.x},${p.y}`));
+      const setP = new Set(positive.map((p) => `${String(p.x)},${String(p.y)}`));
+      const setN = new Set(negative.map((p) => `${String(p.x)},${String(p.y)}`));
 
       expect(setP).toEqual(setN);
     });
@@ -46,7 +46,7 @@ describe('midpoint algorithms', () => {
       expect(r1).toContainEqual({ x: 0, y: -1 });
 
       // Ensure no duplicate points exist internally
-      const stringified = r1.map((p) => `${p.x},${p.y}`);
+      const stringified = r1.map((p) => `${String(p.x)},${String(p.y)}`);
       const uniqueStr = new Set(stringified);
       expect(uniqueStr.size).toEqual(r1.length);
     });
@@ -58,15 +58,15 @@ describe('midpoint algorithms', () => {
       // Mapping p2 back to origin and checking equivalence
       const mappedP2 = p2.map((p) => ({ x: p.x + 10, y: p.y + 10 }));
 
-      const setP1 = new Set(p1.map((p) => `${p.x},${p.y}`));
-      const setP2 = new Set(mappedP2.map((p) => `${p.x},${p.y}`));
+      const setP1 = new Set(p1.map((p) => `${String(p.x)},${String(p.y)}`));
+      const setP2 = new Set(mappedP2.map((p) => `${String(p.x)},${String(p.y)}`));
 
       expect(setP1).toEqual(setP2);
     });
 
     it('known pixel coords for radius 1', () => {
       const points = midpointCircle(0, 0, 1);
-      const set = new Set(points.map((p) => `${p.x},${p.y}`));
+      const set = new Set(points.map((p) => `${String(p.x)},${String(p.y)}`));
       // R=1 circle: the 4 cardinal pixels
       expect(set).toContain('1,0');
       expect(set).toContain('-1,0');
@@ -77,7 +77,7 @@ describe('midpoint algorithms', () => {
 
     it('known pixel coords for radius 3', () => {
       const points = midpointCircle(0, 0, 3);
-      const set = new Set(points.map((p) => `${p.x},${p.y}`));
+      const set = new Set(points.map((p) => `${String(p.x)},${String(p.y)}`));
       // Cardinal poles
       expect(set).toContain('3,0');
       expect(set).toContain('-3,0');
@@ -105,7 +105,7 @@ describe('midpoint algorithms', () => {
     it('no duplicate points', () => {
       for (const r of [1, 3, 5, 8, 12]) {
         const points = midpointCircle(0, 0, r);
-        const set = new Set(points.map((p) => `${p.x},${p.y}`));
+        const set = new Set(points.map((p) => `${String(p.x)},${String(p.y)}`));
         expect(set.size).toBe(points.length);
       }
     });
@@ -148,8 +148,8 @@ describe('midpoint algorithms', () => {
       const circ = midpointCircle(5, 5, 8);
       const elli = midpointEllipse(5, 5, 8, 8);
 
-      const setCirc = new Set(circ.map((p) => `${p.x},${p.y}`));
-      const setElli = new Set(elli.map((p) => `${p.x},${p.y}`));
+      const setCirc = new Set(circ.map((p) => `${String(p.x)},${String(p.y)}`));
+      const setElli = new Set(elli.map((p) => `${String(p.x)},${String(p.y)}`));
 
       expect(setCirc).toEqual(setElli);
     });
@@ -180,13 +180,13 @@ describe('midpoint algorithms', () => {
       expect(elli).toContainEqual({ x: 0, y: -20 });
 
       // Ensure no duplicates exist
-      const uniqueStr = new Set(elli.map((p) => `${p.x},${p.y}`));
+      const uniqueStr = new Set(elli.map((p) => `${String(p.x)},${String(p.y)}`));
       expect(uniqueStr.size).toEqual(elli.length);
     });
 
     it('known poles for rx=4, ry=2 ellipse', () => {
       const points = midpointEllipse(0, 0, 4, 2);
-      const set = new Set(points.map((p) => `${p.x},${p.y}`));
+      const set = new Set(points.map((p) => `${String(p.x)},${String(p.y)}`));
       // Cardinal poles must be present
       expect(set).toContain('4,0');
       expect(set).toContain('-4,0');
@@ -216,7 +216,7 @@ describe('midpoint algorithms', () => {
       ];
       for (const [rx, ry] of cases) {
         const points = midpointEllipse(0, 0, rx, ry);
-        const set = new Set(points.map((p) => `${p.x},${p.y}`));
+        const set = new Set(points.map((p) => `${String(p.x)},${String(p.y)}`));
         expect(set.size).toBe(points.length);
       }
     });
@@ -224,8 +224,8 @@ describe('midpoint algorithms', () => {
     it('center offset shifts all points uniformly', () => {
       const base = midpointEllipse(0, 0, 6, 3);
       const shifted = midpointEllipse(10, 20, 6, 3);
-      const baseSet = new Set(base.map((p) => `${p.x},${p.y}`));
-      const shiftedBack = new Set(shifted.map((p) => `${p.x - 10},${p.y - 20}`));
+      const baseSet = new Set(base.map((p) => `${String(p.x)},${String(p.y)}`));
+      const shiftedBack = new Set(shifted.map((p) => `${String(p.x - 10)},${String(p.y - 20)}`));
       expect(baseSet).toEqual(shiftedBack);
     });
 

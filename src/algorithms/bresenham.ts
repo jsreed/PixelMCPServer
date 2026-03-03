@@ -28,6 +28,7 @@ export function bresenhamLine(
 
   let err = dx - dy;
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   while (true) {
     points.push({ x, y });
     if (x === endX && y === endY) break;

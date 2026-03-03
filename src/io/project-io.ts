@@ -5,16 +5,18 @@ import * as errors from '../errors.js';
 /**
  * Validates that an object is structurally a valid ProjectConfig.
  */
-function validateProjectStructure(data: any): data is ProjectConfig {
+function validateProjectStructure(data: unknown): data is ProjectConfig {
   if (!data || typeof data !== 'object') return false;
 
-  if (typeof data.pixelmcp_version !== 'string') return false;
-  if (typeof data.name !== 'string') return false;
-  if (!data.assets || typeof data.assets !== 'object') return false;
+  const obj = data as Record<string, unknown>;
+
+  if (typeof obj.pixelmcp_version !== 'string') return false;
+  if (typeof obj.name !== 'string') return false;
+  if (!obj.assets || typeof obj.assets !== 'object') return false;
 
   // Optional fields
-  if (data.conventions && typeof data.conventions !== 'object') return false;
-  if (data.defaults && typeof data.defaults !== 'object') return false;
+  if (obj.conventions && typeof obj.conventions !== 'object') return false;
+  if (obj.defaults && typeof obj.defaults !== 'object') return false;
 
   return true;
 }
@@ -28,11 +30,12 @@ function validateProjectStructure(data: any): data is ProjectConfig {
 export async function loadProjectFile(path: string): Promise<ProjectConfig> {
   try {
     const fileContent = await fs.readFile(path, 'utf8');
-    let parsed: any;
+    let parsed: unknown;
     try {
-      parsed = JSON.parse(fileContent);
-    } catch (e: any) {
-      throw new Error(`Invalid JSON in project file: ${path}. ${e?.message ?? ''}`);
+      parsed = JSON.parse(fileContent) as unknown;
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : '';
+      throw new Error(`Invalid JSON in project file: ${path}. ${message}`);
     }
 
     if (!validateProjectStructure(parsed)) {
@@ -40,8 +43,8 @@ export async function loadProjectFile(path: string): Promise<ProjectConfig> {
     }
 
     return parsed;
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
       throw new Error(errors.projectFileNotFound(path).content[0].text);
     }
     throw error;

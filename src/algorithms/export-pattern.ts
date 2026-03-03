@@ -25,10 +25,10 @@ export function resolveExportPattern(
   // intentional adjacent separators elsewhere in the user's string.
   const EMPTY_MARKER = '\x00EMPTY\x00';
 
-  result = result.replace(tokenRegex, (match, tokenName, paddingFormat) => {
-    let value = variables[tokenName];
+  result = result.replace(tokenRegex, (_match: string, tokenName: string, paddingFormat: string | undefined) => {
+    const value = variables[tokenName];
 
-    if (value === undefined || value === null || value === '') {
+    if (value === undefined || value === '') {
       return EMPTY_MARKER;
     }
 

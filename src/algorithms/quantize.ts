@@ -78,7 +78,7 @@ export function quantize(
       palette.set(index, hex);
 
       // Directly map the pixel indices
-      const pIndices = colorToPixelIndices.get(packed)!;
+      const pIndices = colorToPixelIndices.get(packed) ?? [];
       for (const pi of pIndices) {
         indices[pi] = index;
       }
@@ -99,7 +99,7 @@ export function quantize(
   }
 
   // A bucket contains a slice of the colors array
-  let buckets: Array<Array<{ r: number; g: number; b: number; packed: number }>> = [colors];
+  const buckets: Array<Array<{ r: number; g: number; b: number; packed: number }>> = [colors];
 
   while (buckets.length < availableColorsForSolid) {
     // Find the bucket with the largest range in any color channel
@@ -200,7 +200,7 @@ export function quantize(
       }
     }
 
-    const pIndices = colorToPixelIndices.get(color)!;
+    const pIndices = colorToPixelIndices.get(color) ?? [];
     for (const pi of pIndices) {
       indices[pi] = closestIndex;
     }

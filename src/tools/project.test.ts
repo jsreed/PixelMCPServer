@@ -10,17 +10,22 @@ vi.mock('../io/project-io.js', () => ({
 }));
 
 // Capture the tool callback from registerTool
-type ToolCallback = (args: Record<string, unknown>) => unknown;
+interface ToolResult {
+  content: Array<{ type: string; text: string }>;
+  isError?: boolean;
+}
 
+type ToolCallback = (args: Record<string, unknown>) => Promise<ToolResult>;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function captureToolCallback(registerFn: (server: any) => void): ToolCallback {
-  let cb: ToolCallback | null = null;
+  let cb!: ToolCallback;
   const mockServer = {
     registerTool(_name: string, _config: unknown, callback: ToolCallback) {
       cb = callback;
     },
   };
   registerFn(mockServer);
-  if (!cb) throw new Error('registerTool callback not captured');
   return cb;
 }
 
@@ -40,29 +45,29 @@ describe('project tool', () => {
   // ─── init action ─────────────────────────────────────────────────
 
   it('init creates project and sets it on workspace', async () => {
-    const result = (await handler({ action: 'init', path: '/tmp/test-project' })) as any;
+    const result = await handler({ action: 'init', path: '/tmp/test-project' });
 
     expect(result.isError).toBeUndefined();
-    const text = JSON.parse(result.content[0].text);
+    const text = JSON.parse(result.content[0].text) as { message: string; path: string };
     expect(text.message).toContain('initialized');
     expect(text.path).toContain('pixelmcp.json');
 
     // Project should be set on workspace
     const ws = WorkspaceClass.instance();
     expect(ws.project).not.toBeNull();
-    expect(ws.project!.name).toBe('test-project');
+    expect(ws.project?.name).toBe('test-project');
   });
 
   it('init uses custom name when provided', async () => {
-    const result = (await handler({ action: 'init', path: '/tmp/foo', name: 'MyGame' })) as any;
+    const result = await handler({ action: 'init', path: '/tmp/foo', name: 'MyGame' });
 
-    const text = JSON.parse(result.content[0].text);
+    const text = JSON.parse(result.content[0].text) as { message: string };
     expect(text.message).toContain('MyGame');
-    expect(WorkspaceClass.instance().project!.name).toBe('MyGame');
+    expect(WorkspaceClass.instance().project?.name).toBe('MyGame');
   });
 
   it('init without path returns error', async () => {
-    const result = (await handler({ action: 'init' })) as any;
+    const result = await handler({ action: 'init' });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('path');
@@ -86,19 +91,19 @@ describe('project tool', () => {
       assets: { player: { path: 'sprites/player.json', type: 'character' } },
     });
 
-    const result = (await handler({ action: 'open', path: '/game/pixelmcp.json' })) as any;
+    const result = await handler({ action: 'open', path: '/game/pixelmcp.json' });
 
     expect(result.isError).toBeUndefined();
-    const text = JSON.parse(result.content[0].text);
+    const text = JSON.parse(result.content[0].text) as { message: string; assets: number };
     expect(text.message).toContain('Loaded Game');
     expect(text.assets).toBe(1);
 
     const ws = WorkspaceClass.instance();
-    expect(ws.project!.name).toBe('Loaded Game');
+    expect(ws.project?.name).toBe('Loaded Game');
   });
 
   it('open without path returns error', async () => {
-    const result = (await handler({ action: 'open' })) as any;
+    const result = await handler({ action: 'open' });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('path');
@@ -107,7 +112,7 @@ describe('project tool', () => {
   it('open with missing file returns projectFileNotFound', async () => {
     vi.mocked(projectIo.loadProjectFile).mockRejectedValue(new Error('ENOENT'));
 
-    const result = (await handler({ action: 'open', path: '/missing/pixelmcp.json' })) as any;
+    const result = await handler({ action: 'open', path: '/missing/pixelmcp.json' });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('not found');
@@ -119,15 +124,15 @@ describe('project tool', () => {
     // Init a project first
     await handler({ action: 'init', path: '/tmp/info-test' });
 
-    const result = (await handler({ action: 'info' })) as any;
+    const result = await handler({ action: 'info' });
 
     expect(result.isError).toBeUndefined();
-    const text = JSON.parse(result.content[0].text);
+    const text = JSON.parse(result.content[0].text) as { name: string };
     expect(text.name).toBe('info-test');
   });
 
   it('info without project returns noProjectLoaded error', async () => {
-    const result = (await handler({ action: 'info' })) as any;
+    const result = await handler({ action: 'info' });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('No project loaded');
@@ -203,27 +208,34 @@ describe('project tool — add_file', () => {
       [255, 255, 0, 255],
     ],
   ) {
-    vi.mocked(fsModule.readFile as any).mockResolvedValue(Buffer.alloc(8));
-    vi.mocked(pngjs.PNG.sync.read).mockReturnValue({
+    vi.mocked(fsModule.readFile as (...args: unknown[]) => Promise<Buffer>).mockResolvedValue(
+      Buffer.alloc(8),
+    );
+    (pngjs.PNG.sync.read as import('vitest').Mock).mockReturnValue({
       width: w,
       height: h,
       data: makeRgbaBuffer(w, h, colors),
-    } as any);
+    } as ReturnType<typeof pngjs.PNG.sync.read>);
   }
 
   it('add_file happy path registers asset and returns metadata', async () => {
     await initProject();
     mockPng();
 
-    const result = (await handler({
+    const result = await handler({
       action: 'add_file',
       name: 'hero',
       import_path: '/tmp/game/sprites/hero.png',
       type: 'character',
-    })) as any;
+    });
 
     expect(result.isError).toBeUndefined();
-    const data = JSON.parse(result.content[0].text);
+    const data = JSON.parse(result.content[0].text) as {
+      asset_name: string;
+      width: number;
+      height: number;
+      color_count: number;
+    };
     expect(data.asset_name).toBe('hero');
     expect(data.width).toBe(2);
     expect(data.height).toBe(2);
@@ -232,14 +244,14 @@ describe('project tool — add_file', () => {
 
     // Asset registered in project
     const ws = WorkspaceClass.instance();
-    const info = ws.project!.info();
-    expect(info.assets['hero']).toBeDefined();
-    expect(info.assets['hero'].type).toBe('character');
+    const info = ws.project?.info();
+    expect(info?.assets['hero']).toBeDefined();
+    expect(info?.assets['hero'].type).toBe('character');
   });
 
-  it('add_file palette count is always ≤ 256', async () => {
+  it('add_file palette count is always <= 256', async () => {
     await initProject();
-    // 300 unique colors — should be reduced to ≤ 256
+    // 300 unique colors — should be reduced to <= 256
     const colors: [number, number, number, number][] = Array.from({ length: 300 }, (_, i) => [
       i % 256,
       (i * 3) % 256,
@@ -248,23 +260,23 @@ describe('project tool — add_file', () => {
     ]);
     mockPng(20, 15, colors);
 
-    const result = (await handler({
+    const result = await handler({
       action: 'add_file',
       name: 'big_sprite',
       import_path: '/tmp/game/big_sprite.png',
-    })) as any;
+    });
 
     expect(result.isError).toBeUndefined();
-    const data = JSON.parse(result.content[0].text);
+    const data = JSON.parse(result.content[0].text) as { color_count: number };
     expect(data.color_count).toBeLessThanOrEqual(256);
   });
 
   it('add_file without name returns error', async () => {
     await initProject();
-    const result = (await handler({
+    const result = await handler({
       action: 'add_file',
       import_path: '/tmp/hero.png',
-    })) as any;
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('name');
@@ -272,21 +284,21 @@ describe('project tool — add_file', () => {
 
   it('add_file without import_path returns error', async () => {
     await initProject();
-    const result = (await handler({
+    const result = await handler({
       action: 'add_file',
       name: 'hero',
-    })) as any;
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('import_path');
   });
 
   it('add_file without loaded project returns error', async () => {
-    const result = (await handler({
+    const result = await handler({
       action: 'add_file',
       name: 'hero',
       import_path: '/tmp/hero.png',
-    })) as any;
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('No project loaded');
@@ -294,13 +306,15 @@ describe('project tool — add_file', () => {
 
   it('add_file returns error when PNG file cannot be read', async () => {
     await initProject();
-    vi.mocked(fsModule.readFile as any).mockRejectedValue(new Error('ENOENT'));
+    vi.mocked(fsModule.readFile as (...args: unknown[]) => Promise<Buffer>).mockRejectedValue(
+      new Error('ENOENT'),
+    );
 
-    const result = (await handler({
+    const result = await handler({
       action: 'add_file',
       name: 'missing',
       import_path: '/tmp/no_such_file.png',
-    })) as any;
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Cannot read PNG');

@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { registerWorkspaceTool } from './workspace.js';
 import { WorkspaceClass } from '../classes/workspace.js';
 import { ProjectClass } from '../classes/project.js';
-import { AssetClass } from '../classes/asset.js';
 import * as assetIo from '../io/asset-io.js';
 
 // Mock asset I/O so tests don't touch disk
@@ -12,17 +11,22 @@ vi.mock('../io/asset-io.js', () => ({
 }));
 
 // Capture the tool callback from registerTool
-type ToolCallback = (args: Record<string, unknown>) => unknown;
+interface ToolResult {
+  content: Array<{ type: string; text: string }>;
+  isError?: boolean;
+}
 
+type ToolCallback = (args: Record<string, unknown>) => Promise<ToolResult>;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function captureToolCallback(registerFn: (server: any) => void): ToolCallback {
-  let cb: ToolCallback | null = null;
+  let cb!: ToolCallback;
   const mockServer = {
     registerTool(_name: string, _config: unknown, callback: ToolCallback) {
       cb = callback;
     },
   };
   registerFn(mockServer);
-  if (!cb) throw new Error('registerTool callback not captured');
   return cb;
 }
 
@@ -70,20 +74,24 @@ describe('workspace tool', () => {
   it('info returns workspace state', async () => {
     setupProject();
 
-    const result = (await handler({ action: 'info' })) as any;
+    const result = await handler({ action: 'info' });
 
     expect(result.isError).toBeUndefined();
-    const text = JSON.parse(result.content[0].text);
+    const text = JSON.parse(result.content[0].text) as {
+      project: { name: string };
+      loadedAssets: unknown[];
+      undoDepth: number;
+    };
     expect(text.project.name).toBe('TestProject');
     expect(text.loadedAssets).toEqual([]);
     expect(text.undoDepth).toBe(0);
   });
 
   it('info works even without a project loaded', async () => {
-    const result = (await handler({ action: 'info' })) as any;
+    const result = await handler({ action: 'info' });
 
     expect(result.isError).toBeUndefined();
-    const text = JSON.parse(result.content[0].text);
+    const text = JSON.parse(result.content[0].text) as { project: unknown };
     expect(text.project).toBeNull();
   });
 
@@ -92,10 +100,10 @@ describe('workspace tool', () => {
   it('load_asset loads an asset into the workspace', async () => {
     setupProject();
 
-    const result = (await handler({ action: 'load_asset', asset_name: 'player' })) as any;
+    const result = await handler({ action: 'load_asset', asset_name: 'player' });
 
     expect(result.isError).toBeUndefined();
-    const text = JSON.parse(result.content[0].text);
+    const text = JSON.parse(result.content[0].text) as { message: string };
     expect(text.message).toContain('player');
     expect(text.message).toContain('loaded');
 
@@ -105,14 +113,14 @@ describe('workspace tool', () => {
   it('load_asset without asset_name returns error', async () => {
     setupProject();
 
-    const result = (await handler({ action: 'load_asset' })) as any;
+    const result = await handler({ action: 'load_asset' });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('asset_name');
   });
 
   it('load_asset without project returns noProjectLoaded', async () => {
-    const result = (await handler({ action: 'load_asset', asset_name: 'player' })) as any;
+    const result = await handler({ action: 'load_asset', asset_name: 'player' });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('No project loaded');
@@ -121,7 +129,7 @@ describe('workspace tool', () => {
   it('load_asset with unregistered name returns assetNotInRegistry', async () => {
     setupProject();
 
-    const result = (await handler({ action: 'load_asset', asset_name: 'ghost' })) as any;
+    const result = await handler({ action: 'load_asset', asset_name: 'ghost' });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('not found in project registry');
@@ -133,10 +141,13 @@ describe('workspace tool', () => {
     setupProject();
     await workspace.loadAsset('player');
 
-    const result = (await handler({ action: 'unload_asset', asset_name: 'player' })) as any;
+    const result = await handler({ action: 'unload_asset', asset_name: 'player' });
 
     expect(result.isError).toBeUndefined();
-    const text = JSON.parse(result.content[0].text);
+    const text = JSON.parse(result.content[0].text) as {
+      message: string;
+      hadUnsavedChanges: boolean;
+    };
     expect(text.message).toContain('unloaded');
     expect(text.hadUnsavedChanges).toBe(false);
     expect(workspace.loadedAssets.has('player')).toBe(false);
@@ -147,14 +158,14 @@ describe('workspace tool', () => {
     await workspace.loadAsset('player');
     workspace.getAsset('player').isDirty = true;
 
-    const result = (await handler({ action: 'unload_asset', asset_name: 'player' })) as any;
+    const result = await handler({ action: 'unload_asset', asset_name: 'player' });
 
-    const text = JSON.parse(result.content[0].text);
+    const text = JSON.parse(result.content[0].text) as { hadUnsavedChanges: boolean };
     expect(text.hadUnsavedChanges).toBe(true);
   });
 
   it('unload_asset without asset_name returns error', async () => {
-    const result = (await handler({ action: 'unload_asset' })) as any;
+    const result = await handler({ action: 'unload_asset' });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('asset_name');
@@ -163,7 +174,7 @@ describe('workspace tool', () => {
   it('unload_asset on not-loaded asset returns assetNotLoaded', async () => {
     setupProject();
 
-    const result = (await handler({ action: 'unload_asset', asset_name: 'ghost' })) as any;
+    const result = await handler({ action: 'unload_asset', asset_name: 'ghost' });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('not loaded');
@@ -176,10 +187,10 @@ describe('workspace tool', () => {
     await workspace.loadAsset('player');
     workspace.getAsset('player').isDirty = true;
 
-    const result = (await handler({ action: 'save', asset_name: 'player' })) as any;
+    const result = await handler({ action: 'save', asset_name: 'player' });
 
     expect(result.isError).toBeUndefined();
-    const text = JSON.parse(result.content[0].text);
+    const text = JSON.parse(result.content[0].text) as { message: string; path: string };
     expect(text.message).toContain('saved');
     expect(text.path).toBeDefined();
 
@@ -188,14 +199,14 @@ describe('workspace tool', () => {
   });
 
   it('save without asset_name returns error', async () => {
-    const result = (await handler({ action: 'save' })) as any;
+    const result = await handler({ action: 'save' });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('asset_name');
   });
 
   it('save without project returns noProjectLoaded', async () => {
-    const result = (await handler({ action: 'save', asset_name: 'player' })) as any;
+    const result = await handler({ action: 'save', asset_name: 'player' });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('No project loaded');
@@ -208,16 +219,19 @@ describe('workspace tool', () => {
     await workspace.loadAsset('player');
     workspace.getAsset('player').isDirty = true;
 
-    const result = (await handler({ action: 'save_all' })) as any;
+    const result = await handler({ action: 'save_all' });
 
     expect(result.isError).toBeUndefined();
-    const text = JSON.parse(result.content[0].text);
+    const text = JSON.parse(result.content[0].text) as {
+      message: string;
+      saved: unknown[];
+    };
     expect(text.message).toContain('1 asset(s)');
     expect(text.saved.length).toBe(1);
   });
 
   it('save_all without project returns noProjectLoaded', async () => {
-    const result = (await handler({ action: 'save_all' })) as any;
+    const result = await handler({ action: 'save_all' });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('No project loaded');
@@ -226,14 +240,14 @@ describe('workspace tool', () => {
   // ─── undo / redo actions ─────────────────────────────────────────
 
   it('undo with empty stack returns error', async () => {
-    const result = (await handler({ action: 'undo' })) as any;
+    const result = await handler({ action: 'undo' });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Nothing to undo');
   });
 
   it('redo with empty stack returns error', async () => {
-    const result = (await handler({ action: 'redo' })) as any;
+    const result = await handler({ action: 'redo' });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Nothing to redo');
@@ -242,14 +256,18 @@ describe('workspace tool', () => {
   it('undo after push returns success with stack depths', async () => {
     // Push a mock command
     workspace.pushCommand({
-      execute: () => {},
-      undo: () => {},
+      execute: () => { },
+      undo: () => { },
     });
 
-    const result = (await handler({ action: 'undo' })) as any;
+    const result = await handler({ action: 'undo' });
 
     expect(result.isError).toBeUndefined();
-    const text = JSON.parse(result.content[0].text);
+    const text = JSON.parse(result.content[0].text) as {
+      message: string;
+      undoDepth: number;
+      redoDepth: number;
+    };
     expect(text.message).toBe('Undo successful.');
     expect(text.undoDepth).toBe(0);
     expect(text.redoDepth).toBe(1);
@@ -257,15 +275,19 @@ describe('workspace tool', () => {
 
   it('redo after undo returns success', async () => {
     workspace.pushCommand({
-      execute: () => {},
-      undo: () => {},
+      execute: () => { },
+      undo: () => { },
     });
     workspace.undo();
 
-    const result = (await handler({ action: 'redo' })) as any;
+    const result = await handler({ action: 'redo' });
 
     expect(result.isError).toBeUndefined();
-    const text = JSON.parse(result.content[0].text);
+    const text = JSON.parse(result.content[0].text) as {
+      message: string;
+      undoDepth: number;
+      redoDepth: number;
+    };
     expect(text.message).toBe('Redo successful.');
     expect(text.undoDepth).toBe(1);
     expect(text.redoDepth).toBe(0);

@@ -16,16 +16,22 @@ vi.mock('../io/palette-io.js', () => ({
 }));
 
 // Capture tool callback
-type ToolCallback = (args: Record<string, unknown>) => unknown;
+interface ToolResult {
+  content: Array<{ type: string; text: string }>;
+  isError?: boolean;
+}
+
+type ToolCallback = (args: Record<string, unknown>) => Promise<ToolResult>;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function captureToolCallback(registerFn: (server: any) => void): ToolCallback {
-  let cb: ToolCallback | null = null;
+  let cb!: ToolCallback;
   const mockServer = {
     registerTool(_name: string, _config: unknown, callback: ToolCallback) {
       cb = callback;
     },
   };
   registerFn(mockServer);
-  if (!cb) throw new Error('registerTool callback not captured');
   return cb;
 }
 
@@ -36,7 +42,7 @@ function buildMockAsset(overrides?: Partial<Asset>): Asset {
     width: 8,
     height: 8,
     perspective: 'flat' as const,
-    palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]) as any,
+    palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]) as Asset['palette'],
     layers: [
       { id: 1, name: 'Base', type: 'image' as const, opacity: 255, visible: true },
       {
@@ -92,15 +98,21 @@ describe('asset tool', () => {
     vi.restoreAllMocks();
   });
 
+  function getAsset(name: string) {
+    const a = workspace.loadedAssets.get(name);
+    if (!a) throw new Error(`Asset ${name} not found`);
+    return a;
+  }
+
   // ─── Validation ──────────────────────────────────────────────────
 
   it('requires asset_name for most actions', async () => {
-    const r = (await handler({ action: 'info' })) as any;
+    const r = await handler({ action: 'info' });
     expect(r.isError).toBe(true);
   });
 
   it('returns error for unloaded asset', async () => {
-    const r = (await handler({ action: 'info', asset_name: 'ghost' })) as any;
+    const r = await handler({ action: 'info', asset_name: 'ghost' });
     expect(r.isError).toBe(true);
     expect(r.content[0].text).toContain('not loaded');
   });
@@ -108,9 +120,14 @@ describe('asset tool', () => {
   // ─── info ────────────────────────────────────────────────────────
 
   it('info returns asset structure', async () => {
-    const r = (await handler({ action: 'info', asset_name: 'sprite' })) as any;
+    const r = await handler({ action: 'info', asset_name: 'sprite' });
     expect(r.isError).toBeUndefined();
-    const data = JSON.parse(r.content[0].text);
+    const data = JSON.parse(r.content[0].text) as {
+      name: string;
+      width: number;
+      layers: unknown[];
+      frames: unknown[];
+    };
     expect(data.name).toBe('test_sprite');
     expect(data.width).toBe(8);
     expect(data.layers).toHaveLength(2);
@@ -120,13 +137,18 @@ describe('asset tool', () => {
   // ─── get_cel ─────────────────────────────────────────────────────
 
   it('get_cel returns pixel data', async () => {
-    const r = (await handler({
+    const r = await handler({
       action: 'get_cel',
       asset_name: 'sprite',
       layer_id: 1,
       frame_index: 0,
-    })) as any;
-    const data = JSON.parse(r.content[0].text);
+    });
+    const data = JSON.parse(r.content[0].text) as {
+      width: number;
+      height: number;
+      data: number[][];
+      is_linked: boolean;
+    };
     expect(data.width).toBe(8);
     expect(data.height).toBe(8);
     expect(data.data[0][0]).toBe(1);
@@ -134,21 +156,23 @@ describe('asset tool', () => {
   });
 
   it('get_cel missing layer_id returns error', async () => {
-    const r = (await handler({ action: 'get_cel', asset_name: 'sprite', frame_index: 0 })) as any;
+    const r = await handler({ action: 'get_cel', asset_name: 'sprite', frame_index: 0 });
     expect(r.isError).toBe(true);
   });
 
   // ─── get_cels (range mode) ───────────────────────────────────────
 
   it('get_cels range mode returns array', async () => {
-    const r = (await handler({
+    const r = await handler({
       action: 'get_cels',
       asset_name: 'sprite',
       layer_id: 1,
       frame_start: 0,
       frame_end: 0,
-    })) as any;
-    const data = JSON.parse(r.content[0].text);
+    });
+    const data = JSON.parse(r.content[0].text) as {
+      cels: Array<{ data: unknown }>;
+    };
     expect(data.cels).toHaveLength(1);
     expect(data.cels[0].data).toBeDefined();
   });
@@ -156,68 +180,68 @@ describe('asset tool', () => {
   // ─── Layer management ────────────────────────────────────────────
 
   it('add_layer adds a new layer', async () => {
-    const r = (await handler({
+    const r = await handler({
       action: 'add_layer',
       asset_name: 'sprite',
       name: 'Overlay',
       layer_type: 'image',
-    })) as any;
+    });
     expect(r.isError).toBeUndefined();
-    const data = JSON.parse(r.content[0].text);
+    const data = JSON.parse(r.content[0].text) as { layer_id: number };
     expect(data.layer_id).toBeDefined();
-    expect(workspace.loadedAssets.get('sprite')!.layers).toHaveLength(3);
+    expect(getAsset('sprite').layers).toHaveLength(3);
   });
 
   it('add_layer is undoable', async () => {
-    const before = workspace.loadedAssets.get('sprite')!.layers.length;
+    const before = getAsset('sprite').layers.length;
     await handler({
       action: 'add_layer',
       asset_name: 'sprite',
       name: 'Overlay',
       layer_type: 'image',
     });
-    expect(workspace.loadedAssets.get('sprite')!.layers).toHaveLength(before + 1);
+    expect(getAsset('sprite').layers).toHaveLength(before + 1);
     workspace.undo();
-    expect(workspace.loadedAssets.get('sprite')!.layers).toHaveLength(before);
+    expect(getAsset('sprite').layers).toHaveLength(before);
   });
 
   it('add_group adds a group layer', async () => {
-    const r = (await handler({
+    const r = await handler({
       action: 'add_group',
       asset_name: 'sprite',
       name: 'MyGroup',
-    })) as any;
+    });
     expect(r.isError).toBeUndefined();
-    const asset = workspace.loadedAssets.get('sprite')!;
+    const asset = getAsset('sprite');
     const grp = asset.layers.find((l) => l.name === 'MyGroup');
     expect(grp).toBeDefined();
-    expect(grp!.type).toBe('group');
+    expect(grp?.type).toBe('group');
   });
 
   it('remove_layer removes a layer', async () => {
     await handler({ action: 'remove_layer', asset_name: 'sprite', layer_id: 1 });
-    const asset = workspace.loadedAssets.get('sprite')!;
+    const asset = getAsset('sprite');
     expect(asset.layers.find((l) => l.id === 1)).toBeUndefined();
   });
 
   // ─── Frame management ────────────────────────────────────────────
 
   it('add_frame appends a frame', async () => {
-    const r = (await handler({
+    const r = await handler({
       action: 'add_frame',
       asset_name: 'sprite',
       duration_ms: 200,
-    })) as any;
+    });
     expect(r.isError).toBeUndefined();
-    expect(workspace.loadedAssets.get('sprite')!.frames).toHaveLength(2);
+    expect(getAsset('sprite').frames).toHaveLength(2);
   });
 
   it('remove_frame removes a frame', async () => {
     // Add a frame first
     await handler({ action: 'add_frame', asset_name: 'sprite' });
-    expect(workspace.loadedAssets.get('sprite')!.frames).toHaveLength(2);
+    expect(getAsset('sprite').frames).toHaveLength(2);
     await handler({ action: 'remove_frame', asset_name: 'sprite', frame_index: 1 });
-    expect(workspace.loadedAssets.get('sprite')!.frames).toHaveLength(1);
+    expect(getAsset('sprite').frames).toHaveLength(1);
   });
 
   it('set_frame_duration updates duration', async () => {
@@ -227,7 +251,7 @@ describe('asset tool', () => {
       frame_index: 0,
       duration_ms: 250,
     });
-    expect(workspace.loadedAssets.get('sprite')!.frames[0].duration_ms).toBe(250);
+    expect(getAsset('sprite').frames[0].duration_ms).toBe(250);
   });
 
   // ─── Tag management ──────────────────────────────────────────────
@@ -242,7 +266,7 @@ describe('asset tool', () => {
       tag_end: 0,
       tag_direction: 'forward',
     });
-    const asset = workspace.loadedAssets.get('sprite')!;
+    const asset = getAsset('sprite');
     expect(asset.tags.find((t) => t.name === 'idle')).toBeDefined();
   });
 
@@ -256,14 +280,14 @@ describe('asset tool', () => {
       tag_end: 0,
     });
     await handler({ action: 'remove_tag', asset_name: 'sprite', name: 'idle' });
-    const asset = workspace.loadedAssets.get('sprite')!;
+    const asset = getAsset('sprite');
     expect(asset.tags.find((t) => t.name === 'idle')).toBeUndefined();
   });
 
   // ─── Shape management ────────────────────────────────────────────
 
   it('add_shape adds a rect shape', async () => {
-    const r = (await handler({
+    const r = await handler({
       action: 'add_shape',
       asset_name: 'sprite',
       layer_id: 2,
@@ -274,9 +298,9 @@ describe('asset tool', () => {
       shape_y: 0,
       shape_width: 8,
       shape_height: 8,
-    })) as any;
+    });
     expect(r.isError).toBeUndefined();
-    const shapes = workspace.loadedAssets.get('sprite')!.getShapes(2, 0);
+    const shapes = getAsset('sprite').getShapes(2, 0);
     expect(shapes.find((s) => s.name === 'box')).toBeDefined();
   });
 
@@ -293,13 +317,13 @@ describe('asset tool', () => {
       shape_width: 4,
       shape_height: 4,
     });
-    const r = (await handler({
+    const r = await handler({
       action: 'get_shapes',
       asset_name: 'sprite',
       layer_id: 2,
       frame_index: 0,
-    })) as any;
-    const data = JSON.parse(r.content[0].text);
+    });
+    const data = JSON.parse(r.content[0].text) as { shapes: unknown[] };
     expect(data.shapes.length).toBeGreaterThan(0);
   });
 
@@ -323,7 +347,7 @@ describe('asset tool', () => {
       frame_index: 0,
       shape_name: 'to_remove',
     });
-    const shapes = workspace.loadedAssets.get('sprite')!.getShapes(2, 0);
+    const shapes = getAsset('sprite').getShapes(2, 0);
     expect(shapes.find((s) => s.name === 'to_remove')).toBeUndefined();
   });
 
@@ -331,7 +355,7 @@ describe('asset tool', () => {
 
   it('resize changes dimensions', async () => {
     await handler({ action: 'resize', asset_name: 'sprite', width: 16, height: 16 });
-    const asset = workspace.loadedAssets.get('sprite')!;
+    const asset = getAsset('sprite');
     expect(asset.width).toBe(16);
     expect(asset.height).toBe(16);
   });
@@ -339,7 +363,7 @@ describe('asset tool', () => {
   it('resize is undoable', async () => {
     await handler({ action: 'resize', asset_name: 'sprite', width: 16, height: 16 });
     workspace.undo();
-    const asset = workspace.loadedAssets.get('sprite')!;
+    const asset = getAsset('sprite');
     expect(asset.width).toBe(8);
     expect(asset.height).toBe(8);
   });
@@ -347,20 +371,20 @@ describe('asset tool', () => {
   // ─── detect_banding ──────────────────────────────────────────────
 
   it('detect_banding returns clean for small pixel data', async () => {
-    const r = (await handler({
+    const r = await handler({
       action: 'detect_banding',
       asset_name: 'sprite',
       layer_id: 1,
       frame_index: 0,
-    })) as any;
-    const data = JSON.parse(r.content[0].text);
+    });
+    const data = JSON.parse(r.content[0].text) as { clean: boolean };
     expect(data.clean).toBe(true);
   });
 
   // ─── create ──────────────────────────────────────────────────────
 
   it('create builds a new asset with scaffold', async () => {
-    const r = (await handler({
+    const r = await handler({
       action: 'create',
       name: 'new_sprite',
       width: 16,
@@ -370,13 +394,13 @@ describe('asset tool', () => {
         { name: 'fg', type: 'image' },
       ],
       frames: [{ duration_ms: 100 }, { duration_ms: 150 }],
-    })) as any;
+    });
 
     expect(r.isError).toBeUndefined();
     const asset = workspace.loadedAssets.get('new_sprite');
     expect(asset).toBeDefined();
-    expect(asset!.layers).toHaveLength(2);
-    expect(asset!.frames).toHaveLength(2);
+    expect(asset?.layers).toHaveLength(2);
+    expect(asset?.frames).toHaveLength(2);
   });
 
   // ─── delete ──────────────────────────────────────────────────────
@@ -384,8 +408,10 @@ describe('asset tool', () => {
   it('delete removes asset from registry and workspace', async () => {
     await handler({ action: 'delete', asset_name: 'sprite' });
     expect(workspace.loadedAssets.has('sprite')).toBe(false);
-    const info = workspace.project!.info();
-    expect(info.assets['sprite']).toBeUndefined();
+    const project = workspace.project;
+    expect(project).not.toBeNull();
+    const info = project?.info();
+    expect(info?.assets['sprite']).toBeUndefined();
   });
 
   // ─── update_shape ─────────────────────────────────────────────────
@@ -406,7 +432,7 @@ describe('asset tool', () => {
     });
 
     // Update it
-    const r = (await handler({
+    const r = await handler({
       action: 'update_shape',
       asset_name: 'sprite',
       layer_id: 2,
@@ -417,16 +443,16 @@ describe('asset tool', () => {
       shape_y: 1,
       shape_width: 6,
       shape_height: 6,
-    })) as any;
+    });
 
     expect(r.isError).toBeUndefined();
-    const shapes = workspace.loadedAssets.get('sprite')!.getShapes(2, 0);
+    const shapes = getAsset('sprite').getShapes(2, 0);
     const updated = shapes.find((s) => s.name === 'box');
     expect(updated).toBeDefined();
-    expect(updated!.type).toBe('rect');
-    if (updated!.type === 'rect') {
-      expect(updated!.x).toBe(1);
-      expect(updated!.width).toBe(6);
+    expect(updated?.type).toBe('rect');
+    if (updated?.type === 'rect') {
+      expect(updated.x).toBe(1);
+      expect(updated.width).toBe(6);
     }
   });
 
@@ -457,7 +483,7 @@ describe('asset tool', () => {
     });
 
     workspace.undo(); // undo update
-    const shapes = workspace.loadedAssets.get('sprite')!.getShapes(2, 0);
+    const shapes = getAsset('sprite').getShapes(2, 0);
     const box = shapes.find((s) => s.name === 'box');
     expect(box).toBeDefined();
     if (box?.type === 'rect') {
@@ -475,7 +501,7 @@ describe('asset tool', () => {
       width: 16,
       height: 4,
       perspective: 'flat' as const,
-      palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]) as any,
+      palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]) as Asset['palette'],
       layers: [{ id: 1, name: 'Layer 1', type: 'image' as const, opacity: 255, visible: true }],
       frames: [{ index: 0, duration_ms: 100 }],
       tags: [],
@@ -489,13 +515,13 @@ describe('asset tool', () => {
     });
     workspace.loadedAssets.set('banding_test', bandingAsset);
 
-    const r = (await handler({
+    const r = await handler({
       action: 'detect_banding',
       asset_name: 'banding_test',
       layer_id: 1,
       frame_index: 0,
-    })) as any;
-    const data = JSON.parse(r.content[0].text);
+    });
+    const data = JSON.parse(r.content[0].text) as { banding: unknown[] };
     expect(data.banding).toBeDefined();
     expect(data.banding.length).toBeGreaterThan(0);
   });
@@ -504,38 +530,41 @@ describe('asset tool', () => {
 
   it('generate_collision_polygon traces a solid 2x2 rectangle', async () => {
     // The mock asset has a 2x2 solid block at (0,0) in layer 1
-    const r = (await handler({
+    const r = await handler({
       action: 'generate_collision_polygon',
       asset_name: 'sprite',
       layer_id: 1,
       frame_index: 0,
       target_layer_id: 2,
       epsilon: 0.5,
-    })) as any;
+    });
 
     expect(r.isError).toBeUndefined();
-    const data = JSON.parse(r.content[0].text);
+    const data = JSON.parse(r.content[0].text) as {
+      vertices: number;
+      target_layer_id: number;
+    };
     expect(data.vertices).toBeGreaterThan(0);
     expect(data.target_layer_id).toBe(2);
 
     // Shape should have been added to layer 2
-    const shapes = workspace.loadedAssets.get('sprite')!.getShapes(2, 0);
+    const shapes = getAsset('sprite').getShapes(2, 0);
     const collision = shapes.find((s) => s.name === 'collision');
     expect(collision).toBeDefined();
-    expect(collision!.type).toBe('polygon');
+    expect(collision?.type).toBe('polygon');
   });
 
   it('generate_collision_polygon auto-detects shape layer', async () => {
     // Don't pass target_layer_id — should auto-find the 'hitbox' shape layer (id=2)
-    const r = (await handler({
+    const r = await handler({
       action: 'generate_collision_polygon',
       asset_name: 'sprite',
       layer_id: 1,
       frame_index: 0,
-    })) as any;
+    });
 
     expect(r.isError).toBeUndefined();
-    const data = JSON.parse(r.content[0].text);
+    const data = JSON.parse(r.content[0].text) as { target_layer_id: number };
     expect(data.target_layer_id).toBe(2); // auto-resolved hitbox layer
   });
 
@@ -546,7 +575,7 @@ describe('asset tool', () => {
       width: 4,
       height: 4,
       perspective: 'flat' as const,
-      palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]) as any,
+      palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]) as Asset['palette'],
       layers: [
         { id: 1, name: 'Base', type: 'image' as const, opacity: 255, visible: true },
         {
@@ -565,14 +594,14 @@ describe('asset tool', () => {
     });
     workspace.loadedAssets.set('empty_sprite', emptyAsset);
 
-    const r = (await handler({
+    const r = await handler({
       action: 'generate_collision_polygon',
       asset_name: 'empty_sprite',
       layer_id: 1,
       frame_index: 0,
       target_layer_id: 2,
-    })) as any;
-    const data = JSON.parse(r.content[0].text);
+    });
+    const data = JSON.parse(r.content[0].text) as { vertices: unknown[] };
     // When there are no solid pixels, the handler returns { vertices: [] }
     expect(data.vertices).toHaveLength(0);
   });

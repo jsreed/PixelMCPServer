@@ -12,6 +12,7 @@
  * Tool handlers return this object. The LLM reads the text and can self-correct.
  */
 export interface DomainErrorResponse {
+  [key: string]: unknown;
   isError: true;
   content: Array<{ type: 'text'; text: string }>;
 }

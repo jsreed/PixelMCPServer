@@ -596,7 +596,7 @@ export class AssetClass {
     const counts = new Array<number>(256).fill(0);
     for (const cel of Object.values(this._data.cels)) {
       if ('data' in cel && Array.isArray(cel.data)) {
-        for (const row of cel.data as number[][]) {
+        for (const row of cel.data) {
           for (const idx of row) {
             if (idx >= 0 && idx < 256) {
               counts[idx]++;
@@ -786,10 +786,10 @@ export class AssetClass {
    * Takes a partial snapshot of the asset data and replaces the current data.
    */
   public _restoreDataPatch(patch: Partial<Asset>): void {
-    if (patch.layers) this._data.layers = JSON.parse(JSON.stringify(patch.layers));
-    if (patch.frames) this._data.frames = JSON.parse(JSON.stringify(patch.frames));
-    if (patch.tags) this._data.tags = JSON.parse(JSON.stringify(patch.tags));
-    if (patch.cels) this._data.cels = JSON.parse(JSON.stringify(patch.cels));
+    if (patch.layers) this._data.layers = JSON.parse(JSON.stringify(patch.layers)) as Layer[];
+    if (patch.frames) this._data.frames = JSON.parse(JSON.stringify(patch.frames)) as Frame[];
+    if (patch.tags) this._data.tags = JSON.parse(JSON.stringify(patch.tags)) as Tag[];
+    if (patch.cels) this._data.cels = JSON.parse(JSON.stringify(patch.cels)) as Record<string, Cel>;
     if (patch.width !== undefined) this._data.width = patch.width;
     if (patch.height !== undefined) this._data.height = patch.height;
     this.markDirty();

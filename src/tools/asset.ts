@@ -11,7 +11,6 @@ import { RenameCommand } from '../commands/rename-command.js';
 import { AssetDeleteCommand } from '../commands/asset-delete-command.js';
 import { saveAssetFile } from '../io/asset-io.js';
 import { loadPaletteFile } from '../io/palette-io.js';
-import { PaletteCommand } from '../commands/palette-command.js';
 import { marchingSquares, simplifyOrthogonal } from '../algorithms/marching-squares.js';
 import { simplifyPolygon } from '../algorithms/ramer-douglas-peucker.js';
 import { detectBanding } from '../algorithms/banding.js';
@@ -327,7 +326,7 @@ function handleGetCel(
   // Check if it's a linked cel (before resolution)
   const rawKey = packCelKey(layerId, frameIndex);
   const rawCels = asset.cels;
-  const rawCel = rawCels[rawKey];
+  const rawCel = rawCels[rawKey] as unknown as { link?: string } | undefined;
   const isLinked = rawCel !== undefined && 'link' in rawCel;
   const linkSource = isLinked ? rawCel.link : undefined;
 
@@ -443,7 +442,7 @@ function handleDetectBanding(
 // Create / Lifecycle actions
 // ---------------------------------------------------------------------------
 
-async function handleCreate(workspace: Workspace, args: Record<string, any>) {
+async function handleCreate(workspace: Workspace, args: Record<string, unknown>) {
   if (!workspace.project) return errors.noProjectLoaded();
   if (!args.name) return errors.invalidArgument('asset create requires "name".');
   if (!args.width || !args.height)
@@ -460,9 +459,7 @@ async function handleCreate(workspace: Workspace, args: Record<string, any>) {
     width: w,
     height: h,
     perspective,
-    palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]) as Array<
-      [number, number, number, number]
-    >,
+    palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]),
     layers: [],
     frames: [],
     tags: [],
@@ -473,10 +470,11 @@ async function handleCreate(workspace: Workspace, args: Record<string, any>) {
   if (args.tile_height) assetData.tile_height = args.tile_height as number;
 
   // Apply initial palette
-  if (args.palette && Array.isArray(args.palette)) {
-    for (let i = 0; i < (args.palette as number[][]).length && i < 256; i++) {
-      const c = (args.palette as number[][])[i];
-      if (c && c.length === 4) {
+  const paletteArgs = args.palette as number[][] | undefined;
+  if (paletteArgs) {
+    for (let i = 0; i < paletteArgs.length && i < 256; i++) {
+      const c = paletteArgs[i] as number[] | undefined;
+      if (c?.length === 4) {
         assetData.palette[i] = c as [number, number, number, number];
       }
     }
@@ -487,7 +485,7 @@ async function handleCreate(workspace: Workspace, args: Record<string, any>) {
   // Add initial layers
   if (args.layers && Array.isArray(args.layers)) {
     for (const l of args.layers as Array<{ name: string; type: string }>) {
-      asset.addLayer({ name: l.name, type: l.type as any, opacity: 255, visible: true });
+      asset.addLayer({ name: l.name, type: l.type as 'image' | 'tilemap' | 'shape', opacity: 255, visible: true });
     }
   } else {
     // Default layer
@@ -525,7 +523,7 @@ async function handleCreate(workspace: Workspace, args: Record<string, any>) {
   return ok({ message: `Asset '${name}' created.`, path: filePath });
 }
 
-async function handleRename(
+function handleRename(
   workspace: Workspace,
   assetName: string | undefined,
   newName: string | undefined,
@@ -562,10 +560,9 @@ async function handleRename(
           // Update registry path
           const newRelPath = path.relative(projectDir, newFilePath);
           const updatedInfo = project.info();
-          if (updatedInfo.assets[newName]) {
-            project.removeAsset(newName);
-            project.registerAsset(newName, { ...updatedInfo.assets[newName], path: newRelPath });
-          }
+          const entryForNew = updatedInfo.assets[newName];
+          project.removeAsset(newName);
+          project.registerAsset(newName, { ...entryForNew, path: newRelPath });
         }
       },
       () => {
@@ -577,12 +574,11 @@ async function handleRename(
           fs.renameSync(newFilePath, oldFilePath);
           const newRelPath = path.relative(projectDir, oldFilePath);
           const updatedInfo = project.info();
-          if (updatedInfo.assets[oldName]) {
-            project.removeAsset(oldName);
-            project.registerAsset(oldName, { ...updatedInfo.assets[oldName], path: newRelPath });
-          }
+          const entryForOld = updatedInfo.assets[oldName];
+          project.removeAsset(oldName);
+          project.registerAsset(oldName, { ...entryForOld, path: newRelPath });
         }
-      },
+      }
     );
     workspace.pushCommand(cmd);
   } catch (e: unknown) {
@@ -628,7 +624,7 @@ async function handleDuplicate(
   });
 }
 
-async function handleCreateRecolor(workspace: Workspace, args: Record<string, any>) {
+async function handleCreateRecolor(workspace: Workspace, args: Record<string, unknown>) {
   const asset = requireAsset(workspace, args.asset_name as string | undefined);
   if (isError(asset)) return asset;
   if (!args.name) return errors.invalidArgument('asset create_recolor requires "name".');
@@ -651,7 +647,7 @@ async function handleCreateRecolor(workspace: Workspace, args: Record<string, an
       const palData = await loadPaletteFile(palPath);
       for (let i = 0; i < palData.colors.length && i < 256; i++) {
         const c = palData.colors[i];
-        if (c) newAsset.palette.set(i, c as Color);
+        if (c) newAsset.palette.set(i, c);
       }
     } catch {
       return errors.paletteFileNotFound(palPath);
@@ -702,7 +698,7 @@ async function handleCreateRecolor(workspace: Workspace, args: Record<string, an
   return ok({ message: `Recolor '${newName}' created from '${sourceName}'.`, path: newFilePath });
 }
 
-async function handleDelete(
+function handleDelete(
   workspace: Workspace,
   assetName: string | undefined,
   deleteFile: boolean | undefined,
@@ -712,7 +708,7 @@ async function handleDelete(
 
   const project = workspace.project;
   const info = project.info();
-  if (!info.assets[assetName]) return errors.assetNotInRegistry(assetName);
+  if (!(assetName in info.assets)) return errors.assetNotInRegistry(assetName);
 
   const entry = info.assets[assetName];
   const cmd = new AssetDeleteCommand(project, assetName, () => {
@@ -763,19 +759,19 @@ function handleResize(
   });
 }
 
-function handleAddLayer(workspace: Workspace, args: Record<string, any>) {
+function handleAddLayer(workspace: Workspace, args: Record<string, unknown>) {
   const asset = requireAsset(workspace, args.asset_name as string | undefined);
   if (isError(asset)) return asset;
   if (!args.name) return errors.invalidArgument('asset add_layer requires "name".');
   if (!args.layer_type) return errors.invalidArgument('asset add_layer requires "layer_type".');
 
-  let newId: number;
+  let newId: number = -1;
   try {
     const cmd = new LayerCommand(asset, () => {
       newId = asset.addLayer(
         {
           name: args.name as string,
-          type: args.layer_type as any,
+          type: args.layer_type as 'image' | 'tilemap' | 'shape',
           opacity: 255,
           visible: true,
           role: args.layer_role as string | undefined,
@@ -790,7 +786,7 @@ function handleAddLayer(workspace: Workspace, args: Record<string, any>) {
     return errors.domainError(e instanceof Error ? e.message : String(e));
   }
 
-  return ok({ message: `Layer '${args.name as string}' added.`, layer_id: newId! });
+  return ok({ message: `Layer '${args.name as string}' added.`, layer_id: newId });
 }
 
 function handleAddGroup(
@@ -804,7 +800,7 @@ function handleAddGroup(
   if (isError(asset)) return asset;
   if (!name) return errors.invalidArgument('asset add_group requires "name".');
 
-  let newId: number;
+  let newId: number = -1;
   try {
     const cmd = new LayerCommand(asset, () => {
       newId = asset.addGroup(name, parentId, index);
@@ -814,7 +810,7 @@ function handleAddGroup(
     return errors.domainError(e instanceof Error ? e.message : String(e));
   }
 
-  return ok({ message: `Group '${name}' added.`, layer_id: newId! });
+  return ok({ message: `Group '${name}' added.`, layer_id: newId });
 }
 
 function handleRemoveLayer(
@@ -875,7 +871,7 @@ function handleAddFrame(
   if (isError(asset)) return asset;
 
   const duration = durationMs ?? 100;
-  let insertedAt: number;
+  let insertedAt: number = -1;
   try {
     const cmd = new FrameCommand(asset, () => {
       insertedAt = asset.addFrame(
@@ -888,7 +884,7 @@ function handleAddFrame(
     return errors.domainError(e instanceof Error ? e.message : String(e));
   }
 
-  return ok({ message: `Frame added at index ${String(insertedAt!)}.`, frame_index: insertedAt! });
+  return ok({ message: `Frame added at index ${String(insertedAt)}.`, frame_index: insertedAt });
 }
 
 function handleRemoveFrame(
@@ -938,7 +934,7 @@ function handleSetFrameDuration(
   return ok({ message: `Frame ${String(frameIndex)} duration set to ${String(durationMs)}ms.` });
 }
 
-function handleAddTag(workspace: Workspace, args: Record<string, any>) {
+function handleAddTag(workspace: Workspace, args: Record<string, unknown>) {
   const asset = requireAsset(workspace, args.asset_name as string | undefined);
   if (isError(asset)) return asset;
   if (!args.name) return errors.invalidArgument('asset add_tag requires "name".');
@@ -955,7 +951,7 @@ function handleAddTag(workspace: Workspace, args: Record<string, any>) {
         type: 'frame',
         start: args.tag_start as number,
         end: args.tag_end as number,
-        direction: (args.tag_direction ?? 'forward') as any,
+        direction: (args.tag_direction ?? 'forward') as 'forward' | 'reverse' | 'ping_pong',
         facing: args.tag_facing as Facing | undefined,
       };
     } else {
@@ -1006,7 +1002,7 @@ function handleRemoveTag(
 // Shape actions
 // ---------------------------------------------------------------------------
 
-function handleAddShape(workspace: Workspace, args: Record<string, any>) {
+function handleAddShape(workspace: Workspace, args: Record<string, unknown>) {
   const asset = requireAsset(workspace, args.asset_name as string | undefined);
   if (isError(asset)) return asset;
   if (args.layer_id === undefined)
@@ -1049,7 +1045,7 @@ function handleAddShape(workspace: Workspace, args: Record<string, any>) {
   return ok({ message: `Shape '${args.shape_name as string}' added.` });
 }
 
-function handleUpdateShape(workspace: Workspace, args: Record<string, any>) {
+function handleUpdateShape(workspace: Workspace, args: Record<string, unknown>) {
   const asset = requireAsset(workspace, args.asset_name as string | undefined);
   if (isError(asset)) return asset;
   if (args.layer_id === undefined)
@@ -1118,7 +1114,7 @@ function handleRemoveShape(
   return ok({ message: `Shape '${shapeName}' removed.` });
 }
 
-function handleGenerateCollisionPolygon(workspace: Workspace, args: Record<string, any>) {
+function handleGenerateCollisionPolygon(workspace: Workspace, args: Record<string, unknown>) {
   const asset = requireAsset(workspace, args.asset_name as string | undefined);
   if (isError(asset)) return asset;
   if (args.layer_id === undefined)
@@ -1185,7 +1181,7 @@ function handleGenerateCollisionPolygon(workspace: Workspace, args: Record<strin
   const shape: Shape = { name: shapeName, type: 'polygon', points: tuplePoints };
   try {
     const cmd = new ShapeCommand(asset, targetLayerId, frameIndex, () => {
-      asset.addShape(targetLayerId!, frameIndex, shape);
+      asset.addShape(targetLayerId, frameIndex, shape);
     });
     workspace.pushCommand(cmd);
   } catch (e: unknown) {

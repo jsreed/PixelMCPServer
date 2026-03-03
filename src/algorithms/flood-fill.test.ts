@@ -3,7 +3,7 @@ import { floodFill } from './flood-fill.js';
 
 describe('floodFill', () => {
   const createMockCanvas = (w: number, h: number, defaultColor = 0): number[][] => {
-    return Array.from({ length: h }, () => Array(w).fill(defaultColor));
+    return Array.from({ length: h }, () => new Array<number>(w).fill(defaultColor));
   };
 
   const canvasValue = (canvas: number[][]) => (x: number, y: number) => {
@@ -30,11 +30,11 @@ describe('floodFill', () => {
     expect(points.length).toBe(100);
 
     // Ensure every coordinate from 0,0 to 9,9 is covered
-    const map = new Set(points.map((p) => `${p.x},${p.y}`));
+    const map = new Set(points.map((p) => `${String(p.x)},${String(p.y)}`));
     expect(map.size).toBe(100);
     for (let y = 0; y < 10; y++) {
       for (let x = 0; x < 10; x++) {
-        expect(map.has(`${x},${y}`)).toBe(true);
+        expect(map.has(`${String(x)},${String(y)}`)).toBe(true);
       }
     }
   });
@@ -89,7 +89,7 @@ describe('floodFill', () => {
     }
     expect(outsideFill).toHaveLength(20);
 
-    const map = new Set(outsideFill.map((p) => `${p.x},${p.y}`));
+    const map = new Set(outsideFill.map((p) => `${String(p.x)},${String(p.y)}`));
     // Verify inside cells are NOT touched
     expect(map.has('2,2')).toBe(false);
     expect(map.has('3,2')).toBe(false);
@@ -110,7 +110,7 @@ describe('floodFill', () => {
       console.log('INSIDE FILL MISSED:', JSON.stringify(insideFill));
     }
     expect(insideFill).toHaveLength(4);
-    const insideMap = new Set(insideFill.map((p) => `${p.x},${p.y}`));
+    const insideMap = new Set(insideFill.map((p) => `${String(p.x)},${String(p.y)}`));
     expect(insideMap.has('2,2')).toBe(true);
     expect(insideMap.has('3,2')).toBe(true);
     expect(insideMap.has('2,3')).toBe(true);
@@ -178,7 +178,7 @@ describe('floodFill', () => {
     // Fill from (1,0) — top-right region. With 4-way fill it shouldn't leak
     // through the diagonal to (0,1)
     const fill = floodFill(1, 0, 5, 5, canvasValue(canvas));
-    const set = new Set(fill.map((p) => `${p.x},${p.y}`));
+    const set = new Set(fill.map((p) => `${String(p.x)},${String(p.y)}`));
 
     // The diagonal 1s separate via 4-way: (1,0) connects to upper-right zone
     // (0,1) is below-left of the diagonal — should NOT be reached
@@ -233,7 +233,7 @@ describe('floodFill', () => {
     const canvas = [[0, 0, 1, 0, 0]];
     const fill = floodFill(0, 0, 5, 1, canvasValue(canvas));
     expect(fill).toHaveLength(2);
-    const set = new Set(fill.map((p) => `${p.x},${p.y}`));
+    const set = new Set(fill.map((p) => `${String(p.x)},${String(p.y)}`));
     expect(set.has('0,0')).toBe(true);
     expect(set.has('1,0')).toBe(true);
   });

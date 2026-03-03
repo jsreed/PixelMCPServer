@@ -11,7 +11,7 @@ export class AssetDeleteCommand implements Command {
     private action: () => void,
   ) {
     const info = project.info();
-    this.registryEntry = JSON.parse(JSON.stringify(info.assets[assetName]));
+    this.registryEntry = JSON.parse(JSON.stringify(info.assets[assetName])) as AssetRegistryEntry;
   }
 
   execute(): void {

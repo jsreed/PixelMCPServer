@@ -13,7 +13,7 @@ export class ShapeCommand implements Command {
     private action: () => void,
   ) {
     const cel = asset.getCel(layerId, frameIndex);
-    this.beforeCel = cel ? JSON.parse(JSON.stringify(cel)) : undefined;
+    this.beforeCel = cel ? (JSON.parse(JSON.stringify(cel)) as Cel) : undefined;
   }
 
   execute(): void {
@@ -22,7 +22,7 @@ export class ShapeCommand implements Command {
     } else {
       this.action();
       const cel = this.asset.getCel(this.layerId, this.frameIndex);
-      this.afterCel = cel ? JSON.parse(JSON.stringify(cel)) : undefined;
+      this.afterCel = cel ? (JSON.parse(JSON.stringify(cel)) as Cel) : undefined;
     }
   }
 
@@ -34,7 +34,7 @@ export class ShapeCommand implements Command {
     if (state === undefined) {
       this.asset.removeCel(this.layerId, this.frameIndex);
     } else {
-      this.asset.setCel(this.layerId, this.frameIndex, JSON.parse(JSON.stringify(state)));
+      this.asset.setCel(this.layerId, this.frameIndex, JSON.parse(JSON.stringify(state)) as Cel);
     }
   }
 }
