@@ -365,7 +365,7 @@ Visual preview resources for human users (not required for LLM operation — the
 
 #### 4.1.4 Animation View
 
-- [ ] **4.1.4.1** **`pixel://view/animation/{name}/{tag}`** — find the named frame tag, composite each frame in the tag's range using `compositeFrame()`, encode as animated GIF via `gifenc` with per-frame `duration_ms` delays from the asset's frame data. Validate tag exists and is a frame tag (not a layer tag). Return with `mimeType: "image/gif"`.
+- [x] **4.1.4.1** **`pixel://view/animation/{name}/{tag}`** — find the named frame tag, composite each frame in the tag's range using `compositeFrame()`, encode as animated GIF via `gifenc` with per-frame `duration_ms` delays from the asset's frame data. Validate tag exists and is a frame tag (not a layer tag). Return with `mimeType: "image/gif"`.
 
 #### 4.1.5 Palette View
 

@@ -79,7 +79,22 @@ export function registerResources(server: McpServer): void {
   server.registerResource(
     'animation_view',
     new ResourceTemplate('pixel://view/animation/{name}/{tag}', {
-      list: undefined,
+      list: () => {
+        const workspace = getWorkspace();
+        const resources = [];
+        for (const [name, asset] of workspace.loadedAssets) {
+          for (const tag of asset.tags) {
+            if (tag.type === 'frame') {
+              resources.push({
+                uri: `pixel://view/animation/${name}/${tag.name}`,
+                name: `Animation: ${name} (${tag.name})`,
+                mimeType: 'image/gif',
+              });
+            }
+          }
+        }
+        return { resources };
+      },
     }),
     { description: 'Renders a specific frame tag as an animated GIF' },
     (uri, variables) => {

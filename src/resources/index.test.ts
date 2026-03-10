@@ -70,7 +70,7 @@ describe('MCP Resources', () => {
         palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]),
         layers: [],
         frames: [],
-        tags: [],
+        tags: [{ type: 'frame', name: 'idle', start: 0, end: 1, direction: 'forward' }],
         cels: {},
       });
 
@@ -95,6 +95,7 @@ describe('MCP Resources', () => {
       const assetTemplate = registered.find((r) => r.name === 'asset_view');
       const paletteTemplate = registered.find((r) => r.name === 'palette_view');
       const tilesetTemplate = registered.find((r) => r.name === 'tileset_view');
+      const animationTemplate = registered.find((r) => r.name === 'animation_view');
 
       expect(assetTemplate?.template.listCallback).toBeDefined();
       if (!assetTemplate?.template.listCallback) throw new Error('No listCallback');
@@ -119,6 +120,14 @@ describe('MCP Resources', () => {
       const tilesetUris = (tilesetList.resources as Resource[]).map((r) => r.uri);
       expect(tilesetUris).toContain('pixel://view/tileset/tree');
       expect(tilesetUris).not.toContain('pixel://view/tileset/hero');
+
+      expect(animationTemplate?.template.listCallback).toBeDefined();
+      if (!animationTemplate?.template.listCallback) throw new Error('No listCallback');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
+      const animationList = await animationTemplate.template.listCallback({} as any);
+      const animationUris = (animationList.resources as Resource[]).map((r) => r.uri);
+      expect(animationUris).toContain('pixel://view/animation/hero/idle');
+      expect(animationUris).not.toContain('pixel://view/animation/tree/idle');
     });
   });
 
@@ -136,7 +145,10 @@ describe('MCP Resources', () => {
           { index: 0, duration_ms: 100 },
           { index: 1, duration_ms: 100 },
         ],
-        tags: [],
+        tags: [
+          { type: 'frame', name: 'walk', start: 0, end: 1, direction: 'forward' },
+          { type: 'layer', name: 'meta', layers: [1] },
+        ],
         cels: {
           '1/0': {
             x: 0,
@@ -323,6 +335,64 @@ describe('MCP Resources', () => {
           index: '99',
         }),
       ).toThrow('Frame 99 is out of range');
+    });
+
+    it('returns a valid GIF blob for a valid animation URI', async () => {
+      const animationTemplate = registered.find((r) => r.name === 'animation_view');
+      expect(animationTemplate).toBeDefined();
+      if (!animationTemplate) throw new Error('No animation_view template');
+
+      const response = await animationTemplate.readCallback(
+        new URL('pixel://view/animation/hero/walk'),
+        {
+          name: 'hero',
+          tag: 'walk',
+        },
+      );
+
+      expect(response.contents).toHaveLength(1);
+      const content = response.contents[0];
+      if ('mimeType' in content) {
+        expect(content.mimeType).toBe('image/gif');
+      }
+      if ('blob' in content) {
+        expect(content.blob).toBeDefined();
+        expect(typeof content.blob).toBe('string');
+        expect(content.blob.length).toBeGreaterThan(100);
+      }
+    });
+
+    it('throws error for invalid tag in animation view', () => {
+      const animationTemplate = registered.find((r) => r.name === 'animation_view');
+      if (!animationTemplate) throw new Error('no animation_view template');
+      expect(() =>
+        animationTemplate.readCallback(new URL('pixel://view/animation/hero/unknown_tag'), {
+          name: 'hero',
+          tag: 'unknown_tag',
+        }),
+      ).toThrow("Tag 'unknown_tag' does not exist on asset 'hero'");
+    });
+
+    it('throws error if tag is a layer tag in animation view', () => {
+      const animationTemplate = registered.find((r) => r.name === 'animation_view');
+      if (!animationTemplate) throw new Error('no animation_view template');
+      expect(() =>
+        animationTemplate.readCallback(new URL('pixel://view/animation/hero/meta'), {
+          name: 'hero',
+          tag: 'meta',
+        }),
+      ).toThrow("Tag 'meta' is a layer tag, animation requires a frame tag");
+    });
+
+    it('throws error for invalid asset in animation view', () => {
+      const animationTemplate = registered.find((r) => r.name === 'animation_view');
+      if (!animationTemplate) throw new Error('no animation_view template');
+      expect(() =>
+        animationTemplate.readCallback(new URL('pixel://view/animation/unknown/walk'), {
+          name: 'unknown',
+          tag: 'walk',
+        }),
+      ).toThrow("Asset 'unknown' is not loaded");
     });
   });
 });

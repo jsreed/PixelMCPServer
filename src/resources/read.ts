@@ -4,6 +4,7 @@ import { type AssetClass } from '../classes/asset.js';
 import { PNG } from 'pngjs';
 import { compositeFrame, type CompositeLayer } from '../algorithms/composite.js';
 import { buildCompositeLayers, buildPaletteMap } from '../utils/render.js';
+import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 
 const TRANSPARENT_1X1_PNG_B64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
@@ -184,11 +185,79 @@ function renderLayerFrameView(
 }
 
 function renderAnimationView(
-  _route: Extract<ResourceRoute, { type: 'animation' }>,
+  route: Extract<ResourceRoute, { type: 'animation' }>,
   uri: URL,
 ): ReadResourceResult | Promise<ReadResourceResult> {
+  const workspace = getWorkspace();
+  const asset = workspace.loadedAssets.get(route.name);
+  if (!asset) {
+    throw new Error(`Asset '${route.name}' is not loaded`);
+  }
+
+  const tag = asset.tags.find((t) => t.name === route.tag);
+  if (!tag) {
+    throw new Error(`Tag '${route.tag}' does not exist on asset '${route.name}'`);
+  }
+  if (tag.type !== 'frame') {
+    throw new Error(`Tag '${route.tag}' is a layer tag, animation requires a frame tag`);
+  }
+
+  const sequence: number[] = [];
+  const start = tag.start;
+  const end = tag.end;
+  const dir = tag.direction;
+
+  if (dir === 'forward') {
+    for (let i = start; i <= end; i++) sequence.push(i);
+  } else if (dir === 'reverse') {
+    for (let i = end; i >= start; i--) sequence.push(i);
+  } else {
+    // ping_pong
+    for (let i = start; i <= end; i++) sequence.push(i);
+    if (end > start) {
+      for (let i = end - 1; i > start; i--) sequence.push(i);
+    }
+  }
+
+  if (sequence.length === 0) {
+    throw new Error(`Frame tag '${route.tag}' has no frames`);
+  }
+
+  const encoder = GIFEncoder();
+
+  for (const frameIndex of sequence) {
+    const frameDetail = asset.frames.find((f) => f.index === frameIndex);
+    const durationParam = frameDetail ? frameDetail.duration_ms : 100;
+
+    const buffer = compositeFrame(
+      asset.width,
+      asset.height,
+      buildCompositeLayers(asset),
+      buildPaletteMap(asset.palette),
+      frameIndex,
+    );
+
+    const colorOutput = quantize(buffer, 256, { format: 'rgba4444', oneBitAlpha: true });
+    const indexedPixels = applyPalette(buffer, colorOutput);
+
+    encoder.writeFrame(indexedPixels, asset.width, asset.height, {
+      palette: colorOutput,
+      delay: durationParam,
+      transparent: true,
+      transparentIndex:
+        colorOutput.findIndex((c: number[]) => c[3] === 0) !== -1
+          ? colorOutput.findIndex((c: number[]) => c[3] === 0)
+          : 0,
+      dispose: -1, // auto
+    });
+  }
+
+  encoder.finish();
+  const bytes = encoder.bytes();
+  const base64 = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('base64');
+
   return {
-    contents: [{ uri: uri.toString(), mimeType: 'image/gif', blob: TRANSPARENT_1X1_PNG_B64 }],
+    contents: [{ uri: uri.toString(), mimeType: 'image/gif', blob: base64 }],
   };
 }
 
