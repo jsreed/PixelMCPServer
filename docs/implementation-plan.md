@@ -344,28 +344,101 @@ Shared utilities needed by multiple export actions.
 
 ### 4.1 MCP Resources (Visual Previews)
 
-These require the image compositing engine from [§3.4.2](#342-image-compositing-engine).
+Visual preview resources for human users (not required for LLM operation — the LLM reads state via tool actions). These require the image compositing engine from [§1.5.10](#1510-image-compositing) and export encoding from [§3.4.1.2](#3412-image-compositing-integration).
 
-- [ ] **4.1.1** **Resource URI router** — parse `pixel://view/...` URIs, dispatch to renderers
-- [ ] **4.1.2** **Asset view** — `pixel://view/asset/{name}` and `/frame/{index}` — composite to PNG
-- [ ] **4.1.3** **Layer view** — `pixel://view/asset/{name}/layer/{id}` and `/{frame_index}` — single layer PNG
-- [ ] **4.1.4** **Animation view** — `pixel://view/animation/{name}/{tag}` — render tagged frames as animated GIF
-- [ ] **4.1.5** **Palette view** — `pixel://view/palette/{name}` — rendered palette swatch grid PNG
-- [ ] **4.1.6** **Tileset view** — `pixel://view/tileset/{name}` — rendered tile grid PNG
-- [ ] **4.1.7** **Resource links in tool responses** — mutation tools include relevant `pixel://` URIs in response content
-- [ ] **4.1.8** **Resource tests** — URI routing, each resource type returns valid image data, resource links present in mutation tool responses
+#### 4.1.1 Resource URI Router
+
+- [ ] **4.1.1.1** **URI parser** — parse `pixel://view/...` URIs into structured route objects: resource type (`asset`, `layer`, `animation`, `palette`, `tileset`), asset name, and optional sub-parameters (frame index, layer ID, tag name). Return typed dispatch target or error for malformed URIs.
+- [ ] **4.1.1.2** **Dispatch + registration** — register a resource handler with the MCP SDK that dispatches parsed URIs to the appropriate renderer function. Return `{ uri, mimeType, blob }` for image data.
+
+#### 4.1.2 Asset View
+
+- [ ] **4.1.2.1** **`pixel://view/asset/{name}`** — composite all visible layers at frame 0 using `compositeFrame()`, encode as PNG via `pngjs`, return as base64 blob with `mimeType: "image/png"`. Validate asset is loaded.
+- [ ] **4.1.2.2** **`pixel://view/asset/{name}/frame/{index}`** — same as above but composite the specified frame index. Validate frame index in bounds.
+
+#### 4.1.3 Layer View
+
+- [ ] **4.1.3.1** **`pixel://view/asset/{name}/layer/{layer_id}`** — render a single layer at frame 0 in isolation: resolve cel (including linked cels), convert palette indices to RGBA, encode as PNG. Non-image layers return an error or empty image.
+- [ ] **4.1.3.2** **`pixel://view/asset/{name}/layer/{layer_id}/{frame_index}`** — same as above for a specific frame. Validate layer ID exists and frame index in bounds.
+
+#### 4.1.4 Animation View
+
+- [ ] **4.1.4.1** **`pixel://view/animation/{name}/{tag}`** — find the named frame tag, composite each frame in the tag's range using `compositeFrame()`, encode as animated GIF via `gifenc` with per-frame `duration_ms` delays from the asset's frame data. Validate tag exists and is a frame tag (not a layer tag). Return with `mimeType: "image/gif"`.
+
+#### 4.1.5 Palette View
+
+- [ ] **4.1.5.1** **`pixel://view/palette/{name}`** — render the asset's palette as a swatch grid PNG. Layout: 16 columns × ceil(colorCount/16) rows, each swatch a fixed pixel size (e.g., 8×8 or 16×16). Transparent (index 0) rendered with a checkerboard background. Include index labels or distinguishing marks for empty vs. occupied slots.
+
+#### 4.1.6 Tileset View
+
+- [ ] **4.1.6.1** **`pixel://view/tileset/{name}`** — render all tile slots in a grid PNG. Layout: tiles arranged in rows of `ceil(sqrt(tile_count))` columns, each tile at `tile_width × tile_height`. Composite each tile slot's pixel data, convert to RGBA via palette. Draw 1px grid lines between tiles for visual separation. Validate asset has tileset fields (`tile_width`, `tile_height`, `tile_count`).
+
+#### 4.1.7 Resource Links in Tool Responses
+
+Retrofit existing mutation tool handlers to include relevant `pixel://` URIs in their response content, so clients that support resources can render inline previews.
+
+- [ ] **4.1.7.1** **`draw` tool** — append `pixel://view/asset/{name}/layer/{layer_id}/{frame_index}` after successful draw operations.
+- [ ] **4.1.7.2** **`transform` tool** — append `pixel://view/asset/{name}/layer/{layer_id}/{frame_index}` after successful transform operations.
+- [ ] **4.1.7.3** **`effect` tool** — append `pixel://view/asset/{name}/layer/{layer_id}/{frame_index}` after successful effect operations.
+- [ ] **4.1.7.4** **`palette` tool** — append `pixel://view/palette/{name}` after palette mutations (`set`, `set_bulk`, `swap`, `load`, `fetch_lospec`, `generate_ramp`).
+- [ ] **4.1.7.5** **`asset` tool** — append `pixel://view/asset/{name}` after structural mutations (`create`, `resize`, `add_layer`, `remove_layer`, `add_frame`, `remove_frame`).
+- [ ] **4.1.7.6** **`tileset` tool** — append `pixel://view/tileset/{name}` after tileset mutations (`extract_tile`, `place_tile`, `autotile_generate`).
+- [ ] **4.1.7.7** **`selection` tool** — append `pixel://view/asset/{name}/layer/{layer_id}/{frame_index}` after `paste` and `cut` operations.
+
+#### 4.1.8 Resource Tests
+
+- [ ] **4.1.8.1** **URI routing tests** — valid URIs dispatch to correct renderer, malformed URIs return errors, unknown asset names return domain errors.
+- [ ] **4.1.8.2** **Asset view tests** — returns valid PNG data, correct dimensions, frame index bounds validation.
+- [ ] **4.1.8.3** **Layer view tests** — single layer isolation (other layers excluded), linked cel resolution, layer ID and frame validation.
+- [ ] **4.1.8.4** **Animation view tests** — GIF frame count matches tag range, per-frame delays match asset durations, tag-not-found error.
+- [ ] **4.1.8.5** **Palette view tests** — PNG dimensions match expected grid layout, swatch count matches palette size.
+- [ ] **4.1.8.6** **Tileset view tests** — PNG dimensions match expected grid layout, tile count correct, error for non-tileset assets.
+- [ ] **4.1.8.7** **Resource link tests** — verify mutation tool responses include expected `pixel://` URIs for draw, transform, effect, palette, asset, tileset, and selection tools.
 
 ### 4.2 MCP Prompts (Workflow Templates)
 
-- [ ] **4.2.1** **Prompt registration** — register prompts with the MCP server using the SDK's prompt API
-- [ ] **4.2.2** **`scaffold_character`** — generate messages array guiding character creation: palette, layers, directional tags, optional hitbox
-- [ ] **4.2.3** **`scaffold_tileset`** — generate messages for blob47 tileset creation workflow
-- [ ] **4.2.4** **`scaffold_equipment`** — generate messages for modular equipment with fit variants
-- [ ] **4.2.5** **`analyze_asset`** — generate messages prompting asset critique (palette usage, banding, completeness)
-- [ ] **4.2.6** **`export_for_godot`** — generate messages guiding correct export action selection
-- [ ] **4.2.7** **Prompt tests** — each prompt returns valid `messages` array, argument validation, message content references correct tool names
+MCP Prompts are user-invoked workflow templates (triggered from the host UI, not by the LLM). Each returns a `messages` array that seeds the LLM's context with structured instructions before it begins tool calls. Depends on the full tool surface being available (Phases 2–3).
 
-> **Definition of Done — Phase 4:** All resource URIs resolve and return valid image data. All prompts return well-formed message arrays. Resource links appear in mutation tool responses.
+#### 4.2.1 Prompt Registration
+
+- [ ] **4.2.1.1** **Prompt registration infrastructure** — register all prompts with the MCP server using the SDK's prompt API. Each prompt defines its `name`, `description`, and `arguments` array (with `name`, `description`, `required` fields). Wire into `src/index.ts` via `register*Prompt(server)` functions following the same pattern as tool registration.
+
+#### 4.2.2 `scaffold_character`
+
+- [ ] **4.2.2.1** **Arguments**: `name` (required — asset name), `directions` (optional — `"4"` or `"8"` directional, default `"4"`), `width` (optional — canvas width in pixels, default 16), `height` (optional — canvas height in pixels, default 24), `palette` (optional — Lospec slug or palette file path, default project default).
+- [ ] **4.2.2.2** **Messages generation** — return messages array guiding the LLM through: (1) create asset with specified dimensions and perspective, (2) set up palette (fetch from Lospec or load from file), (3) create layer structure (body, eyes/detail, optional hitbox shape layer), (4) create directional frame tags with `facing` values based on `directions` arg (4-dir: N/E/S/W or 8-dir: all 8), (5) draw base pose on frame 0, (6) guidance for animation frames (idle, walk cycles).
+
+#### 4.2.3 `scaffold_tileset`
+
+- [ ] **4.2.3.1** **Arguments**: `name` (required — asset name), `tile_size` (optional — tile pixel size as integer, default project default), `terrain_name` (optional — Godot terrain name, default asset name).
+- [ ] **4.2.3.2** **Messages generation** — return messages array guiding the LLM through: (1) create asset with `tile_width`/`tile_height` set to `tile_size`, (2) set up palette, (3) explain blob47 canonical slot layout and bitmask indexing, (4) draw each of the 47 tile variants at their correct slot positions, (5) call `autotile_generate` with `terrain_name` to assign peering bits, (6) set tile physics for relevant slots, (7) export via `godot_tileset`.
+
+#### 4.2.4 `scaffold_equipment`
+
+- [ ] **4.2.4.1** **Arguments**: `name` (required — asset name), `type` (optional — `"weapon"`, `"armor_head"`, `"armor_chest"`, `"cape"`, etc.; informs default variant structure), `reference_character` (optional — registered asset name of the base body to use as anchor reference).
+- [ ] **4.2.4.2** **Messages generation** — return messages array guiding the LLM through: (1) create asset with dimensions matching the reference character (if provided, query its info), (2) set up palette (possibly shared with reference character), (3) create layer structure appropriate for the equipment type, (4) create directional frame tags aligned with the reference character's tags, (5) draw equipment with alignment guidance relative to the character rig, (6) create fit variants if applicable.
+
+#### 4.2.5 `analyze_asset`
+
+- [ ] **4.2.5.1** **Arguments**: `asset_name` (required — the asset to analyze).
+- [ ] **4.2.5.2** **Messages generation** — return messages array prompting the LLM to: (1) call `asset info` and `palette info` to gather structural data, (2) call `asset detect_banding` to check for banding issues, (3) analyze palette usage (unused colors, duplicate near-colors, missing ramp continuity), (4) check animation completeness (missing frames in tags, inconsistent durations), (5) for tilesets: check for missing canonical slots via `autotile_generate` query mode, (6) return a structured critique with specific fix suggestions referencing the correct tool actions.
+
+#### 4.2.6 `export_for_godot`
+
+- [ ] **4.2.6.1** **Arguments**: `asset_name` (required — the asset to export), `godot_project_path` (optional — root path of the Godot project; defaults to project-level export path if configured).
+- [ ] **4.2.6.2** **Messages generation** — return messages array guiding the LLM to: (1) call `asset info` to determine asset type and structure, (2) select the correct export action based on asset characteristics: `godot_spriteframes` for animated sprites (has frame tags), `godot_tileset` for tilesets (has tile dimensions), `godot_static` for single-frame non-tiled assets, (3) construct the correct `path` parameter relative to `godot_project_path`, (4) execute the export, (5) verify output files were created.
+
+#### 4.2.7 Prompt Tests
+
+- [ ] **4.2.7.1** **Registration tests** — all 5 prompts registered, each has correct name, description, and argument definitions.
+- [ ] **4.2.7.2** **Argument validation tests** — required arguments enforced, optional arguments apply defaults correctly, invalid argument values rejected.
+- [ ] **4.2.7.3** **`scaffold_character` tests** — messages reference `asset create`, `palette` tool, `asset add_layer`, `asset add_tag`; 4-dir vs 8-dir produces different facing values; custom dimensions passed through.
+- [ ] **4.2.7.4** **`scaffold_tileset` tests** — messages reference `asset create` with tile fields, `autotile_generate`, `godot_tileset` export; terrain_name defaults to asset name.
+- [ ] **4.2.7.5** **`scaffold_equipment` tests** — messages reference `asset info` for reference character, correct equipment type guidance.
+- [ ] **4.2.7.6** **`analyze_asset` tests** — messages include calls to `asset info`, `palette info`, `detect_banding`; output is a structured critique.
+- [ ] **4.2.7.7** **`export_for_godot` tests** — messages include `asset info` inspection, correct export action selection logic for each asset type.
+
+> **Definition of Done — Phase 4:** All resource URIs resolve and return valid image data. All prompts return well-formed message arrays with correct argument validation. Resource links appear in mutation tool responses for all 7 mutation tools. Prompt messages reference correct tool names and actions.
 
 ---
 
@@ -373,28 +446,95 @@ These require the image compositing engine from [§3.4.2](#342-image-compositing
 
 ### 5.1 Error Handling Audit
 
-- [ ] **5.1.1** **Error response audit** — verify every error from [design §2.6](design.md) is returned correctly by the corresponding tool handler
-- [ ] **5.1.2** **Error recovery tests** — test that an LLM can self-correct from each domain error (e.g., "not loaded" → call `load_asset` → retry)
+Verify every domain error from [design §2.6](design.md) is implemented correctly. The error catalog defines ~30 specific errors across 8 tools with exact message strings.
 
-### 5.2 End-to-End Integration Testing
+#### 5.1.1 Error Message Fidelity
 
-- [ ] **5.2.1** **E2E: character sprite** — project init → asset create → palette set → draw frames → add tags → export godot_spriteframes → verify output files
-- [ ] **5.2.2** **E2E: tileset** — project init → asset create (with tile dims) → draw tiles at slot indices → autotile_generate → set_tile_physics → export godot_tileset → verify .tres
-- [ ] **5.2.3** **E2E: equipment** — create base character + sword assets → draw on both → copy/paste cross-asset → export per_tag
-- [ ] **5.2.4** **E2E: undo/redo stress** — perform diverse mutations across multiple loaded assets, undo all, verify state matches initial
-- [ ] **5.2.5** **E2E: linked cel lifecycle** — create linked cel → read (verify resolution) → write (verify link break) → undo (verify link restored)
-- [ ] **5.2.6** **E2E: selection workflow** — select region → draw (verify constrained) → copy → paste to different asset → verify pixel data
+Verify each tool returns the exact error message text from §2.6, with `isError: true` set, for every documented error condition.
 
-### 5.3 CLAUDE.md Update
+- [ ] **5.1.1.1** **`project` errors** — (1) "No project loaded" on any action without active project, (2) "Project file not found: {path}" on `open` with missing file.
+- [ ] **5.1.1.2** **`workspace` errors** — (1) "Asset '{name}' not found in project registry" on `load_asset` with unknown name, (2) "Asset file not found: {path}" on `load_asset` with missing file on disk, (3) "Asset '{name}' is not loaded" on `unload_asset`/`save` with unloaded asset, (4) unsaved changes warning (non-error) on `unload_asset` with dirty asset.
+- [ ] **5.1.1.3** **`asset` errors** — (1) "Asset '{name}' is not loaded" on any action, (2) "Layer {id} is a shape layer" redirect on `get_cel`/`get_cels`, (3) tilemap layer returns grid array (non-error), (4) "Layer {id} does not exist" on invalid `layer_id`, (5) "Frame {index} is out of range" on out-of-bounds `frame_index`, (6) "Layer {id} is not a group layer" on invalid `parent_layer_id` in `add_layer`, (7) "Layer {id} is not an image layer" on `generate_collision_polygon`, (8) "No target shape layer specified" when no hitbox shape layer found, (9) "Layer {id} is not a shape layer" on `add_shape`/`update_shape`, (10) "At least one palette source" on `create_recolor` with no palette.
+- [ ] **5.1.1.4** **`draw` errors** — (1) "Color index {color} is out of range (0–255)" on any operation, (2) "write_pixels data dimensions ({dw}×{dh}) do not match declared width×height ({w}×{h})" on `write_pixels`.
+- [ ] **5.1.1.5** **`effect` errors** — (1) "Color index {color} is out of range (0–255)" for `color1`/`color2`.
+- [ ] **5.1.1.6** **`palette` errors** — (1) "Palette index {index} is out of range (0–255)" on `set`/`swap`, (2) "Palette index {index} has no color defined" on `generate_ramp` endpoints, (3) "generate_ramp requires color1 < color2", (4) "Lospec palette '{slug}' not found or API unavailable" on `fetch_lospec`, (5) "Palette file not found: {path}" on `load`, (6) "Invalid palette file: {path}" on `load` with malformed JSON.
+- [ ] **5.1.1.7** **`tileset` errors** — (1) "Asset '{name}' has no tile dimensions" on `autotile_generate` for non-tileset, (2) "autotile_generate requires a pattern" when `pattern` missing, (3) "Tile index {index} does not exist" on `set_tile_physics`.
+- [ ] **5.1.1.8** **`export` errors** — (1) "Asset '{name}' is not loaded" on any action, (2) "Cannot write to path: {path}" on non-writable output.
+- [ ] **5.1.1.9** **`selection` errors** — (1) "Clipboard is empty" on `paste` without prior copy/cut, (2) "Target asset '{name}' is not loaded" on `paste` with unloaded target.
 
-- [ ] **5.3.1** **Update CLAUDE.md** to reflect final architecture, tool list, and file layout
+#### 5.1.2 Error Recovery Tests
 
-### 5.4 Documentation
+Verify that each domain error returns sufficient information for recovery. For each error, test the pattern: trigger error → verify `isError: true` + message text → perform the corrective action suggested by the message → retry original operation → verify success.
 
-- [ ] **5.4.1** **README** — usage instructions, MCP client configuration, example tool calls
-- [ ] **5.4.2** **Example project** — a minimal `pixelmcp.json` + asset files demonstrating the format
+- [ ] **5.1.2.1** **Project recovery** — call any tool before project init → get error → call `project init` → retry → success.
+- [ ] **5.1.2.2** **Workspace recovery** — call `asset info` on unloaded asset → get error → call `workspace load_asset` → retry → success.
+- [ ] **5.1.2.3** **Layer type recovery** — call `get_cel` on shape layer → get redirect message → call `asset get_shapes` → success.
+- [ ] **5.1.2.4** **Palette recovery** — call `generate_ramp` with undefined endpoint → get error → call `palette set` on endpoint → retry → success.
 
-> **Definition of Done — Phase 5:** All E2E tests pass. Error audit confirms full coverage. README and example project are complete.
+### 5.2 Tool Surface Completeness Check
+
+- [ ] **5.2.1** **Action inventory** — verify all 10 tools are registered with all actions from [design §2.2](design.md). Cross-reference every action enum value in the design spec against the implemented Zod schemas. Report any missing or extra actions.
+- [ ] **5.2.2** **Parameter completeness** — for each tool action, verify all parameters from the design spec are accepted (required params enforced, optional params have correct defaults). Spot-check against the design spec's parameter tables.
+
+### 5.3 End-to-End Integration Testing
+
+Full workflow tests that exercise multiple tools in sequence, verifying the system works as an integrated whole. Each test uses only the public tool interface (no direct class/algorithm imports).
+
+#### 5.3.1 Character Sprite Workflow
+
+- [ ] **5.3.1.1** **E2E: character creation and export** — `project init` → `asset create` (16×24, perspective "top_down_3/4") → `palette fetch_lospec` (apply a known slug) → `asset add_layer` (body, eyes) → `asset add_layer` (hitbox, shape type) → `asset add_frame` (×3 for walk cycle) → `asset add_tag` (frame tag "idle" frame 0, "walk" frames 1–3 with direction forward) → `asset add_tag` (frame tag "idle_south" with facing S) → `draw` (rect + fill on body layer, frame 0) → `draw` (pixels on eyes layer) → `asset get_cel` (verify pixel data matches) → `workspace save` → `workspace unload_asset` → `workspace load_asset` → `asset info` (verify full structure persisted) → `export godot_spriteframes` → verify strip PNG exists with correct dimensions (`16 × 4 frames × scale` wide), `.tres` file contains animation names matching tags, `.png.import` sidecar exists.
+
+#### 5.3.2 Tileset Workflow
+
+- [ ] **5.3.2.1** **E2E: tileset creation and Godot export** — `project init` → `asset create` (with `tile_width: 16`, `tile_height: 16`) → `palette set_bulk` → `draw` (draw a few tile patterns at slot positions) → `tileset extract_tile` (extract 3+ tiles, verify slot indices increment, verify canvas width extends) → `tileset place_tile` (stamp tile onto image layer, verify pixels) → `tileset autotile_generate` (query-only mode with `pattern: "blob47"`, verify expected/occupied/missing lists) → `tileset autotile_generate` (assign mode with `terrain_name`, verify `tile_terrain` populated with peering bits) → `tileset set_tile_physics` (add collision polygon to a tile, verify storage) → `workspace save` → `export godot_tileset` → verify `.tres` contains `TileSetAtlasSource` with correct tile size, collision polygons embedded, terrain peering bits present, `.png.import` sidecar exists.
+
+#### 5.3.3 Equipment Workflow
+
+- [ ] **5.3.3.1** **E2E: modular equipment with cross-asset operations** — `project init` → `asset create` "hero" (16×24 character) → `asset create` "sword" (16×24 weapon) → `palette set_bulk` (same palette on both) → `draw` (draw character body on hero) → `draw` (draw sword pixels on sword asset) → `asset add_tag` on both (matching "idle" tags with facing) → `selection rect` (select sword region) → `selection copy` → `selection paste` (paste to hero asset at offset, verify pixels transferred cross-asset) → `export per_tag` (with export pattern `{name}_{tag}_{direction}`) → verify output filenames use correct token substitution with separator-dropping for tags without facing.
+
+#### 5.3.4 Recolor Workflow
+
+- [ ] **5.3.4.1** **E2E: recolor creation and variant resolution** — `project init` → `asset create` "base_char" → `palette set_bulk` → `draw` (draw base character) → `workspace save` → `asset create_recolor` "alt_char" (with `palette_entries` providing replacement colors) → `workspace load_asset` "alt_char" → `asset get_cel` (verify pixel structure matches base but palette differs) → `asset info` (verify `recolor_of` in registry) → `project info` (verify both assets in registry, alt_char has `recolor_of: "base_char"`).
+
+#### 5.3.5 Variant Resolution Workflow
+
+- [ ] **5.3.5.1** **E2E: asset variants** — `project init` → `asset create` "iron_sword" → `workspace save` → manually register a `variants` map in the project (standard → path_a, slim → path_b) by creating two asset files → `workspace load_asset` "iron_sword" (no variant — loads first defined) → verify loaded → `workspace unload_asset` → `workspace load_asset` "iron_sword" with `variant: "slim"` → verify loads the slim variant path.
+
+#### 5.3.6 Palette Workflow
+
+- [ ] **5.3.6.1** **E2E: palette lifecycle** — `project init` → `asset create` → `palette fetch_lospec` (known slug) → `palette info` (verify colors populated) → `palette save` (write to palette file) → `palette set` (modify a color) → `palette load` (reload saved file, verify color reverted) → `palette generate_ramp` (between two existing colors) → `palette info` (verify ramp entries interpolated) → `workspace undo` (verify ramp reverted) → `workspace redo` (verify ramp restored).
+
+#### 5.3.7 PNG Import Workflow
+
+- [ ] **5.3.7.1** **E2E: project add_file** — `project init` → place a test PNG file (small, ≤256 colors) → `project add_file` (import the PNG) → `project info` (verify asset registered) → `workspace load_asset` (load the imported asset) → `asset info` (verify dimensions match PNG) → `palette info` (verify palette ≤ 256 entries, colors match quantized PNG) → `asset get_cel` (verify pixel data is indexed, non-zero for non-transparent regions).
+
+#### 5.3.8 Undo/Redo Stress
+
+- [ ] **5.3.8.1** **E2E: undo/redo across tools and assets** — `project init` → create and load 2 assets → perform diverse mutations: `palette set_bulk` on asset A → `draw` (line + rect + fill) on asset A → `transform` (rotate + flip) on asset A → `effect` (gradient + outline) on asset B → `draw` (write_pixels) on asset B → `tileset extract_tile` on asset B → capture full state snapshot of both assets via `asset get_cel` on all layers/frames → undo all operations one by one via `workspace undo`, verify state after each undo step matches expected intermediate state → redo all operations via `workspace redo`, verify final state matches the captured snapshot.
+
+#### 5.3.9 Linked Cel Lifecycle
+
+- [ ] **5.3.9.1** **E2E: linked cel resolution, write-break, and undo** — `project init` → `asset create` (2 frames) → `draw` (pixels on frame 0) → create linked cel (frame 1 links to frame 0) → `asset get_cel` frame 1 (verify returns frame 0 pixel data, `is_linked: true`, `link_source` metadata) → `draw` (modify a pixel on frame 1) → `asset get_cel` frame 1 (verify link broken — `is_linked: false`, pixel data includes the modification) → `asset get_cel` frame 0 (verify source cel unchanged) → `workspace undo` → `asset get_cel` frame 1 (verify link restored — `is_linked: true`, data matches frame 0 again).
+
+#### 5.3.10 Selection Workflow
+
+- [ ] **5.3.10.1** **E2E: selection masking and clipboard** — `project init` → `asset create` (16×16) → `palette set` (set a few colors) → `draw` (fill entire cel with color 1) → `selection rect` (select 4×4 region) → `draw` (fill with color 2 — verify only selected 4×4 region changed, rest remains color 1) → `selection copy` → `selection clear` → create second asset → `workspace load_asset` → `selection paste` (to second asset at offset) → `asset get_cel` on second asset (verify 4×4 region pasted at correct offset) → `selection by_color` (select color 2 region) → `selection cut` → `asset get_cel` (verify cut region now transparent/index 0) → `selection invert` → verify selection covers everything except the cut region.
+
+#### 5.3.11 MCP Resources Integration
+
+- [ ] **5.3.11.1** **E2E: resource rendering** — `project init` → `asset create` (with palette and drawn pixels) → verify `pixel://view/asset/{name}` returns valid PNG data with correct dimensions → `draw` on specific layer/frame → verify `pixel://view/asset/{name}/layer/{id}/{frame}` renders that layer in isolation → `asset add_tag` (frame tag) → verify `pixel://view/animation/{name}/{tag}` returns valid GIF → verify `pixel://view/palette/{name}` returns a PNG → create tileset asset → verify `pixel://view/tileset/{name}` returns a PNG grid.
+- [ ] **5.3.11.2** **E2E: resource links in mutation responses** — perform a `draw` operation → verify response includes `pixel://view/` URI → perform a `palette set` → verify response includes palette resource URI → perform `tileset extract_tile` → verify response includes tileset resource URI.
+
+### 5.4 CLAUDE.md Update
+
+- [ ] **5.4.1** **Update CLAUDE.md** to reflect final architecture, tool list, and file layout
+
+### 5.5 Documentation
+
+- [ ] **5.5.1** **README** — usage instructions, MCP client configuration, example tool calls
+- [ ] **5.5.2** **Example project** — a minimal `pixelmcp.json` + asset files demonstrating the format
+
+> **Definition of Done — Phase 5:** All E2E tests pass covering every major workflow from the design spec. Error audit confirms all ~30 domain errors from §2.6 return correct messages with `isError: true`. Tool surface completeness check confirms all 10 tools with all actions match the design spec. README and example project are complete.
 
 ---
 
@@ -464,10 +604,28 @@ Phase 3 (Advanced Tools — depends on Phase 2)
         └── 3.4.3 export tests
 
 Phase 4 (Resources & Prompts)
-  ├── 4.1 Resources (depends on 3.4.2 compositing)
-  └── 4.2 Prompts (depends on full tool surface)
+  ├── 4.1 Resources (depends on 1.5.10 compositing + 3.4.1.2 export integration)
+  │     ├── 4.1.1-6 resource renderers (compositing + pngjs/gifenc encoding)
+  │     └── 4.1.7 resource links in tool responses (cross-cuts all mutation tools)
+  └── 4.2 Prompts (depends on full tool surface from Phases 2-3)
 
-Phase 5 (Polish — depends on everything)
+Phase 5 (Integration & Polish — depends on everything)
+  ├── 5.1 Error handling audit (verifies §2.6 catalog across all tools)
+  ├── 5.2 Tool surface completeness check (verifies all 10 tools × all actions)
+  ├── 5.3 E2E integration tests
+  │     ├── 5.3.1 character sprite workflow (Phases 2-3 tools + godot_spriteframes)
+  │     ├── 5.3.2 tileset workflow (tileset tool + godot_tileset export)
+  │     ├── 5.3.3 equipment workflow (cross-asset + per_tag export + export pattern)
+  │     ├── 5.3.4 recolor workflow (create_recolor + recolor_of registry)
+  │     ├── 5.3.5 variant resolution (variants map + load_asset variant param)
+  │     ├── 5.3.6 palette lifecycle (fetch_lospec + save + load + generate_ramp)
+  │     ├── 5.3.7 PNG import (project add_file + quantize + register)
+  │     ├── 5.3.8 undo/redo stress (multi-tool, multi-asset)
+  │     ├── 5.3.9 linked cel lifecycle (resolution + write-break + undo restore)
+  │     ├── 5.3.10 selection workflow (masking + clipboard + cross-asset paste)
+  │     └── 5.3.11 MCP resources integration (Phase 4 resources in E2E context)
+  ├── 5.4 CLAUDE.md update
+  └── 5.5 Documentation (README + example project)
 ```
 
 ## Implementation Rules
