@@ -218,4 +218,101 @@ describe('Export Tool', () => {
     expect(png.width).toBe(8); // 2 frames from tag 0-1
     expect(png.height).toBe(4);
   });
+
+  it('exports godot_spriteframes correctly', async () => {
+    const outPrefix = path.join(TEST_DIR, 'godot_spriteframes');
+    const result = await exportHandler(
+      {
+        action: 'godot_spriteframes',
+        asset_name: 'test_asset',
+        path: outPrefix,
+        scale_factor: 1,
+      },
+      {} as unknown,
+    );
+
+    expect(result.content[0].text).toContain('Exported Godot SpriteFrames');
+
+    const parsed = JSON.parse(result.content[0].text) as { files: string[] };
+    expect(parsed.files).toHaveLength(3); // strip, import, tres
+
+    const stripPath = outPrefix + '_strip.png';
+    const importPath = stripPath + '.import';
+    const tresPath = outPrefix + '.tres';
+
+    expect(fs.existsSync(stripPath)).toBe(true);
+    expect(fs.existsSync(importPath)).toBe(true);
+    expect(fs.existsSync(tresPath)).toBe(true);
+
+    const tresData = fs.readFileSync(tresPath, 'utf8');
+    expect(tresData).toContain('[gd_resource type="SpriteFrames"');
+    expect(tresData).toContain('"name": &"idle_S"'); // Uses facing tag S
+
+    const importData = fs.readFileSync(importPath, 'utf8');
+    expect(importData).toContain('[remap]');
+    expect(importData).toContain('compress/mode=0');
+  });
+
+  it('exports godot_tileset correctly', async () => {
+    // Add tileset metadata to the test asset by reloading it
+    const assetJson = workspace.loadedAssets.get('test_asset')?.toJSON();
+    if (assetJson) {
+      assetJson.tile_width = 2;
+      assetJson.tile_height = 2;
+      assetJson.tile_count = 4;
+      workspace.loadedAssets.set('test_asset', AssetClass.fromJSON(assetJson));
+    }
+
+    const outPrefix = path.join(TEST_DIR, 'godot_tileset');
+    const result = await exportHandler(
+      {
+        action: 'godot_tileset',
+        asset_name: 'test_asset',
+        path: outPrefix,
+        scale_factor: 1,
+      },
+      {} as unknown,
+    );
+
+    expect(result.content[0].text).toContain('Exported Godot TileSet');
+
+    const parsed = JSON.parse(result.content[0].text) as { files: string[] };
+    expect(parsed.files).toHaveLength(3);
+
+    const pngPath = outPrefix + '.png';
+    const importPath = pngPath + '.import';
+    const tresPath = outPrefix + '.tres';
+
+    expect(fs.existsSync(pngPath)).toBe(true);
+    expect(fs.existsSync(importPath)).toBe(true);
+    expect(fs.existsSync(tresPath)).toBe(true);
+
+    const tresData = fs.readFileSync(tresPath, 'utf8');
+    expect(tresData).toContain('[gd_resource type="TileSet"');
+    expect(tresData).toContain('tile_size = Vector2i(2, 2)');
+  });
+
+  it('exports godot_static correctly', async () => {
+    const outPrefix = path.join(TEST_DIR, 'godot_static');
+    const result = await exportHandler(
+      {
+        action: 'godot_static',
+        asset_name: 'test_asset',
+        path: outPrefix,
+        scale_factor: 1,
+      },
+      {} as unknown,
+    );
+
+    expect(result.content[0].text).toContain('Exported Godot Static PNG');
+
+    const parsed = JSON.parse(result.content[0].text) as { files: string[] };
+    expect(parsed.files).toHaveLength(2);
+
+    const pngPath = outPrefix + '.png';
+    const importPath = pngPath + '.import';
+
+    expect(fs.existsSync(pngPath)).toBe(true);
+    expect(fs.existsSync(importPath)).toBe(true);
+  });
 });

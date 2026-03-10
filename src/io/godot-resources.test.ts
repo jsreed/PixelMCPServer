@@ -1,0 +1,201 @@
+import { expect, test, describe } from 'vitest';
+import { AssetClass } from '../classes/asset.js';
+import {
+  generateGodotSpriteFrames,
+  generateGodotShapesAnimation,
+  generateGodotTileSet,
+} from './godot-resources.js';
+import { type Asset } from '../types/asset.js';
+
+function createDummyAsset(data: Partial<Asset> = {}): AssetClass {
+  return new AssetClass({
+    name: 'test',
+    width: 16,
+    height: 16,
+    perspective: 'flat',
+    palette: [],
+    layers: [],
+    frames: [],
+    cels: {},
+    tags: [],
+    ...data,
+  });
+}
+
+describe('godot-resources', () => {
+  describe('generateGodotSpriteFrames', () => {
+    test('generates SpriteFrames with default animation when no tags exist', () => {
+      const asset = createDummyAsset({
+        width: 16,
+        height: 16,
+        frames: [
+          { index: 0, duration_ms: 100 },
+          { index: 1, duration_ms: 100 },
+        ],
+        tags: [],
+      });
+      const res = generateGodotSpriteFrames(asset, 'test_strip.png', 1);
+
+      expect(res).toContain('[gd_resource type="SpriteFrames" load_steps=4 format=3]');
+      expect(res).toContain('path="res://test_strip.png"');
+      expect(res).toContain('region = Rect2(0, 0, 16, 16)');
+      expect(res).toContain('region = Rect2(16, 0, 16, 16)');
+      expect(res).toContain('"name": &"default"');
+      expect(res).toContain('"speed": 10.00'); // 1000/100
+    });
+
+    test('generates animations expanding ping-pong tags', () => {
+      const asset = createDummyAsset({
+        width: 10,
+        height: 10,
+        frames: [
+          { index: 0, duration_ms: 200 },
+          { index: 1, duration_ms: 200 },
+          { index: 2, duration_ms: 200 },
+        ],
+        tags: [{ name: 'idle', type: 'frame', start: 0, end: 2, direction: 'ping_pong' }],
+      });
+      const res = generateGodotSpriteFrames(asset, 'test_strip.png', 1);
+
+      expect(res).toContain('"name": &"idle"');
+      expect(res).toContain('SubResource("AtlasTexture_f0")');
+      expect(res).toContain('SubResource("AtlasTexture_f1")');
+      expect(res).toContain('SubResource("AtlasTexture_f2")');
+      // ping_pong of 0, 1, 2 = 0, 1, 2, 1
+      expect(res.split('AtlasTexture_f1').length).toBe(4); // 1 declaration + 2 usages + 1 original declaration
+    });
+
+    test('scales region sizes appropriately', () => {
+      const asset = createDummyAsset({
+        width: 10,
+        height: 10,
+        frames: [{ index: 0, duration_ms: 100 }],
+      });
+      const res = generateGodotSpriteFrames(asset, 'test_strip.png', 2);
+      expect(res).toContain('region = Rect2(0, 0, 20, 20)');
+    });
+  });
+
+  describe('generateGodotShapesAnimation', () => {
+    test('returns empty if no shape layers', () => {
+      const asset = createDummyAsset({ layers: [] });
+      const res = generateGodotShapesAnimation(asset);
+      expect(res).toBe('');
+    });
+
+    test('generates Animation resource with tracks for shape layers', () => {
+      const asset = createDummyAsset({
+        layers: [
+          {
+            id: 1,
+            name: 'hitbox',
+            type: 'shape',
+            visible: true,
+            opacity: 255,
+            role: 'hitbox',
+            physics_layer: 1,
+          },
+        ],
+        frames: [
+          { index: 0, duration_ms: 200 },
+          { index: 1, duration_ms: 200 },
+        ],
+        tags: [],
+        cels: {
+          '1/0': { shapes: [{ type: 'rect', name: 'main', x: 2, y: 2, width: 4, height: 4 }] },
+          '1/1': {
+            shapes: [
+              {
+                type: 'polygon',
+                name: 'main',
+                points: [
+                  [0, 0],
+                  [4, 0],
+                  [4, 4],
+                  [0, 4],
+                ],
+              },
+            ],
+          },
+        },
+      });
+      const res = generateGodotShapesAnimation(asset, 2); // scale by 2
+
+      expect(res).toContain('resource_name = "test_shapes"');
+      expect(res).toContain('length = 0.400'); // 2 * 200ms
+      expect(res).toContain('path = NodePath("hitbox:shape")');
+      expect(res).toContain('SubResource("RectangleShape2D_1_0_1")');
+      expect(res).toContain('size = Vector2(8, 8)'); // 4 * 2 = 8
+      expect(res).toContain('SubResource("ConvexPolygonShape2D_1_1_2")');
+      expect(res).toContain('points = PackedVector2Array(0, 0, 8, 0, 8, 8, 0, 8)');
+
+      // key times
+      expect(res).toContain('"times": PackedFloat32Array(0.000, 0.200)');
+    });
+  });
+
+  describe('generateGodotTileSet', () => {
+    test('generates basic TileSet without terrain/physics', () => {
+      const asset = createDummyAsset({
+        tile_width: 8,
+        tile_height: 8,
+        tile_count: 4,
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      expect(res).toContain('[gd_resource type="TileSet"');
+      expect(res).toContain('texture_region_size = Vector2i(8, 8)');
+      expect(res).toContain('path="res://atlas.png"');
+    });
+
+    test('embeds physics and terrain peering bits', () => {
+      const asset = createDummyAsset({
+        tile_width: 8,
+        tile_height: 8,
+        tile_count: 4,
+        tile_physics: {
+          physics_layers: [{ collision_layer: 1, collision_mask: 1 }],
+          tiles: {
+            '1': {
+              polygon: [
+                [0, 0],
+                [16, 0],
+                [16, 16],
+                [0, 16],
+              ],
+            },
+          },
+        },
+        tile_terrain: {
+          pattern: 'blob47',
+          terrain_name: 'Grass',
+          peering_bits: {
+            '1': {
+              bottom: 0,
+              right: 0,
+              top: -1,
+              top_right: -1,
+              bottom_right: -1,
+              bottom_left: -1,
+              left: -1,
+              top_left: -1,
+            },
+          },
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 2); // scale 2
+
+      expect(res).toContain('tile_size = Vector2i(16, 16)');
+      // col = 1, row = 0 (1 % 2 = 1, 1 / 2 = 0)
+      expect(res).toContain(
+        '1:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(0, 0, 32, 0, 32, 32, 0, 32)',
+      );
+      expect(res).toContain('physics_layer_0/collision_layer = 1');
+      expect(res).toContain('terrain_set_0/terrain_0/name = "Grass"');
+
+      // terrain peering bits
+      expect(res).toContain('1:0/0/terrains_peering_bit/bottom = 0');
+      expect(res).toContain('1:0/0/terrains_peering_bit/right = 0');
+    });
+  });
+});

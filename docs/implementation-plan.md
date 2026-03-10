@@ -324,12 +324,12 @@ Shared utilities needed by multiple export actions.
 
 #### 3.4.2 Tool Handler — Godot Exports
 
-- [ ] **3.4.2.1** **`godot_spriteframes` — strip PNG** — composite all frames into horizontal strip, upscale by `scale_factor`, write `{name}_strip.png`.
-- [ ] **3.4.2.2** **`godot_spriteframes` — import sidecar** — generate `{name}_strip.png.import` using shared sidecar template ([§3.4.0.2](#3402-godot-pngimport-sidecar-template)).
-- [ ] **3.4.2.3** **`godot_spriteframes` — `.tres` SpriteFrames resource** — generate Godot 4.x text resource. Each frame tag → named animation. Frame regions as `AtlasTexture` sub-resources into the strip. FPS via GCD method: `GCD(all_durations)` → `animation_fps = 1000 / GCD` → `relative_duration = frame_ms / GCD`. Ping-pong tags expanded: `[A, B, C]` → `[A, B, C, B]` (reverse excluding final frame to avoid double-display).
-- [ ] **3.4.2.4** **`godot_spriteframes` — optional shapes export** — if asset has shape layers, export `{name}_shapes.tres` as a Godot `Animation` resource with keyed `CollisionShape2D` shape data per frame. Each shape layer → separate track, using `role` as track path hint.
-- [ ] **3.4.2.5** **`godot_tileset`** — composite tileset into atlas PNG, upscale, write `{name}.png` + `{name}.png.import`. Generate `{name}.tres` as Godot `TileSet` text resource: `TileSetAtlasSource` referencing atlas, tile size from `tile_width`/`tile_height`. Embed per-tile collision polygons from `tile_physics`. If `tile_terrain` exists, include terrain set with `TERRAIN_MODE_MATCH_CORNERS_AND_SIDES` (blob47) or appropriate mode, plus per-tile `terrain_peering_bits`.
-- [ ] **3.4.2.6** **`godot_static`** — composite frame 0 (all visible layers), upscale, write `{name}.png` + `{name}.png.import`. No `.tres` resource.
+- [x] **3.4.2.1** **`godot_spriteframes` — strip PNG** — composite all frames into horizontal strip, upscale by `scale_factor`, write `{name}_strip.png`.
+- [x] **3.4.2.2** **`godot_spriteframes` — import sidecar** — generate `{name}_strip.png.import` using shared sidecar template ([§3.4.0.2](#3402-godot-pngimport-sidecar-template)).
+- [x] **3.4.2.3** **`godot_spriteframes` — `.tres` SpriteFrames resource** — generate Godot 4.x text resource. Each frame tag → named animation. Frame regions as `AtlasTexture` sub-resources into the strip. FPS via GCD method: `GCD(all_durations)` → `animation_fps = 1000 / GCD` → `relative_duration = frame_ms / GCD`. Ping-pong tags expanded: `[A, B, C]` → `[A, B, C, B]` (reverse excluding final frame to avoid double-display).
+- [x] **3.4.2.4** **`godot_spriteframes` — optional shapes export** — if asset has shape layers, export `{name}_shapes.tres` as a Godot `Animation` resource with keyed `CollisionShape2D` shape data per frame. Each shape layer → separate track, using `role` as track path hint.
+- [x] **3.4.2.5** **`godot_tileset`** — composite tileset into atlas PNG, upscale, write `{name}.png` + `{name}.png.import`. Generate `{name}.tres` as Godot `TileSet` text resource: `TileSetAtlasSource` referencing atlas, tile size from `tile_width`/`tile_height`. Embed per-tile collision polygons from `tile_physics`. If `tile_terrain` exists, include terrain set with `TERRAIN_MODE_MATCH_CORNERS_AND_SIDES` (blob47) or appropriate mode, plus per-tile `terrain_peering_bits`.
+- [x] **3.4.2.6** **`godot_static`** — composite frame 0 (all visible layers), upscale, write `{name}.png` + `{name}.png.import`. No `.tres` resource.
 
 #### 3.4.3 Export Tests
 

@@ -14,6 +14,8 @@ import { compositeFrame, type CompositeLayer, type PaletteEntry } from '../algor
 import { upscale } from '../algorithms/upscale.js';
 import { packRectangles, type PackInput } from '../algorithms/bin-pack.js';
 import { resolveExportPattern } from '../algorithms/export-pattern.js';
+import { generateGodotImportSidecar } from '../io/godot-import.js';
+import * as godotResources from '../io/godot-resources.js';
 
 // ---------------------------------------------------------------------------
 // Zod input schema
@@ -98,9 +100,16 @@ export function registerExportTool(server: McpServer): void {
               args.tags,
             );
           case 'godot_spriteframes':
+            return await handleGodotSpriteframesExport(
+              workspace,
+              args.asset_name,
+              outPath,
+              scaleFactor,
+            );
           case 'godot_tileset':
+            return await handleGodotTilesetExport(workspace, args.asset_name, outPath, scaleFactor);
           case 'godot_static':
-            return errors.domainError(`Action '${args.action}' is not implemented yet.`);
+            return await handleGodotStaticExport(workspace, args.asset_name, outPath, scaleFactor);
           default:
             return errors.invalidArgument(`Unknown export action: ${String(args.action)}`);
         }
@@ -515,5 +524,189 @@ async function writePng(outPath: string, width: number, height: number, buffer: 
     stream.on('error', (err) => {
       reject(err);
     });
+  });
+}
+
+async function handleGodotSpriteframesExport(
+  workspace: ReturnType<typeof getWorkspace>,
+  assetName: string,
+  outPath: string,
+  scaleFactor: number,
+) {
+  const asset = requireAsset(workspace, assetName);
+  if (isError(asset)) return asset;
+
+  const frameCount = asset.frames.length;
+  if (frameCount === 0) return errors.domainError('Asset has no frames to export.');
+
+  const frameWidth = asset.width * scaleFactor;
+  const frameHeight = asset.height * scaleFactor;
+  const outWidth = frameWidth * frameCount;
+  const outHeight = frameHeight;
+
+  const stripBuffer = new Uint8Array(outWidth * outHeight * 4);
+
+  for (let i = 0; i < frameCount; i++) {
+    let buffer = compositeFrame(
+      asset.width,
+      asset.height,
+      buildCompositeLayers(asset),
+      buildPaletteMap(asset.palette),
+      asset.frames[i].index,
+    );
+    if (scaleFactor > 1) {
+      buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
+    }
+
+    const xOffset = i * frameWidth;
+    for (let y = 0; y < frameHeight; y++) {
+      for (let x = 0; x < frameWidth; x++) {
+        const srcIdx = (y * frameWidth + x) * 4;
+        const dstIdx = (y * outWidth + (xOffset + x)) * 4;
+        stripBuffer[dstIdx] = buffer[srcIdx];
+        stripBuffer[dstIdx + 1] = buffer[srcIdx + 1];
+        stripBuffer[dstIdx + 2] = buffer[srcIdx + 2];
+        stripBuffer[dstIdx + 3] = buffer[srcIdx + 3];
+      }
+    }
+  }
+
+  let dirName = path.dirname(outPath);
+  let baseName = path.basename(outPath);
+  if (outPath.endsWith('/') || outPath.endsWith('\\')) {
+    dirName = outPath;
+    baseName = assetName;
+  }
+
+  const stripPngName = `${baseName}_strip.png`;
+  const stripPngPath = path.join(dirName, stripPngName);
+
+  await writePng(stripPngPath, outWidth, outHeight, stripBuffer);
+
+  const importSidecar = generateGodotImportSidecar(stripPngName);
+  await fs.promises.writeFile(`${stripPngPath}.import`, importSidecar);
+
+  const tresContent = godotResources.generateGodotSpriteFrames(asset, stripPngName, scaleFactor);
+  const tresPath = path.join(dirName, `${baseName}.tres`);
+  await fs.promises.writeFile(tresPath, tresContent);
+
+  const generatedFiles = [stripPngPath, `${stripPngPath}.import`, tresPath];
+
+  const shapeLayers = asset.layers.filter((l) => l.type === 'shape');
+  if (shapeLayers.length > 0) {
+    const shapesContent = godotResources.generateGodotShapesAnimation(asset, scaleFactor);
+    if (shapesContent) {
+      const shapesPath = path.join(dirName, `${baseName}_shapes.tres`);
+      await fs.promises.writeFile(shapesPath, shapesContent);
+      generatedFiles.push(shapesPath);
+    }
+  }
+
+  return ok({
+    message: `Exported Godot SpriteFrames to '${outPath}'.`,
+    files: generatedFiles,
+  });
+}
+
+async function handleGodotTilesetExport(
+  workspace: ReturnType<typeof getWorkspace>,
+  assetName: string,
+  outPath: string,
+  scaleFactor: number,
+) {
+  const asset = requireAsset(workspace, assetName);
+  if (isError(asset)) return asset;
+
+  if (
+    asset.tile_width === undefined ||
+    asset.tile_height === undefined ||
+    asset.tile_count === undefined
+  ) {
+    return errors.domainError(`Asset '${assetName}' is not a tileset.`);
+  }
+
+  // To export a tileset, we essentially generate an atlas of its current frames.
+  // Actually, a tileset is typically a single frame of an image or tilemap layer.
+  // We'll export frame 0 composited as the atlas texture.
+  let buffer = compositeFrame(
+    asset.width,
+    asset.height,
+    buildCompositeLayers(asset),
+    buildPaletteMap(asset.palette),
+    0,
+  );
+  if (scaleFactor > 1) {
+    buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
+  }
+
+  const outWidth = asset.width * scaleFactor;
+  const outHeight = asset.height * scaleFactor;
+
+  let dirName = path.dirname(outPath);
+  let baseName = path.basename(outPath);
+  if (outPath.endsWith('/') || outPath.endsWith('\\')) {
+    dirName = outPath;
+    baseName = assetName;
+  }
+
+  const pngName = `${baseName}.png`;
+  const pngPath = path.join(dirName, pngName);
+
+  await writePng(pngPath, outWidth, outHeight, buffer);
+
+  const importSidecar = generateGodotImportSidecar(pngName);
+  await fs.promises.writeFile(`${pngPath}.import`, importSidecar);
+
+  const tresContent = godotResources.generateGodotTileSet(asset, pngName, scaleFactor);
+  const tresPath = path.join(dirName, `${baseName}.tres`);
+  await fs.promises.writeFile(tresPath, tresContent);
+
+  return ok({
+    message: `Exported Godot TileSet to '${dirName}'.`,
+    files: [pngPath, `${pngPath}.import`, tresPath],
+  });
+}
+
+async function handleGodotStaticExport(
+  workspace: ReturnType<typeof getWorkspace>,
+  assetName: string,
+  outPath: string,
+  scaleFactor: number,
+) {
+  const asset = requireAsset(workspace, assetName);
+  if (isError(asset)) return asset;
+
+  let buffer = compositeFrame(
+    asset.width,
+    asset.height,
+    buildCompositeLayers(asset),
+    buildPaletteMap(asset.palette),
+    0,
+  );
+  if (scaleFactor > 1) {
+    buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
+  }
+
+  const outWidth = asset.width * scaleFactor;
+  const outHeight = asset.height * scaleFactor;
+
+  let dirName = path.dirname(outPath);
+  let baseName = path.basename(outPath);
+  if (outPath.endsWith('/') || outPath.endsWith('\\')) {
+    dirName = outPath;
+    baseName = assetName;
+  }
+
+  const pngName = `${baseName}.png`;
+  const pngPath = path.join(dirName, pngName);
+
+  await writePng(pngPath, outWidth, outHeight, buffer);
+
+  const importSidecar = generateGodotImportSidecar(pngName);
+  await fs.promises.writeFile(`${pngPath}.import`, importSidecar);
+
+  return ok({
+    message: `Exported Godot Static PNG to '${dirName}'.`,
+    files: [pngPath, `${pngPath}.import`],
   });
 }
