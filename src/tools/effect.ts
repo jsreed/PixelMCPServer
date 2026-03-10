@@ -3,7 +3,7 @@ import { type McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { getWorkspace } from '../classes/workspace.js';
 import * as errors from '../errors.js';
 import { CelWriteCommand } from '../commands/cel-write-command.js';
-import { linearGradient, type GradientDirection } from '../algorithms/gradient.js';
+import { linearGradient } from '../algorithms/gradient.js';
 import { checkerboard, noise, orderedDither, errorDiffusion } from '../algorithms/dither.js';
 import { generateOutline, cleanupOrphans } from '../algorithms/outline.js';
 import { autoAntiAlias } from '../algorithms/auto-aa.js';
@@ -323,13 +323,7 @@ function applyRegionEffect(
   let pattern: Grid;
   switch (op.action) {
     case 'gradient':
-      pattern = linearGradient(
-        rw,
-        rh,
-        op.color1,
-        op.color2,
-        (op as { direction?: GradientDirection }).direction,
-      );
+      pattern = linearGradient(rw, rh, op.color1, op.color2, op.direction);
       break;
     case 'checkerboard':
       pattern = checkerboard(rw, rh, op.color1, op.color2);

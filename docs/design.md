@@ -24,10 +24,9 @@ patterns (blob 47, corner 16, transitions).
 
 ### 1.2 Visual Feedback Loop
 
-LLMs cannot iterate on art they cannot see. The server provides MCP
-Resources (PNG/GIF previews, palette dumps, animation metadata) so the
-agent can inspect its output and self-correct without leaving the
-protocol.
+LLMs cannot iterate on art they cannot see. The server provides visual previews of the active workspace through two MCP Protocol features:
+1. **MCP Resources** — Parameterized `pixel://` URIs exposed via Resource Templates (for arbitrary exploration) and Resource Lists (for currently loaded assets) that provide PNG/GIF previews and palette swatch grids. The server emits `list_changed` notifications when the workspace state changes.
+2. **Inline Tool Results** — Many mutation tools return base64 image data directly in their Tool Results alongside the resource URIs for immediate, zero-latency visual feedback in the chat UI.
 
 ### 1.3 Agent-Friendly API Surface
 
@@ -881,7 +880,15 @@ In practice, only ~39% of MCP clients support resources, while 100% support tool
 
 **Our approach:** All state the LLM needs to query is exposed through **read-only tool actions** (`project info`, `workspace info`, `asset info`, `asset get_cel`, `palette info`). The LLM calls these like any other tool and gets structured data back. MCP Resources are defined as a **supplementary layer** for clients that support them — primarily visual previews (PNG/GIF) that are useful for the human user but not interpretable by the LLM.
 
-Tool results for mutation actions (e.g., `draw`, `transform`) may include **resource links** in their response, pointing to relevant visual previews. Clients that support resources can render these inline; clients that don't simply ignore them.
+Tool results for mutation actions (e.g., `draw`, `transform`) may include **resource links** and **inline image data** in their response, pointing to or displaying relevant visual previews. Clients that support resources can render these inline; clients that don't simply ignore them.
+
+#### Resource Registration and Discovery
+
+To adhere idiomatically to the MCP specification:
+
+1. **Resource Templates (`resources/templates/list`)**: All parameterized dynamic views are explicitly registered and advertised as URI templates (e.g., `pixel://view/asset/{name}`). This allows the MCP client to understand how to construct queries.
+2. **Resource Listing (`resources/list`)**: When queried for a concrete list of resources, the server returns the fully qualified URIs for the assets currently loaded in the active workspace.
+3. **List Changed Notifications (`notifications/resources/list_changed`)**: Because the Workspace state changes dynamically as the LLM loads and unloads assets, the server emits `list_changed` notifications to prompt the client to refresh its resource list.
 
 #### Visual Preview Resources (Client-Facing)
 

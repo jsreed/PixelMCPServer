@@ -21,7 +21,7 @@ import * as godotResources from '../io/godot-resources.js';
 // Zod input schema
 // ---------------------------------------------------------------------------
 
-const exportInputSchema = {
+const exportInputZodSchema = z.object({
   action: z
     .enum([
       'png',
@@ -34,14 +34,14 @@ const exportInputSchema = {
       'godot_static',
     ])
     .describe('Export action to perform'),
-  asset_name: z.string().describe('Target asset name (except for atlas)'),
+  asset_name: z.string().optional().describe('Target asset name (required except for atlas)'),
   path: z.string().describe('Output file or directory path'),
   scale_factor: z.number().int().min(1).optional().describe('Scale factor for export (default 1)'),
   frame: z.number().int().min(0).optional().describe('Frame index to export (for png)'),
   pad: z.number().int().optional().describe('Pixel padding for atlas (default 0)'),
   extrude: z.boolean().optional().describe('Extrude edge pixels for atlas (default false)'),
   tags: z.array(z.string()).optional().describe('Optional list of tag names to export for per_tag'),
-};
+});
 
 function ok(data: object) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] };
@@ -57,7 +57,7 @@ export function registerExportTool(server: McpServer): void {
     {
       title: 'Export',
       description: 'Export an asset or workspace assets to various formats.',
-      inputSchema: exportInputSchema,
+      inputSchema: exportInputZodSchema,
     },
     async (args) => {
       const workspace = getWorkspace();
@@ -70,46 +70,36 @@ export function registerExportTool(server: McpServer): void {
       const outPath = args.path;
 
       try {
+        if (args.action === 'atlas') {
+          return await handleAtlasExport(
+            workspace,
+            outPath,
+            scaleFactor,
+            args.pad ?? 0,
+            args.extrude === true,
+          );
+        }
+
+        const assetName = args.asset_name;
+        if (assetName === undefined) {
+          return errors.invalidArgument('asset_name is required for this export action');
+        }
+
         switch (args.action) {
           case 'png':
-            return await handlePngExport(
-              workspace,
-              args.asset_name,
-              outPath,
-              scaleFactor,
-              args.frame ?? 0,
-            );
+            return await handlePngExport(workspace, assetName, outPath, scaleFactor, args.frame ?? 0);
           case 'gif':
-            return await handleGifExport(workspace, args.asset_name, outPath, scaleFactor);
+            return await handleGifExport(workspace, assetName, outPath, scaleFactor);
           case 'spritesheet_strip':
-            return await handleStripExport(workspace, args.asset_name, outPath, scaleFactor);
-          case 'atlas':
-            return await handleAtlasExport(
-              workspace,
-              outPath,
-              scaleFactor,
-              args.pad ?? 0,
-              args.extrude === true,
-            );
+            return await handleStripExport(workspace, assetName, outPath, scaleFactor);
           case 'per_tag':
-            return await handlePerTagExport(
-              workspace,
-              args.asset_name,
-              outPath,
-              scaleFactor,
-              args.tags,
-            );
+            return await handlePerTagExport(workspace, assetName, outPath, scaleFactor, args.tags);
           case 'godot_spriteframes':
-            return await handleGodotSpriteframesExport(
-              workspace,
-              args.asset_name,
-              outPath,
-              scaleFactor,
-            );
+            return await handleGodotSpriteframesExport(workspace, assetName, outPath, scaleFactor);
           case 'godot_tileset':
-            return await handleGodotTilesetExport(workspace, args.asset_name, outPath, scaleFactor);
+            return await handleGodotTilesetExport(workspace, assetName, outPath, scaleFactor);
           case 'godot_static':
-            return await handleGodotStaticExport(workspace, args.asset_name, outPath, scaleFactor);
+            return await handleGodotStaticExport(workspace, assetName, outPath, scaleFactor);
           default:
             return errors.invalidArgument(`Unknown export action: ${String(args.action)}`);
         }

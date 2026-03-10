@@ -346,10 +346,12 @@ Shared utilities needed by multiple export actions.
 
 Visual preview resources for human users (not required for LLM operation — the LLM reads state via tool actions). These require the image compositing engine from [§1.5.10](#1510-image-compositing) and export encoding from [§3.4.1.2](#3412-image-compositing-integration).
 
-#### 4.1.1 Resource URI Router
+#### 4.1.1 Resource Registration & Discovery
 
-- [ ] **4.1.1.1** **URI parser** — parse `pixel://view/...` URIs into structured route objects: resource type (`asset`, `layer`, `animation`, `palette`, `tileset`), asset name, and optional sub-parameters (frame index, layer ID, tag name). Return typed dispatch target or error for malformed URIs.
-- [ ] **4.1.1.2** **Dispatch + registration** — register a resource handler with the MCP SDK that dispatches parsed URIs to the appropriate renderer function. Return `{ uri, mimeType, blob }` for image data.
+- [ ] **4.1.1.1** **Resource Templates (`resources/templates/list`)** — register URI templates with the MCP SDK for the dynamic views: `pixel://view/asset/{name}`, `pixel://view/asset/{name}/layer/{layer_id}`, `pixel://view/asset/{name}/frame/{index}`, `pixel://view/animation/{name}/{tag}`, `pixel://view/palette/{name}`, `pixel://view/tileset/{name}`.
+- [ ] **4.1.1.2** **Resource Listing (`resources/list`)** — implement the listing endpoint to return concrete URIs for the currently active/loaded Workspace assets (e.g., `pixel://view/asset/{name}`, `pixel://view/palette/{name}`).
+- [ ] **4.1.1.3** **List Changed Notifications (`notifications/resources/list_changed`)** — wire up notifications so that when `workspace load_asset`, `workspace unload_asset`, or `project open` are called, the server emits a `list_changed` notification telling clients to refresh their resource lists.
+- [ ] **4.1.1.4** **URI parser & dispatch (`resources/read`)** — parse incoming `pixel://view/...` URIs into structured route objects: resource type (`asset`, `layer`, `animation`, `palette`, `tileset`), asset name, and optional sub-parameters. Dispatch to the appropriate renderer function and return `{ uri, mimeType, blob }` for image data.
 
 #### 4.1.2 Asset View
 
@@ -387,13 +389,14 @@ Retrofit existing mutation tool handlers to include relevant `pixel://` URIs in 
 
 #### 4.1.8 Resource Tests
 
-- [ ] **4.1.8.1** **URI routing tests** — valid URIs dispatch to correct renderer, malformed URIs return errors, unknown asset names return domain errors.
-- [ ] **4.1.8.2** **Asset view tests** — returns valid PNG data, correct dimensions, frame index bounds validation.
-- [ ] **4.1.8.3** **Layer view tests** — single layer isolation (other layers excluded), linked cel resolution, layer ID and frame validation.
-- [ ] **4.1.8.4** **Animation view tests** — GIF frame count matches tag range, per-frame delays match asset durations, tag-not-found error.
-- [ ] **4.1.8.5** **Palette view tests** — PNG dimensions match expected grid layout, swatch count matches palette size.
-- [ ] **4.1.8.6** **Tileset view tests** — PNG dimensions match expected grid layout, tile count correct, error for non-tileset assets.
-- [ ] **4.1.8.7** **Resource link tests** — verify mutation tool responses include expected `pixel://` URIs for draw, transform, effect, palette, asset, tileset, and selection tools.
+- [ ] **4.1.8.1** **Registration & discovery tests** — templates list returns expected templates, resources list returns valid concrete URIs for loaded assets, list_changed notification is fired on workspace asset load/unload.
+- [ ] **4.1.8.2** **URI routing tests** — valid URIs dispatch to correct renderer, malformed URIs return errors, unknown asset names return domain errors.
+- [ ] **4.1.8.3** **Asset view tests** — returns valid PNG data, correct dimensions, frame index bounds validation.
+- [ ] **4.1.8.4** **Layer view tests** — single layer isolation (other layers excluded), linked cel resolution, layer ID and frame validation.
+- [ ] **4.1.8.5** **Animation view tests** — GIF frame count matches tag range, per-frame delays match asset durations, tag-not-found error.
+- [ ] **4.1.8.6** **Palette view tests** — PNG dimensions match expected grid layout, swatch count matches palette size.
+- [ ] **4.1.8.7** **Tileset view tests** — PNG dimensions match expected grid layout, tile count correct, error for non-tileset assets.
+- [ ] **4.1.8.8** **Resource link tests** — verify mutation tool responses include expected `pixel://` URIs for draw, transform, effect, palette, asset, tileset, and selection tools.
 
 ### 4.2 MCP Prompts (Workflow Templates)
 
