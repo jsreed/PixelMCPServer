@@ -348,10 +348,10 @@ Visual preview resources for human users (not required for LLM operation — the
 
 #### 4.1.1 Resource Registration & Discovery
 
-- [ ] **4.1.1.1** **Resource Templates (`resources/templates/list`)** — register URI templates with the MCP SDK for the dynamic views: `pixel://view/asset/{name}`, `pixel://view/asset/{name}/layer/{layer_id}`, `pixel://view/asset/{name}/frame/{index}`, `pixel://view/animation/{name}/{tag}`, `pixel://view/palette/{name}`, `pixel://view/tileset/{name}`.
-- [ ] **4.1.1.2** **Resource Listing (`resources/list`)** — implement the listing endpoint to return concrete URIs for the currently active/loaded Workspace assets (e.g., `pixel://view/asset/{name}`, `pixel://view/palette/{name}`).
-- [ ] **4.1.1.3** **List Changed Notifications (`notifications/resources/list_changed`)** — wire up notifications so that when `workspace load_asset`, `workspace unload_asset`, or `project open` are called, the server emits a `list_changed` notification telling clients to refresh their resource lists.
-- [ ] **4.1.1.4** **URI parser & dispatch (`resources/read`)** — parse incoming `pixel://view/...` URIs into structured route objects: resource type (`asset`, `layer`, `animation`, `palette`, `tileset`), asset name, and optional sub-parameters. Dispatch to the appropriate renderer function and return `{ uri, mimeType, blob }` for image data.
+- [x] **4.1.1.1** **Resource Templates (`resources/templates/list`)** — register URI templates with the MCP SDK for the dynamic views: `pixel://view/asset/{name}`, `pixel://view/asset/{name}/layer/{layer_id}`, `pixel://view/asset/{name}/frame/{index}`, `pixel://view/animation/{name}/{tag}`, `pixel://view/palette/{name}`, `pixel://view/tileset/{name}`.
+- [x] **4.1.1.2** **Resource Listing (`resources/list`)** — implement the listing endpoint to return concrete URIs for the currently active/loaded Workspace assets (e.g., `pixel://view/asset/{name}`, `pixel://view/palette/{name}`).
+- [x] **4.1.1.3** **List Changed Notifications (`notifications/resources/list_changed`)** — wire up notifications so that when `workspace load_asset`, `workspace unload_asset`, or `project open` are called, the server emits a `list_changed` notification telling clients to refresh their resource lists.
+- [x] **4.1.1.4** **URI parser & dispatch (`resources/read`)** — parse incoming `pixel://view/...` URIs into structured route objects: resource type (`asset`, `layer`, `animation`, `palette`, `tileset`), asset name, and optional sub-parameters. Dispatch to the appropriate renderer function and return `{ uri, mimeType, blob }` for image data.
 
 #### 4.1.2 Asset View
 

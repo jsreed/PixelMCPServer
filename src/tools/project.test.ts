@@ -24,6 +24,7 @@ function captureToolCallback(registerFn: (server: any) => void): ToolCallback {
     registerTool(_name: string, _config: unknown, callback: ToolCallback) {
       cb = callback;
     },
+    sendResourceListChanged: vi.fn(),
   };
   registerFn(mockServer);
   return cb;

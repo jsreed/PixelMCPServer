@@ -66,7 +66,7 @@ export function registerProjectTool(server: McpServer): void {
         case 'init':
           return handleInit(workspace, args.path, args.name);
         case 'open':
-          return handleOpen(workspace, args.path);
+          return handleOpen(server, workspace, args.path);
         case 'info':
           return handleInfo(workspace);
         case 'add_file':
@@ -113,6 +113,7 @@ async function handleInit(
 }
 
 async function handleOpen(
+  server: McpServer,
   workspace: ReturnType<typeof getWorkspace>,
   filePath: string | undefined,
 ) {
@@ -131,6 +132,8 @@ async function handleOpen(
 
   const project = ProjectClass.fromJSON(resolvedPath, data);
   workspace.setProject(project);
+
+  server.sendResourceListChanged();
 
   return {
     content: [

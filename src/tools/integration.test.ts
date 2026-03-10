@@ -86,6 +86,7 @@ function createMockServer() {
         handler: callback,
       });
     },
+    sendResourceListChanged: vi.fn(),
   };
   /* eslint-disable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any */
   registerProjectTool(mockServer as any);

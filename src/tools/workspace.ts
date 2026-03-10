@@ -41,9 +41,9 @@ export function registerWorkspaceTool(server: McpServer): void {
         case 'info':
           return handleInfo(workspace);
         case 'load_asset':
-          return handleLoadAsset(workspace, args.asset_name, args.variant);
+          return handleLoadAsset(server, workspace, args.asset_name, args.variant);
         case 'unload_asset':
-          return handleUnloadAsset(workspace, args.asset_name);
+          return handleUnloadAsset(server, workspace, args.asset_name);
         case 'save':
           return handleSave(workspace, args.asset_name);
         case 'save_all':
@@ -77,6 +77,7 @@ function handleInfo(workspace: Workspace) {
 }
 
 async function handleLoadAsset(
+  server: McpServer,
   workspace: Workspace,
   assetName: string | undefined,
   variant: string | undefined,
@@ -102,6 +103,8 @@ async function handleLoadAsset(
     return errors.domainError(msg);
   }
 
+  server.sendResourceListChanged();
+
   return {
     content: [
       {
@@ -115,13 +118,14 @@ async function handleLoadAsset(
   };
 }
 
-function handleUnloadAsset(workspace: Workspace, assetName: string | undefined) {
+function handleUnloadAsset(server: McpServer, workspace: Workspace, assetName: string | undefined) {
   if (!assetName) {
     return errors.invalidArgument('workspace unload_asset requires "asset_name".');
   }
 
   try {
     const result = workspace.unloadAsset(assetName);
+    server.sendResourceListChanged();
     return {
       content: [
         {

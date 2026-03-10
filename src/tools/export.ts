@@ -87,7 +87,13 @@ export function registerExportTool(server: McpServer): void {
 
         switch (args.action) {
           case 'png':
-            return await handlePngExport(workspace, assetName, outPath, scaleFactor, args.frame ?? 0);
+            return await handlePngExport(
+              workspace,
+              assetName,
+              outPath,
+              scaleFactor,
+              args.frame ?? 0,
+            );
           case 'gif':
             return await handleGifExport(workspace, assetName, outPath, scaleFactor);
           case 'spritesheet_strip':
