@@ -71,13 +71,13 @@ src/
 │   ├── midpoint.ts                #   Circle & ellipse rasterization
 │   ├── flood-fill.ts              #   Scanline flood fill
 │   ├── marching-squares.ts        #   Contour tracing
-│   ├── rdp.ts                     #   Ramer-Douglas-Peucker simplification
+│   ├── ramer-douglas-peucker.ts    #   Ramer-Douglas-Peucker simplification
 │   ├── quantize.ts                #   Color quantization (median cut)
 │   ├── banding.ts                 #   Banding detection
 │   ├── export-pattern.ts          #   Token substitution with separator-drop logic
 │   ├── bin-pack.ts                #   Rectangle packing for atlas export
 │   ├── composite.ts               #   Layer compositing — indexed→RGBA, opacity, visibility
-│   ├── iso-projection.ts          #   Dimetric 2:1 projection helpers
+│   ├── isometric.ts               #   Dimetric 2:1 projection helpers
 │   ├── gradient.ts                #   Linear gradient generation
 │   ├── dither.ts                  #   Checkerboard, ordered (Bayer), error diffusion, noise
 │   ├── outline.ts                 #   Outline generation

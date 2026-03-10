@@ -236,51 +236,107 @@ Remaining actions that have additional dependencies or are non-essential for the
 
 ## Phase 3: Advanced Tools
 
-Build on the foundation from Phase 2. These tools complete the design spec's full creative surface.
+Build on the foundation from Phase 2. These tools complete the design spec's full creative surface. Each sub-phase begins with its prerequisite pure algorithms (under `src/algorithms/`), followed by the tool handler wiring and tests.
 
 ### 3.1 `transform` Tool
 
-- [ ] **3.1.1** **Zod schema** — top-level targeting + operations array
-- [ ] **3.1.2** **`rotate`** — 90° increments (lossless index rotation of 2D array)
-- [ ] **3.1.3** **`flip_h` / `flip_v`** — horizontal/vertical pixel array reversal
-- [ ] **3.1.4** **`shear`** — pixel offset shear
-- [ ] **3.1.5** **`shift`** — translation by pixel offset
-- [ ] **3.1.6** **Selection mask + batched command** — same pattern as draw
-- [ ] **3.1.7** **Transform unit tests** — verify pixel output for each operation, selection-masked transform, batched command undo
+#### 3.1.0 Transform Algorithms
+
+Pure functions under `src/algorithms/transform.ts`, unit tested independently.
+
+- [x] **3.1.0.1** **`rotate90` / `rotate180` / `rotate270`** — lossless index rotation of 2D palette-index array. `rotate90` maps `(x, y)` → `(height - 1 - y, x)`. Returns a new array with swapped dimensions for 90°/270°.
+- [x] **3.1.0.2** **`flipHorizontal` / `flipVertical`** — in-place or copy reversal of rows (flip_h) or columns (flip_v) in a 2D array.
+- [x] **3.1.0.3** **`shear`** — pixel offset shear by `amount_x` and/or `amount_y`. Shifts each row (for x-shear) or column (for y-shear) by a proportional integer offset. Out-of-bounds pixels are filled with index 0.
+- [x] **3.1.0.4** **`shift`** — translation by `amount_x`, `amount_y` pixel offset. Wraps or fills with index 0 at edges.
+- [x] **3.1.0.5** **Transform algorithm tests** — verify pixel output for each operation: rotate at all 3 angles, flip symmetry, shear offset correctness, shift wrap/fill behavior.
+
+#### 3.1.1 Tool Handler
+
+- [ ] **3.1.1.1** **Zod schema** — top-level targeting (`asset_name`, `layer_id`, `frame_index`) + `operations` array. Discriminated union on `action`: `rotate` (`angle`: 90 | 180 | 270), `flip_h`, `flip_v`, `shear` (`amount_x?`, `amount_y?`), `shift` (`amount_x?`, `amount_y?`).
+- [ ] **3.1.1.2** **`rotate`** — delegate to `rotate90`/`rotate180`/`rotate270` from algorithm. Validate angle is 90/180/270.
+- [ ] **3.1.1.3** **`flip_h` / `flip_v`** — delegate to algorithm functions.
+- [ ] **3.1.1.4** **`shear`** — delegate to algorithm. At least one of `amount_x` or `amount_y` required.
+- [ ] **3.1.1.5** **`shift`** — delegate to algorithm. At least one of `amount_x` or `amount_y` required.
+- [ ] **3.1.1.6** **Selection mask + batched command** — same pattern as draw: all operations in one call share a single `CelWriteCommand`. When a selection mask is active, only the selected region is affected (copy selected region → transform → write back).
+- [ ] **3.1.1.7** **Transform tool tests** — tool-level tests: schema validation, each operation returns expected result shape, selection-masked transform, batched command undo/redo.
 
 ### 3.2 `effect` Tool
 
-- [ ] **3.2.1** **Zod schema** — top-level targeting + operations array
-- [ ] **3.2.2** **Gradient effects**: `gradient` (4 directions), `checkerboard`, `noise`, `ordered_dither`, `error_diffusion`
-- [ ] **3.2.3** **Pixel art refinement**: `auto_aa` (convex corner intermediate color), `outline`, `cleanup_orphans`
-- [ ] **3.2.4** **Animation effects**: `subpixel_shift`, `smear_frame` (directional motion blur)
-- [ ] **3.2.5** **Selection mask + batched command** — same pattern as draw
-- [ ] **3.2.6** **Effect unit tests** — verify pixel output for each effect type, region-constrained effects, selection-masked effects
+#### 3.2.0 Effect Algorithms
+
+Pure functions under `src/algorithms/`, unit tested independently. Each file handles one category.
+
+- [ ] **3.2.0.1** **`gradient.ts`** — `linearGradient(width, height, color1, color2, direction)` where `direction` is `vertical` | `horizontal` | `diagonal_down` | `diagonal_up`. Returns a 2D palette-index array. Interpolation distributes the two colors across the axis using a dither threshold (not true-color blending — this is indexed color).
+- [ ] **3.2.0.2** **`dither.ts`** — four functions: `checkerboard(w, h, color1, color2)`, `noise(w, h, color1, color2)`, `orderedDither(w, h, color1, color2)` (4×4 Bayer matrix), `errorDiffusion(w, h, color1, color2)` (Floyd-Steinberg). All return 2D palette-index arrays. Region parameters (`x`, `y`, `width`, `height`) default to full cel when omitted.
+- [ ] **3.2.0.3** **`outline.ts`** — `generateOutline(data, color)` scans for non-transparent pixels and writes `color` to adjacent transparent pixels (4-connected or 8-connected). Does not expand canvas — only fills within bounds.
+- [ ] **3.2.0.4** **`auto-aa.ts`** — `autoAntiAlias(data, palette)` detects convex corners on color boundaries. For each convex corner pixel, finds the nearest existing palette entry whose luminance falls between the two boundary colors and places it. Does not modify concave regions or straight edges.
+- [ ] **3.2.0.5** **`motion.ts`** — `subpixelShift(data, intensity, dirX, dirY)` shifts pixel data by a sub-pixel amount along a normalized direction vector for animation smoothing. `smearFrame(data, intensity, dirX, dirY)` applies directional motion blur by sampling along the direction vector. `intensity` is 0.0–1.0. Direction vector is normalized internally.
+- [ ] **3.2.0.6** **`cleanupOrphans`** — can live in `outline.ts` or standalone. Removes isolated single pixels (pixels with no same-color neighbors in 4-connected adjacency). Returns modified 2D array.
+- [ ] **3.2.0.7** **Effect algorithm tests** — gradient direction correctness, checkerboard pattern verification, ordered dither Bayer matrix validation, noise statistical distribution, error diffusion error propagation, outline adjacency, auto_aa convex corner detection, motion blur directionality, orphan detection.
+
+#### 3.2.1 Tool Handler
+
+- [ ] **3.2.1.1** **Zod schema** — top-level targeting + `operations` array. Discriminated union on `action` for all 10 operations. Region parameters (`x`, `y`, `width`, `height`) optional on gradient/dither ops, default to full cel. `color1`/`color2` are palette indices 0–255. `direction` enum for gradient. `intensity` float 0.0–1.0 and `direction_x`/`direction_y` floats for motion ops.
+- [ ] **3.2.1.2** **Gradient effects**: `gradient`, `checkerboard`, `noise`, `ordered_dither`, `error_diffusion` — delegate to `gradient.ts` and `dither.ts`. Apply within optional region bounds.
+- [ ] **3.2.1.3** **Pixel art refinement**: `auto_aa`, `outline`, `cleanup_orphans` — delegate to `auto-aa.ts` and `outline.ts`.
+- [ ] **3.2.1.4** **Animation effects**: `subpixel_shift`, `smear_frame` — delegate to `motion.ts`.
+- [ ] **3.2.1.5** **Selection mask + batched command** — same pattern as draw.
+- [ ] **3.2.1.6** **Effect tool tests** — tool-level tests: schema validation, each effect returns expected result shape, region-constrained effects, selection-masked effects, batched command undo/redo.
 
 ### 3.3 `tileset` Tool
 
-- [ ] **3.3.1** **Zod schema** — discriminated union on `action`
-- [ ] **3.3.2** **`extract_tile`** — copy pixel region to next tile slot, extend canvas width, increment `tile_count`
-- [ ] **3.3.3** **`place_tile`** — stamp tile onto image or tilemap layer. Isometric projection when asset `perspective` is `"isometric"` (uses `col`/`row` instead of `x`/`y`).
-- [ ] **3.3.4** **`autotile_generate`** — blob47/4side/4corner bitmask pattern assignment. Compute canonical slot list, assign Godot `CellNeighbor` peering bits, store in `tile_terrain`. Report missing slots. Query-only mode (no `terrain_name`) returns expected slots without assigning.
-- [ ] **3.3.5** **`set_tile_physics`** — store collision/navigation polygons per tile slot in `tile_physics`
-- [ ] **3.3.6** **Tileset unit tests** — extract_tile canvas extension, place_tile pixel verification, autotile canonical slot computation for each pattern, set_tile_physics storage
+#### 3.3.0 Autotile Algorithm
+
+Pure functions under `src/algorithms/autotile.ts`, unit tested independently.
+
+- [ ] **3.3.0.1** **Canonical slot computation** — `getCanonicalSlots(pattern)` returns the list of valid bitmask slot indices for `blob47` (47 slots), `4side` (16 slots, bits N+E+S+W), or `4corner` (16 slots, bits NE+SE+SW+NW). For `blob47`, a slot is canonical iff every set corner bit has both orthogonal neighbors set (NE requires N+E, SE requires E+S, SW requires S+W, NW requires N+W).
+- [ ] **3.3.0.2** **Godot peering bit assignment** — `assignPeeringBits(slotIndex, pattern)` maps a bitmask slot index to a Godot `CellNeighbor` peering bits object (`{ top, top_right, right, bottom_right, bottom, bottom_left, left, top_left }` with values `0` for connected or `-1` for not connected). Direction mapping: bit 0 (N) → `top`, bit 1 (NE) → `top_right`, bit 2 (E) → `right`, etc.
+- [ ] **3.3.0.3** **Autotile algorithm tests** — blob47 produces exactly 47 canonical slots, 4side produces 16, 4corner produces 16. Known slot indices verified (e.g., blob47: 0, 1, 4, 5, 7, 16, 17, 20, 21, 23, …, 255). Peering bit output verified for isolated tile (slot 0), interior tile (slot 255), and orthogonal interior (slot 85).
+
+#### 3.3.1 Tool Handler
+
+- [ ] **3.3.1.1** **Zod schema** — discriminated union on `action`: `extract_tile`, `place_tile`, `autotile_generate`, `set_tile_physics`. Parameters per [design §2.2.6](design.md).
+- [ ] **3.3.1.2** **`extract_tile`** — copy `tile_width × tile_height` pixel region from source position (`x`, `y`) on target layer/frame, append as next tile slot. Extend canvas width by `tile_width`, increment `tile_count`. Return new slot index. Wrapped in Command.
+- [ ] **3.3.1.3** **`place_tile`** — stamp tile slot pixels onto target layer at (`x`, `y`) for image layers, or write tile index into grid cell for tilemap layers. When asset `perspective` is `"isometric"`, accept `col`/`row` instead of `x`/`y` and project via dimetric formula.
+- [ ] **3.3.1.4** **`autotile_generate`** — delegate to autotile algorithm. When `terrain_name` is provided: compute peering bits for all occupied canonical slots, store in `tile_terrain`, report assigned + missing. When `terrain_name` is omitted: query-only mode, return expected + occupied + missing slot lists. Wrapped in Command.
+- [ ] **3.3.1.5** **`set_tile_physics`** — store `physics_polygon` and/or `navigation_polygon` for `tile_index` in `tile_physics`. Pass empty array to clear. Wrapped in Command.
+- [ ] **3.3.1.6** **Tileset tool tests** — extract_tile canvas extension + slot index, place_tile pixel verification (both image and tilemap layers), place_tile isometric projection, autotile query-only vs assign modes, autotile missing slot reporting, set_tile_physics storage + clear, Command undo/redo for each action.
 
 ### 3.4 `export` Tool
 
-- [ ] **3.4.1** **Zod schema** — discriminated union on `action`
-- [ ] **3.4.2** **Image compositing integration** — wire the compositing algorithm from [§1.5.10](#1510-image-compositing) into the export pipeline. This is a prerequisite for all export actions and MCP Resources (Phase 4).
-- [ ] **3.4.3** **`png`** — single frame composite at optional scale factor
-- [ ] **3.4.4** **`gif`** — animated GIF from frame sequence (depends on [§2.1.2](#212-gif-encoding-library))
-- [ ] **3.4.5** **`spritesheet_strip`** — horizontal strip of all frames
-- [ ] **3.4.6** **`atlas`** — bin-pack multiple loaded assets into one texture (needs bin-packing algorithm)
-- [ ] **3.4.7** **`per_tag`** — iterate frame tags, apply export pattern token substitution ([§1.5.8](#158-export-pattern-token-substitution)), export each as strip PNG
-- [ ] **3.4.8** **`godot_spriteframes`** — export `{name}_strip.png` + `{name}_strip.png.import` + `{name}.tres` (SpriteFrames). GCD-based FPS calculation, ping-pong frame expansion, AtlasTexture sub-resources. Optionally `{name}_shapes.tres` for shape layers.
-- [ ] **3.4.9** **`godot_tileset`** — export `{name}.png` + `{name}.png.import` + `{name}.tres` (TileSet). Embed collision polygons from `tile_physics`, terrain peering bits from `tile_terrain`.
-- [ ] **3.4.10** **`godot_static`** — export composited PNG + import sidecar for non-animated assets
-- [ ] **3.4.11** **Export tests** — verify PNG output dimensions and pixel spot-checks, GIF frame count, spritesheet strip dimensions, per_tag filename generation, Godot .tres file structure validation, godot_tileset collision polygon embedding
+#### 3.4.0 Export Prerequisites
 
-> **Definition of Done — Phase 3:** All 10 MCP tools from the design spec are implemented and tested. Export produces valid output files for each format. Godot .tres resources are structurally valid.
+Shared utilities needed by multiple export actions.
+
+- [ ] **3.4.0.1** **Nearest-neighbor upscale** — `upscale(buffer: Uint8Array, width, height, scaleFactor): Uint8Array` multiplies each pixel into an N×N block in the output RGBA buffer. Used by all export actions that accept `scale_factor`. Can live in `src/algorithms/composite.ts` or a new `src/algorithms/upscale.ts`.
+- [ ] **3.4.0.2** **Godot `.png.import` sidecar template** — shared function `generateGodotImportSidecar(pngPath, resourceType?)` that writes the standard Godot 4.x import file: `[remap]` section with `type="CompressedTexture2D"`, `[deps]` with `source_file`, `dest_files`, and `[params]` with `compress/mode=0` (lossless), `mipmaps/generate=false`, `roughness/mode=0`. Reused by `godot_spriteframes` (3.4.3), `godot_tileset` (3.4.4), and `godot_static` (3.4.5).
+- [ ] **3.4.0.3** **Export prerequisite tests** — upscale correctness at 1×/2×/4× factors, sidecar file content validation against expected Godot format.
+
+#### 3.4.1 Tool Handler — Core Exports
+
+- [ ] **3.4.1.1** **Zod schema** — discriminated union on `action`: `png`, `gif`, `spritesheet_strip`, `atlas`, `per_tag`, `godot_spriteframes`, `godot_tileset`, `godot_static`. Parameters: `asset_name`, `path` (required), `scale_factor` (optional int, default 1), `pad`/`extrude` (optional bools for atlas), `tags` (optional string array for per_tag).
+- [ ] **3.4.1.2** **Image compositing integration** — wire `compositeFrame()` from `src/algorithms/composite.ts` into the export pipeline. Each export action calls `compositeFrame(asset, frameIndex)` → receives `Uint8Array` RGBA buffer → optionally upscales → encodes to target format.
+- [ ] **3.4.1.3** **`png`** — composite frame 0 (or specified frame), upscale by `scale_factor`, encode via `pngjs`, write to `path`.
+- [ ] **3.4.1.4** **`gif`** — composite each frame, upscale, encode via `gifenc` with per-frame `duration_ms` delays. Write to `path`.
+- [ ] **3.4.1.5** **`spritesheet_strip`** — composite all frames, lay out horizontally in a single row, upscale, encode as PNG. Output dimensions: `(width × frame_count × scale) × (height × scale)`.
+- [ ] **3.4.1.6** **`atlas`** — bin-pack all loaded assets (frame 0 each) using `bin-pack.ts`. Optional `pad` (1px transparent gap) and `extrude` (repeat edge pixels). Upscale, encode as PNG. Return atlas metadata (asset → region mapping).
+- [ ] **3.4.1.7** **`per_tag`** — iterate frame tags (or `tags` subset), apply `export-pattern.ts` token substitution with each tag's name/facing/frame data, export each as a strip PNG to `path` directory. Return list of generated file paths.
+
+#### 3.4.2 Tool Handler — Godot Exports
+
+- [ ] **3.4.2.1** **`godot_spriteframes` — strip PNG** — composite all frames into horizontal strip, upscale by `scale_factor`, write `{name}_strip.png`.
+- [ ] **3.4.2.2** **`godot_spriteframes` — import sidecar** — generate `{name}_strip.png.import` using shared sidecar template ([§3.4.0.2](#3402-godot-pngimport-sidecar-template)).
+- [ ] **3.4.2.3** **`godot_spriteframes` — `.tres` SpriteFrames resource** — generate Godot 4.x text resource. Each frame tag → named animation. Frame regions as `AtlasTexture` sub-resources into the strip. FPS via GCD method: `GCD(all_durations)` → `animation_fps = 1000 / GCD` → `relative_duration = frame_ms / GCD`. Ping-pong tags expanded: `[A, B, C]` → `[A, B, C, B]` (reverse excluding final frame to avoid double-display).
+- [ ] **3.4.2.4** **`godot_spriteframes` — optional shapes export** — if asset has shape layers, export `{name}_shapes.tres` as a Godot `Animation` resource with keyed `CollisionShape2D` shape data per frame. Each shape layer → separate track, using `role` as track path hint.
+- [ ] **3.4.2.5** **`godot_tileset`** — composite tileset into atlas PNG, upscale, write `{name}.png` + `{name}.png.import`. Generate `{name}.tres` as Godot `TileSet` text resource: `TileSetAtlasSource` referencing atlas, tile size from `tile_width`/`tile_height`. Embed per-tile collision polygons from `tile_physics`. If `tile_terrain` exists, include terrain set with `TERRAIN_MODE_MATCH_CORNERS_AND_SIDES` (blob47) or appropriate mode, plus per-tile `terrain_peering_bits`.
+- [ ] **3.4.2.6** **`godot_static`** — composite frame 0 (all visible layers), upscale, write `{name}.png` + `{name}.png.import`. No `.tres` resource.
+
+#### 3.4.3 Export Tests
+
+- [ ] **3.4.3.1** **Core export tests** — PNG output dimensions and pixel spot-checks at various scale factors, GIF frame count and delay values, spritesheet strip dimensions match `width × frames × scale`, atlas packing (no overlap, bounds fit, padding/extrusion), per_tag filename generation from export pattern.
+- [ ] **3.4.3.2** **Godot export tests** — `.tres` SpriteFrames structure validation (animation names match tags, frame count correct, GCD FPS calculation, ping-pong expansion), `.tres` TileSet structure (tile size, collision polygon embedding, terrain peering bits), `.png.import` sidecar format validation, `godot_static` produces only PNG + import (no .tres).
+
+> **Definition of Done — Phase 3:** All 10 MCP tools from the design spec are implemented and tested. All prerequisite algorithms have dedicated unit tests. Export produces valid output files for each format. Godot .tres resources are structurally valid.
 
 ---
 
@@ -388,14 +444,24 @@ Phase 2 (Basic Tools — depends on Phase 1)
         └── 2.5.5 project add_file (2.1.1 PNG lib + 1.5.6 quantization)
 
 Phase 3 (Advanced Tools — depends on Phase 2)
-  ├── 3.1 transform (follows 2.3.5 draw pattern)
-  ├── 3.2 effect (follows 2.3.5 draw pattern)
-  ├── 3.3 tileset (1.2 Asset tileset fields)
-  └── 3.4 export ───────────────────────┤
-        ├── 3.4.2 compositing integration (wires 1.5.10 into export pipeline)
-        ├── 3.4.3-6 standard exports (2.1.1 PNG, 2.1.2 GIF, 1.5.9 bin-pack)
-        ├── 3.4.7 per_tag (1.5.8 pattern substitution)
-        └── 3.4.8-10 Godot exports
+  ├── 3.1 transform
+  │     ├── 3.1.0 algorithms: transform.ts (rotate/flip/shear/shift pure functions)
+  │     └── 3.1.1 tool handler (follows 2.3.5 draw pattern)
+  ├── 3.2 effect
+  │     ├── 3.2.0 algorithms: gradient.ts, dither.ts, outline.ts, auto-aa.ts, motion.ts
+  │     └── 3.2.1 tool handler (follows 2.3.5 draw pattern)
+  ├── 3.3 tileset
+  │     ├── 3.3.0 algorithm: autotile.ts (blob47/4side/4corner + Godot peering bits)
+  │     └── 3.3.1 tool handler (1.2 Asset tileset fields)
+  └── 3.4 export
+        ├── 3.4.0 prerequisites: upscale util, Godot .png.import sidecar template
+        ├── 3.4.1 core exports (png, gif, strip, atlas, per_tag)
+        │     └── 3.4.1.2 compositing integration (wires 1.5.10 into export pipeline)
+        ├── 3.4.2 Godot exports (spriteframes, tileset, static)
+        │     ├── 3.4.2.1-4 godot_spriteframes (strip + sidecar + .tres + shapes)
+        │     ├── 3.4.2.5 godot_tileset (atlas + sidecar + .tres with collision/terrain)
+        │     └── 3.4.2.6 godot_static (composite + sidecar, no .tres)
+        └── 3.4.3 export tests
 
 Phase 4 (Resources & Prompts)
   ├── 4.1 Resources (depends on 3.4.2 compositing)
