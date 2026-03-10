@@ -308,9 +308,9 @@ Pure functions under `src/algorithms/autotile.ts`, unit tested independently.
 
 Shared utilities needed by multiple export actions.
 
-- [ ] **3.4.0.1** **Nearest-neighbor upscale** — `upscale(buffer: Uint8Array, width, height, scaleFactor): Uint8Array` multiplies each pixel into an N×N block in the output RGBA buffer. Used by all export actions that accept `scale_factor`. Can live in `src/algorithms/composite.ts` or a new `src/algorithms/upscale.ts`.
-- [ ] **3.4.0.2** **Godot `.png.import` sidecar template** — shared function `generateGodotImportSidecar(pngPath, resourceType?)` that writes the standard Godot 4.x import file: `[remap]` section with `type="CompressedTexture2D"`, `[deps]` with `source_file`, `dest_files`, and `[params]` with `compress/mode=0` (lossless), `mipmaps/generate=false`, `roughness/mode=0`. Reused by `godot_spriteframes` (3.4.3), `godot_tileset` (3.4.4), and `godot_static` (3.4.5).
-- [ ] **3.4.0.3** **Export prerequisite tests** — upscale correctness at 1×/2×/4× factors, sidecar file content validation against expected Godot format.
+- [x] **3.4.0.1** **Nearest-neighbor upscale** — `upscale(buffer: Uint8Array, width, height, scaleFactor): Uint8Array` multiplies each pixel into an N×N block in the output RGBA buffer. Used by all export actions that accept `scale_factor`. Can live in `src/algorithms/composite.ts` or a new `src/algorithms/upscale.ts`.
+- [x] **3.4.0.2** **Godot `.png.import` sidecar template** — shared function `generateGodotImportSidecar(pngPath, resourceType?)` that writes the standard Godot 4.x import file: `[remap]` section with `type="CompressedTexture2D"`, `[deps]` with `source_file`, `dest_files`, and `[params]` with `compress/mode=0` (lossless), `mipmaps/generate=false`, `roughness/mode=0`. Reused by `godot_spriteframes` (3.4.3), `godot_tileset` (3.4.4), and `godot_static` (3.4.5).
+- [x] **3.4.0.3** **Export prerequisite tests** — upscale correctness at 1×/2×/4× factors, sidecar file content validation against expected Godot format.
 
 #### 3.4.1 Tool Handler — Core Exports
 
