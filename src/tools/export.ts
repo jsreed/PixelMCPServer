@@ -1,0 +1,519 @@
+import { z } from 'zod';
+import { type McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { getWorkspace } from '../classes/workspace.js';
+import { requireAsset, isError } from './asset.js';
+import * as errors from '../errors.js';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import { PNG } from 'pngjs';
+import { GIFEncoder, quantize, applyPalette } from 'gifenc';
+
+import { type AssetClass } from '../classes/asset.js';
+import { type PaletteClass } from '../classes/palette.js';
+import { compositeFrame, type CompositeLayer, type PaletteEntry } from '../algorithms/composite.js';
+import { upscale } from '../algorithms/upscale.js';
+import { packRectangles, type PackInput } from '../algorithms/bin-pack.js';
+import { resolveExportPattern } from '../algorithms/export-pattern.js';
+
+// ---------------------------------------------------------------------------
+// Zod input schema
+// ---------------------------------------------------------------------------
+
+const exportInputSchema = {
+  action: z
+    .enum([
+      'png',
+      'gif',
+      'spritesheet_strip',
+      'atlas',
+      'per_tag',
+      'godot_spriteframes',
+      'godot_tileset',
+      'godot_static',
+    ])
+    .describe('Export action to perform'),
+  asset_name: z.string().describe('Target asset name (except for atlas)'),
+  path: z.string().describe('Output file or directory path'),
+  scale_factor: z.number().int().min(1).optional().describe('Scale factor for export (default 1)'),
+  frame: z.number().int().min(0).optional().describe('Frame index to export (for png)'),
+  pad: z.number().int().optional().describe('Pixel padding for atlas (default 0)'),
+  extrude: z.boolean().optional().describe('Extrude edge pixels for atlas (default false)'),
+  tags: z.array(z.string()).optional().describe('Optional list of tag names to export for per_tag'),
+};
+
+function ok(data: object) {
+  return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] };
+}
+
+// ---------------------------------------------------------------------------
+// Register
+// ---------------------------------------------------------------------------
+
+export function registerExportTool(server: McpServer): void {
+  server.registerTool(
+    'export',
+    {
+      title: 'Export',
+      description: 'Export an asset or workspace assets to various formats.',
+      inputSchema: exportInputSchema,
+    },
+    async (args) => {
+      const workspace = getWorkspace();
+
+      let scaleFactor = 1;
+      if (args.scale_factor && typeof args.scale_factor === 'number') {
+        scaleFactor = args.scale_factor;
+      }
+
+      const outPath = args.path;
+
+      try {
+        switch (args.action) {
+          case 'png':
+            return await handlePngExport(
+              workspace,
+              args.asset_name,
+              outPath,
+              scaleFactor,
+              args.frame ?? 0,
+            );
+          case 'gif':
+            return await handleGifExport(workspace, args.asset_name, outPath, scaleFactor);
+          case 'spritesheet_strip':
+            return await handleStripExport(workspace, args.asset_name, outPath, scaleFactor);
+          case 'atlas':
+            return await handleAtlasExport(
+              workspace,
+              outPath,
+              scaleFactor,
+              args.pad ?? 0,
+              args.extrude === true,
+            );
+          case 'per_tag':
+            return await handlePerTagExport(
+              workspace,
+              args.asset_name,
+              outPath,
+              scaleFactor,
+              args.tags,
+            );
+          case 'godot_spriteframes':
+          case 'godot_tileset':
+          case 'godot_static':
+            return errors.domainError(`Action '${args.action}' is not implemented yet.`);
+          default:
+            return errors.invalidArgument(`Unknown export action: ${String(args.action)}`);
+        }
+      } catch (e: unknown) {
+        return errors.domainError(e instanceof Error ? e.message : String(e));
+      }
+    },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function buildCompositeLayers(asset: AssetClass): CompositeLayer[] {
+  const compLayers: Record<number, CompositeLayer> = {};
+
+  for (const layer of asset.layers) {
+    compLayers[layer.id] = {
+      id: layer.id,
+      type: layer.type,
+      visible: layer.visible,
+      opacity: layer.opacity,
+      children: layer.type === 'group' ? [] : undefined,
+      getPixel: (x, y, frame) => {
+        const cel = asset.getCel(layer.id, frame);
+        if (!cel || !('data' in cel)) return null;
+        const cx = x - cel.x;
+        const cy = y - cel.y;
+        if (cy >= 0 && cy < cel.data.length && cx >= 0 && cx < (cel.data[0]?.length ?? 0)) {
+          const val = cel.data[cy][cx];
+          return val === 0 ? null : val;
+        }
+        return null;
+      },
+    };
+  }
+
+  const rootLayers: CompositeLayer[] = [];
+  for (const layer of asset.layers) {
+    const comp = compLayers[layer.id];
+    if (layer.parent_id !== undefined) {
+      const parent = compLayers[layer.parent_id];
+      if (parent.type === 'group') {
+        (parent.children as CompositeLayer[]).push(comp);
+      } else {
+        rootLayers.push(comp);
+      }
+    } else {
+      rootLayers.push(comp);
+    }
+  }
+
+  return rootLayers;
+}
+
+function buildPaletteMap(palette: PaletteClass): Map<number, PaletteEntry> {
+  const map = new Map<number, PaletteEntry>();
+  for (let i = 0; i < 256; i++) {
+    const [r, g, b, a] = palette.get(i);
+    map.set(i, { r, g, b, a });
+  }
+  return map;
+}
+
+// ---------------------------------------------------------------------------
+// Handlers
+// ---------------------------------------------------------------------------
+
+async function handlePngExport(
+  workspace: ReturnType<typeof getWorkspace>,
+  assetName: string,
+  outPath: string,
+  scaleFactor: number,
+  frameIndex: number,
+) {
+  const asset = requireAsset(workspace, assetName);
+  if (isError(asset)) return asset;
+
+  let buffer = compositeFrame(
+    asset.width,
+    asset.height,
+    buildCompositeLayers(asset),
+    buildPaletteMap(asset.palette),
+    Math.min(frameIndex, asset.frames.length - 1),
+  );
+  if (scaleFactor > 1) {
+    buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
+  }
+
+  const outWidth = asset.width * scaleFactor;
+  const outHeight = asset.height * scaleFactor;
+
+  await writePng(outPath, outWidth, outHeight, buffer);
+
+  return ok({ message: `Exported PNG to '${outPath}'.` });
+}
+
+async function handleGifExport(
+  workspace: ReturnType<typeof getWorkspace>,
+  assetName: string,
+  outPath: string,
+  scaleFactor: number,
+) {
+  const asset = requireAsset(workspace, assetName);
+  if (isError(asset)) return asset;
+
+  const outWidth = asset.width * scaleFactor;
+  const outHeight = asset.height * scaleFactor;
+
+  const encoder = GIFEncoder();
+
+  for (const frame of asset.frames) {
+    let buffer = compositeFrame(
+      asset.width,
+      asset.height,
+      buildCompositeLayers(asset),
+      buildPaletteMap(asset.palette),
+      frame.index,
+    );
+    if (scaleFactor > 1) {
+      buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
+    }
+
+    // We need a palette for the GIF, gifenc provides quantize
+    // We can extract RGBA arrays for use from our composite RGBA
+    // But really we just pass the RGBA pixels directly to quantize if using format 'rgba4444'
+    const colorOutput = quantize(buffer, 256, { format: 'rgba4444', oneBitAlpha: true });
+    const indexedPixels = applyPalette(buffer, colorOutput);
+
+    encoder.writeFrame(indexedPixels, outWidth, outHeight, {
+      palette: colorOutput,
+      delay: frame.duration_ms,
+      transparent: true,
+      transparentIndex:
+        colorOutput.findIndex((c: number[]) => c[3] === 0) !== -1
+          ? colorOutput.findIndex((c: number[]) => c[3] === 0)
+          : 0,
+      dispose: -1, // auto
+    });
+  }
+
+  encoder.finish();
+  const bytes = encoder.bytes();
+
+  await fs.promises.mkdir(path.dirname(outPath), { recursive: true });
+  await fs.promises.writeFile(outPath, bytes);
+
+  return ok({ message: `Exported GIF to '${outPath}'.` });
+}
+
+async function handleStripExport(
+  workspace: ReturnType<typeof getWorkspace>,
+  assetName: string,
+  outPath: string,
+  scaleFactor: number,
+) {
+  const asset = requireAsset(workspace, assetName);
+  if (isError(asset)) return asset;
+
+  const frameCount = asset.frames.length;
+  const frameWidth = asset.width * scaleFactor;
+  const frameHeight = asset.height * scaleFactor;
+  const outWidth = frameWidth * frameCount;
+  const outHeight = frameHeight;
+
+  const stripBuffer = new Uint8Array(outWidth * outHeight * 4);
+
+  for (let i = 0; i < frameCount; i++) {
+    let buffer = compositeFrame(
+      asset.width,
+      asset.height,
+      buildCompositeLayers(asset),
+      buildPaletteMap(asset.palette),
+      i,
+    );
+    if (scaleFactor > 1) {
+      buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
+    }
+
+    // copy buffer into strip sequence
+    const xOffset = i * frameWidth;
+    for (let y = 0; y < frameHeight; y++) {
+      for (let x = 0; x < frameWidth; x++) {
+        const srcIdx = (y * frameWidth + x) * 4;
+        const dstIdx = (y * outWidth + (xOffset + x)) * 4;
+        stripBuffer[dstIdx] = buffer[srcIdx];
+        stripBuffer[dstIdx + 1] = buffer[srcIdx + 1];
+        stripBuffer[dstIdx + 2] = buffer[srcIdx + 2];
+        stripBuffer[dstIdx + 3] = buffer[srcIdx + 3];
+      }
+    }
+  }
+
+  await writePng(outPath, outWidth, outHeight, stripBuffer);
+
+  return ok({ message: `Exported spritesheet strip to '${outPath}'.` });
+}
+
+async function handleAtlasExport(
+  workspace: ReturnType<typeof getWorkspace>,
+  outPath: string,
+  scaleFactor: number,
+  padding: number,
+  extrude: boolean,
+) {
+  const assetsToPack: PackInput[] = [];
+  const rawAssets = Array.from(workspace.loadedAssets.values());
+  const extrudeAmount = extrude ? 2 : 0; // 1px on each side
+
+  for (const asset of rawAssets) {
+    assetsToPack.push({
+      id: asset.name,
+      width: asset.width * scaleFactor + extrudeAmount,
+      height: asset.height * scaleFactor + extrudeAmount,
+    });
+  }
+
+  if (assetsToPack.length === 0) {
+    return errors.domainError('No loaded assets to pack in atlas.');
+  }
+
+  const scaledPadding = padding * scaleFactor;
+  const packResult = packRectangles(assetsToPack, scaledPadding);
+
+  const outWidth = packResult.width;
+  const outHeight = packResult.height;
+  const atlasBuffer = new Uint8Array(outWidth * outHeight * 4);
+
+  for (const placement of packResult.placements) {
+    const asset = workspace.loadedAssets.get(placement.id);
+    if (!asset) continue;
+
+    let buffer = compositeFrame(
+      asset.width,
+      asset.height,
+      buildCompositeLayers(asset),
+      buildPaletteMap(asset.palette),
+      0,
+    );
+    if (scaleFactor > 1) {
+      buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
+    }
+
+    const { x: dstX, y: dstY, width: srcW, height: srcH } = placement;
+    const actualW = srcW - extrudeAmount;
+    const actualH = srcH - extrudeAmount;
+    const startX = dstX + (extrude ? 1 : 0);
+    const startY = dstY + (extrude ? 1 : 0);
+
+    // Draw main image
+    for (let y = 0; y < actualH; y++) {
+      for (let x = 0; x < actualW; x++) {
+        const srcIdx = (y * actualW + x) * 4;
+        const outIdx = ((startY + y) * outWidth + (startX + x)) * 4;
+        atlasBuffer[outIdx] = buffer[srcIdx];
+        atlasBuffer[outIdx + 1] = buffer[srcIdx + 1];
+        atlasBuffer[outIdx + 2] = buffer[srcIdx + 2];
+        atlasBuffer[outIdx + 3] = buffer[srcIdx + 3];
+      }
+    }
+
+    // Extrude
+    if (extrude) {
+      // Top and bottom edges
+      for (let x = 0; x < actualW; x++) {
+        // Top edge
+        const topSrcIdx = (0 * actualW + x) * 4;
+        const topDstIdx = ((startY - 1) * outWidth + (startX + x)) * 4;
+        atlasBuffer[topDstIdx] = buffer[topSrcIdx];
+        atlasBuffer[topDstIdx + 1] = buffer[topSrcIdx + 1];
+        atlasBuffer[topDstIdx + 2] = buffer[topSrcIdx + 2];
+        atlasBuffer[topDstIdx + 3] = buffer[topSrcIdx + 3];
+        // Bottom edge
+        const botSrcIdx = ((actualH - 1) * actualW + x) * 4;
+        const botDstIdx = ((startY + actualH) * outWidth + (startX + x)) * 4;
+        atlasBuffer[botDstIdx] = buffer[botSrcIdx];
+        atlasBuffer[botDstIdx + 1] = buffer[botSrcIdx + 1];
+        atlasBuffer[botDstIdx + 2] = buffer[botSrcIdx + 2];
+        atlasBuffer[botDstIdx + 3] = buffer[botSrcIdx + 3];
+      }
+      // Left and right edges (including corners)
+      for (let y = -1; y <= actualH; y++) {
+        const clampY = Math.max(0, Math.min(y, actualH - 1));
+        // Left edge
+        const leftSrcIdx = (clampY * actualW + 0) * 4;
+        const leftDstIdx = ((startY + y) * outWidth + (startX - 1)) * 4;
+        atlasBuffer[leftDstIdx] = buffer[leftSrcIdx];
+        atlasBuffer[leftDstIdx + 1] = buffer[leftSrcIdx + 1];
+        atlasBuffer[leftDstIdx + 2] = buffer[leftSrcIdx + 2];
+        atlasBuffer[leftDstIdx + 3] = buffer[leftSrcIdx + 3];
+        // Right edge
+        const rightSrcIdx = (clampY * actualW + actualW - 1) * 4;
+        const rightDstIdx = ((startY + y) * outWidth + (startX + actualW)) * 4;
+        atlasBuffer[rightDstIdx] = buffer[rightSrcIdx];
+        atlasBuffer[rightDstIdx + 1] = buffer[rightSrcIdx + 1];
+        atlasBuffer[rightDstIdx + 2] = buffer[rightSrcIdx + 2];
+        atlasBuffer[rightDstIdx + 3] = buffer[rightSrcIdx + 3];
+      }
+    }
+  }
+
+  await writePng(outPath, outWidth, outHeight, atlasBuffer);
+
+  return ok({
+    message: `Exported atlas to '${outPath}'.`,
+    atlas_width: outWidth,
+    atlas_height: outHeight,
+    regions: packResult.placements,
+  });
+}
+
+async function handlePerTagExport(
+  workspace: ReturnType<typeof getWorkspace>,
+  assetName: string,
+  outDir: string,
+  scaleFactor: number,
+  tagsFilter: string[] | undefined,
+) {
+  const asset = requireAsset(workspace, assetName);
+  if (isError(asset)) return asset;
+
+  const projectInfo = workspace.project?.info();
+  const exportPattern = projectInfo?.conventions?.export_pattern ?? '{name}_{tag}_{direction}.png';
+
+  const tagsSource = asset.tags.filter((t) => t.type === 'frame');
+  let tagsToProcess = tagsSource;
+  if (tagsFilter && tagsFilter.length > 0) {
+    tagsToProcess = tagsSource.filter((t) => tagsFilter.includes(t.name));
+  }
+
+  if (tagsToProcess.length === 0) {
+    return errors.domainError('No matching frame tags to export.');
+  }
+
+  const generatedFiles: string[] = [];
+
+  for (const tag of tagsToProcess) {
+    const start = tag.start;
+    const end = tag.end;
+    const count = end - start + 1;
+
+    // We compose the frames for the tag as a horizontal strip
+    const frameWidth = asset.width * scaleFactor;
+    const frameHeight = asset.height * scaleFactor;
+    const outWidth = frameWidth * count;
+    const outHeight = frameHeight;
+
+    const stripBuffer = new Uint8Array(outWidth * outHeight * 4);
+
+    for (let i = 0; i < count; i++) {
+      const frameIndex = start + i;
+      let buffer = compositeFrame(
+        asset.width,
+        asset.height,
+        buildCompositeLayers(asset),
+        buildPaletteMap(asset.palette),
+        frameIndex,
+      );
+      if (scaleFactor > 1) {
+        buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
+      }
+
+      const xOffset = i * frameWidth;
+      for (let y = 0; y < frameHeight; y++) {
+        for (let x = 0; x < frameWidth; x++) {
+          const srcIdx = (y * frameWidth + x) * 4;
+          const dstIdx = (y * outWidth + (xOffset + x)) * 4;
+          stripBuffer[dstIdx] = buffer[srcIdx];
+          stripBuffer[dstIdx + 1] = buffer[srcIdx + 1];
+          stripBuffer[dstIdx + 2] = buffer[srcIdx + 2];
+          stripBuffer[dstIdx + 3] = buffer[srcIdx + 3];
+        }
+      }
+    }
+
+    const filename = resolveExportPattern(exportPattern, {
+      name: assetName,
+      tag: tag.name,
+      direction: (tag.facing as string) || (tag.direction as string) || '',
+      variant: '', // Variants are handled at project load time right now
+      frame: '', // Could be multiple frames per tag
+    });
+
+    // Safety check - make sure it resolves to something with .png
+    const finalFilename = filename.endsWith('.png') ? filename : filename + '.png';
+
+    const fullPath = path.join(outDir, finalFilename);
+    await writePng(fullPath, outWidth, outHeight, stripBuffer);
+    generatedFiles.push(fullPath);
+  }
+
+  return ok({
+    message: `Exported ${String(generatedFiles.length)} tag sequences.`,
+    files: generatedFiles,
+  });
+}
+
+async function writePng(outPath: string, width: number, height: number, buffer: Uint8Array) {
+  return new Promise<void>((resolve, reject) => {
+    fs.mkdirSync(path.dirname(outPath), { recursive: true });
+
+    const png = new PNG({ width, height });
+    png.data = Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+
+    const stream = fs.createWriteStream(outPath);
+    png.pack().pipe(stream);
+
+    stream.on('finish', () => {
+      resolve();
+    });
+    stream.on('error', (err) => {
+      reject(err);
+    });
+  });
+}

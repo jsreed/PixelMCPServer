@@ -1,0 +1,84 @@
+
+> pixelmcpserver@1.0.0 lint
+> eslint .
+
+
+/home/jackson/Workspace/Projects/PixelMCPServer/src/tools/export.test.ts
+   11:8   error  'GIFEncoder' is defined but never used                                             @typescript-eslint/no-unused-vars
+   19:81  error  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+   24:62  error  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+   25:9   error  Unsafe assignment of an `any` value                                                @typescript-eslint/no-unsafe-assignment
+   42:16  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+   86:66  error  Unsafe argument of type `any` assigned to a parameter of type `Asset`              @typescript-eslint/no-unsafe-argument
+   86:79  error  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+   97:13  error  Empty block statement                                                              no-empty
+  102:11  error  Unsafe assignment of an `any` value                                                @typescript-eslint/no-unsafe-assignment
+  102:20  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  109:13  error  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  110:11  error  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  112:19  error  Unsafe member access .content on an `any` value                                    @typescript-eslint/no-unsafe-member-access
+  133:11  error  Unsafe assignment of an `any` value                                                @typescript-eslint/no-unsafe-assignment
+  133:20  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  140:13  error  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  141:11  error  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  143:19  error  Unsafe member access .content on an `any` value                                    @typescript-eslint/no-unsafe-member-access
+  151:11  error  Unsafe assignment of an `any` value                                                @typescript-eslint/no-unsafe-assignment
+  151:20  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  158:13  error  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  159:11  error  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  161:19  error  Unsafe member access .content on an `any` value                                    @typescript-eslint/no-unsafe-member-access
+  169:11  error  Unsafe assignment of an `any` value                                                @typescript-eslint/no-unsafe-assignment
+  169:20  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  177:13  error  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  178:11  error  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  180:19  error  Unsafe member access .content on an `any` value                                    @typescript-eslint/no-unsafe-member-access
+  181:11  error  Unsafe assignment of an `any` value                                                @typescript-eslint/no-unsafe-assignment
+  181:31  error  Unsafe argument of type `any` assigned to a parameter of type `string`             @typescript-eslint/no-unsafe-argument
+  181:38  error  Unsafe member access .content on an `any` value                                    @typescript-eslint/no-unsafe-member-access
+  182:19  error  Unsafe member access .regions on an `any` value                                    @typescript-eslint/no-unsafe-member-access
+  191:11  error  Unsafe assignment of an `any` value                                                @typescript-eslint/no-unsafe-assignment
+  191:20  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  198:13  error  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  199:11  error  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  201:19  error  Unsafe member access .content on an `any` value                                    @typescript-eslint/no-unsafe-member-access
+
+/home/jackson/Workspace/Projects/PixelMCPServer/src/tools/export.ts
+    9:1   error  Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free  @typescript-eslint/ban-ts-comment
+   15:15  error  'Layer' is defined but never used                                                                                    @typescript-eslint/no-unused-vars
+   15:27  error  'GroupLayer' is defined but never used                                                                               @typescript-eslint/no-unused-vars
+   69:23  error  This assertion is unnecessary since it does not change the type of the expression                                    @typescript-eslint/no-unnecessary-type-assertion
+   76:15  error  This assertion is unnecessary since it does not change the type of the expression                                    @typescript-eslint/no-unnecessary-type-assertion
+   83:15  error  This assertion is unnecessary since it does not change the type of the expression                                    @typescript-eslint/no-unnecessary-type-assertion
+   90:15  error  This assertion is unnecessary since it does not change the type of the expression                                    @typescript-eslint/no-unnecessary-type-assertion
+   99:16  error  Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined                   @typescript-eslint/no-unnecessary-condition
+  104:15  error  This assertion is unnecessary since it does not change the type of the expression                                    @typescript-eslint/no-unnecessary-type-assertion
+  107:15  error  This assertion is unnecessary since it does not change the type of the expression                                    @typescript-eslint/no-unnecessary-type-assertion
+  154:42  error  Unnecessary conditional, value is always truthy                                                                      @typescript-eslint/no-unnecessary-condition
+  194:26  error  This assertion is unnecessary since it does not change the type of the expression                                    @typescript-eslint/no-unnecessary-type-assertion
+  195:21  error  This assertion is unnecessary since it does not change the type of the expression                                    @typescript-eslint/no-unnecessary-type-assertion
+  210:1   error  Async function 'handleGifExport' has no 'await' expression                                                           @typescript-eslint/require-await
+  223:9   error  Unsafe assignment of an `any` value                                                                                  @typescript-eslint/no-unsafe-assignment
+  229:28  error  This assertion is unnecessary since it does not change the type of the expression                                    @typescript-eslint/no-unnecessary-type-assertion
+  230:23  error  This assertion is unnecessary since it does not change the type of the expression                                    @typescript-eslint/no-unnecessary-type-assertion
+  243:5   error  Unsafe call of an `any` typed value                                                                                  @typescript-eslint/no-unsafe-call
+  243:13  error  Unsafe member access .writeFrame on an `any` value                                                                   @typescript-eslint/no-unsafe-member-access
+  255:3   error  Unsafe call of an `any` typed value                                                                                  @typescript-eslint/no-unsafe-call
+  255:11  error  Unsafe member access .finish on an `any` value                                                                       @typescript-eslint/no-unsafe-member-access
+  256:9   error  Unsafe assignment of an `any` value                                                                                  @typescript-eslint/no-unsafe-assignment
+  256:17  error  Unsafe call of an `any` typed value                                                                                  @typescript-eslint/no-unsafe-call
+  256:25  error  Unsafe member access .bytes on an `any` value                                                                        @typescript-eslint/no-unsafe-member-access
+  259:29  error  Unsafe argument of type `any` assigned to a parameter of type `string | ArrayBufferView<ArrayBufferLike>`            @typescript-eslint/no-unsafe-argument
+  285:28  error  This assertion is unnecessary since it does not change the type of the expression                                    @typescript-eslint/no-unnecessary-type-assertion
+  286:23  error  This assertion is unnecessary since it does not change the type of the expression                                    @typescript-eslint/no-unnecessary-type-assertion
+  346:28  error  This assertion is unnecessary since it does not change the type of the expression                                    @typescript-eslint/no-unnecessary-type-assertion
+  347:23  error  This assertion is unnecessary since it does not change the type of the expression                                    @typescript-eslint/no-unnecessary-type-assertion
+  404:9   error  Unnecessary conditional, comparison is always false, since `"frame" !== "frame"` is false                            @typescript-eslint/no-unnecessary-condition
+  423:30  error  This assertion is unnecessary since it does not change the type of the expression                                    @typescript-eslint/no-unnecessary-type-assertion
+  424:25  error  This assertion is unnecessary since it does not change the type of the expression                                    @typescript-eslint/no-unnecessary-type-assertion
+  447:32  error  Unnecessary conditional, value is always truthy                                                                      @typescript-eslint/no-unnecessary-condition
+  476:31  error  Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function   @typescript-eslint/no-confusing-void-expression
+  477:33  error  Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function   @typescript-eslint/no-confusing-void-expression
+
+✖ 72 problems (72 errors, 0 warnings)
+  24 errors and 0 warnings potentially fixable with the `--fix` option.
+

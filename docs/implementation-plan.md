@@ -314,13 +314,13 @@ Shared utilities needed by multiple export actions.
 
 #### 3.4.1 Tool Handler — Core Exports
 
-- [ ] **3.4.1.1** **Zod schema** — discriminated union on `action`: `png`, `gif`, `spritesheet_strip`, `atlas`, `per_tag`, `godot_spriteframes`, `godot_tileset`, `godot_static`. Parameters: `asset_name`, `path` (required), `scale_factor` (optional int, default 1), `pad`/`extrude` (optional bools for atlas), `tags` (optional string array for per_tag).
-- [ ] **3.4.1.2** **Image compositing integration** — wire `compositeFrame()` from `src/algorithms/composite.ts` into the export pipeline. Each export action calls `compositeFrame(asset, frameIndex)` → receives `Uint8Array` RGBA buffer → optionally upscales → encodes to target format.
-- [ ] **3.4.1.3** **`png`** — composite frame 0 (or specified frame), upscale by `scale_factor`, encode via `pngjs`, write to `path`.
-- [ ] **3.4.1.4** **`gif`** — composite each frame, upscale, encode via `gifenc` with per-frame `duration_ms` delays. Write to `path`.
-- [ ] **3.4.1.5** **`spritesheet_strip`** — composite all frames, lay out horizontally in a single row, upscale, encode as PNG. Output dimensions: `(width × frame_count × scale) × (height × scale)`.
-- [ ] **3.4.1.6** **`atlas`** — bin-pack all loaded assets (frame 0 each) using `bin-pack.ts`. Optional `pad` (1px transparent gap) and `extrude` (repeat edge pixels). Upscale, encode as PNG. Return atlas metadata (asset → region mapping).
-- [ ] **3.4.1.7** **`per_tag`** — iterate frame tags (or `tags` subset), apply `export-pattern.ts` token substitution with each tag's name/facing/frame data, export each as a strip PNG to `path` directory. Return list of generated file paths.
+- [x] **3.4.1.1** **Zod schema** — discriminated union on `action`: `png`, `gif`, `spritesheet_strip`, `atlas`, `per_tag`, `godot_spriteframes`, `godot_tileset`, `godot_static`. Parameters: `asset_name`, `path` (required), `scale_factor` (optional int, default 1), `pad`/`extrude` (optional bools for atlas), `tags` (optional string array for per_tag).
+- [x] **3.4.1.2** **Image compositing integration** — wire `compositeFrame()` from `src/algorithms/composite.ts` into the export pipeline. Each export action calls `compositeFrame(asset, frameIndex)` → receives `Uint8Array` RGBA buffer → optionally upscales → encodes to target format.
+- [x] **3.4.1.3** **`png`** — composite frame 0 (or specified frame), upscale by `scale_factor`, encode via `pngjs`, write to `path`.
+- [x] **3.4.1.4** **`gif`** — composite each frame, upscale, encode via `gifenc` with per-frame `duration_ms` delays. Write to `path`.
+- [x] **3.4.1.5** **`spritesheet_strip`** — composite all frames, lay out horizontally in a single row, upscale, encode as PNG. Output dimensions: `(width × frame_count × scale) × (height × scale)`.
+- [x] **3.4.1.6** **`atlas`** — bin-pack all loaded assets (frame 0 each) using `bin-pack.ts`. Optional `pad` (1px transparent gap) and `extrude` (repeat edge pixels). Upscale, encode as PNG. Return atlas metadata (asset → region mapping).
+- [x] **3.4.1.7** **`per_tag`** — iterate frame tags (or `tags` subset), apply `export-pattern.ts` token substitution with each tag's name/facing/frame data, export each as a strip PNG to `path` directory. Return list of generated file paths.
 
 #### 3.4.2 Tool Handler — Godot Exports
 

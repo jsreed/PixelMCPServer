@@ -12,8 +12,7 @@ import { registerSelectionTool } from './tools/selection.js';
 import { registerTransformTool } from './tools/transform.js';
 import { registerEffectTool } from './tools/effect.js';
 import { registerTilesetTool } from './tools/tileset.js';
-// import { registerExportTool } from './tools/export.js';
-
+import { registerExportTool } from './tools/export.js';
 // Create the MCP server instance
 const server = new McpServer({
   name: 'PixelMCPServer',
@@ -30,7 +29,7 @@ registerSelectionTool(server);
 registerTransformTool(server);
 registerEffectTool(server);
 registerTilesetTool(server);
-// registerExportTool(server);
+registerExportTool(server);
 
 async function main() {
   const transport = new StdioServerTransport();

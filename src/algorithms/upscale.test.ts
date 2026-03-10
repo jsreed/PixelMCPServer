@@ -95,14 +95,20 @@ describe('upscale algorithm', () => {
     // 2x1 image
     // Yellow, Cyan
     const input = new Uint8Array([
-      255, 255, 0, 255, // Y
-      0, 255, 255, 255, // C
+      255,
+      255,
+      0,
+      255, // Y
+      0,
+      255,
+      255,
+      255, // C
     ]);
 
     const output = upscale(input, 2, 1, 4);
-    
+
     expect(output.length).toBe(8 * 4 * 4); // 8x4 output
-    
+
     const getPixel = (x: number, y: number) => {
       const idx = (y * 8 + x) * 4;
       return [output[idx], output[idx + 1], output[idx + 2], output[idx + 3]];
@@ -119,4 +125,3 @@ describe('upscale algorithm', () => {
     }
   });
 });
-
