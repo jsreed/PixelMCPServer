@@ -252,13 +252,13 @@ Pure functions under `src/algorithms/transform.ts`, unit tested independently.
 
 #### 3.1.1 Tool Handler
 
-- [ ] **3.1.1.1** **Zod schema** — top-level targeting (`asset_name`, `layer_id`, `frame_index`) + `operations` array. Discriminated union on `action`: `rotate` (`angle`: 90 | 180 | 270), `flip_h`, `flip_v`, `shear` (`amount_x?`, `amount_y?`), `shift` (`amount_x?`, `amount_y?`).
-- [ ] **3.1.1.2** **`rotate`** — delegate to `rotate90`/`rotate180`/`rotate270` from algorithm. Validate angle is 90/180/270.
-- [ ] **3.1.1.3** **`flip_h` / `flip_v`** — delegate to algorithm functions.
-- [ ] **3.1.1.4** **`shear`** — delegate to algorithm. At least one of `amount_x` or `amount_y` required.
-- [ ] **3.1.1.5** **`shift`** — delegate to algorithm. At least one of `amount_x` or `amount_y` required.
-- [ ] **3.1.1.6** **Selection mask + batched command** — same pattern as draw: all operations in one call share a single `CelWriteCommand`. When a selection mask is active, only the selected region is affected (copy selected region → transform → write back).
-- [ ] **3.1.1.7** **Transform tool tests** — tool-level tests: schema validation, each operation returns expected result shape, selection-masked transform, batched command undo/redo.
+- [x] **3.1.1.1** **Zod schema** — top-level targeting (`asset_name`, `layer_id`, `frame_index`) + `operations` array. Discriminated union on `action`: `rotate` (`angle`: 90 | 180 | 270), `flip_h`, `flip_v`, `shear` (`amount_x?`, `amount_y?`), `shift` (`amount_x?`, `amount_y?`).
+- [x] **3.1.1.2** **`rotate`** — delegate to `rotate90`/`rotate180`/`rotate270` from algorithm. Validate angle is 90/180/270.
+- [x] **3.1.1.3** **`flip_h` / `flip_v`** — delegate to algorithm functions.
+- [x] **3.1.1.4** **`shear`** — delegate to algorithm. At least one of `amount_x` or `amount_y` required.
+- [x] **3.1.1.5** **`shift`** — delegate to algorithm. At least one of `amount_x` or `amount_y` required.
+- [x] **3.1.1.6** **Selection mask + batched command** — same pattern as draw: all operations in one call share a single `CelWriteCommand`. When a selection mask is active, only the selected region is affected (copy selected region → transform → write back).
+- [x] **3.1.1.7** **Transform tool tests** — tool-level tests: schema validation, each operation returns expected result shape, selection-masked transform, batched command undo/redo.
 
 ### 3.2 `effect` Tool
 
