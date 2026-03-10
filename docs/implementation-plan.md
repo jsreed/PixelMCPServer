@@ -295,12 +295,12 @@ Pure functions under `src/algorithms/autotile.ts`, unit tested independently.
 
 #### 3.3.1 Tool Handler
 
-- [ ] **3.3.1.1** **Zod schema** — discriminated union on `action`: `extract_tile`, `place_tile`, `autotile_generate`, `set_tile_physics`. Parameters per [design §2.2.6](design.md).
-- [ ] **3.3.1.2** **`extract_tile`** — copy `tile_width × tile_height` pixel region from source position (`x`, `y`) on target layer/frame, append as next tile slot. Extend canvas width by `tile_width`, increment `tile_count`. Return new slot index. Wrapped in Command.
-- [ ] **3.3.1.3** **`place_tile`** — stamp tile slot pixels onto target layer at (`x`, `y`) for image layers, or write tile index into grid cell for tilemap layers. When asset `perspective` is `"isometric"`, accept `col`/`row` instead of `x`/`y` and project via dimetric formula.
-- [ ] **3.3.1.4** **`autotile_generate`** — delegate to autotile algorithm. When `terrain_name` is provided: compute peering bits for all occupied canonical slots, store in `tile_terrain`, report assigned + missing. When `terrain_name` is omitted: query-only mode, return expected + occupied + missing slot lists. Wrapped in Command.
-- [ ] **3.3.1.5** **`set_tile_physics`** — store `physics_polygon` and/or `navigation_polygon` for `tile_index` in `tile_physics`. Pass empty array to clear. Wrapped in Command.
-- [ ] **3.3.1.6** **Tileset tool tests** — extract_tile canvas extension + slot index, place_tile pixel verification (both image and tilemap layers), place_tile isometric projection, autotile query-only vs assign modes, autotile missing slot reporting, set_tile_physics storage + clear, Command undo/redo for each action.
+- [x] **3.3.1.1** **Zod schema** — discriminated union on `action`: `extract_tile`, `place_tile`, `autotile_generate`, `set_tile_physics`. Parameters per [design §2.2.6](design.md).
+- [x] **3.3.1.2** **`extract_tile`** — copy `tile_width × tile_height` pixel region from source position (`x`, `y`) on target layer/frame, append as next tile slot. Extend canvas width by `tile_width`, increment `tile_count`. Return new slot index. Wrapped in Command.
+- [x] **3.3.1.3** **`place_tile`** — stamp tile slot pixels onto target layer at (`x`, `y`) for image layers, or write tile index into grid cell for tilemap layers. When asset `perspective` is `"isometric"`, accept `col`/`row` instead of `x`/`y` and project via dimetric formula.
+- [x] **3.3.1.4** **`autotile_generate`** — delegate to autotile algorithm. When `terrain_name` is provided: compute peering bits for all occupied canonical slots, store in `tile_terrain`, report assigned + missing. When `terrain_name` is omitted: query-only mode, return expected + occupied + missing slot lists. Wrapped in Command.
+- [x] **3.3.1.5** **`set_tile_physics`** — store `physics_polygon` and/or `navigation_polygon` for `tile_index` in `tile_physics`. Pass empty array to clear. Wrapped in Command.
+- [x] **3.3.1.6** **Tileset tool tests** — extract_tile canvas extension + slot index, place_tile pixel verification (both image and tilemap layers), place_tile isometric projection, autotile query-only vs assign modes, autotile missing slot reporting, set_tile_physics storage + clear, Command undo/redo for each action.
 
 ### 3.4 `export` Tool
 

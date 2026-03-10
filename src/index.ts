@@ -11,15 +11,16 @@ import { registerDrawTool } from './tools/draw.js';
 import { registerSelectionTool } from './tools/selection.js';
 import { registerTransformTool } from './tools/transform.js';
 import { registerEffectTool } from './tools/effect.js';
-// import { registerTilesetTool } from './tools/tileset.js';
+import { registerTilesetTool } from './tools/tileset.js';
 // import { registerExportTool } from './tools/export.js';
 
+// Create the MCP server instance
 const server = new McpServer({
-  name: 'pixelmcpserver',
+  name: 'PixelMCPServer',
   version: '1.0.0',
 });
 
-// Register tools — uncomment as each tool is implemented:
+// Register all tool handlers
 registerProjectTool(server);
 registerWorkspaceTool(server);
 registerAssetTool(server);
@@ -28,7 +29,7 @@ registerDrawTool(server);
 registerSelectionTool(server);
 registerTransformTool(server);
 registerEffectTool(server);
-// registerTilesetTool(server);
+registerTilesetTool(server);
 // registerExportTool(server);
 
 async function main() {

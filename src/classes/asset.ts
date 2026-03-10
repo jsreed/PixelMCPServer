@@ -1,4 +1,10 @@
-import { type Asset, type Perspective, type Anchor } from '../types/asset.js';
+import {
+  type Asset,
+  type Perspective,
+  type Anchor,
+  type TilePhysics,
+  type TileTerrain,
+} from '../types/asset.js';
 import { PaletteClass } from './palette.js';
 import * as errors from '../errors.js';
 import {
@@ -72,6 +78,33 @@ export class AssetClass {
 
   get tile_height(): number | undefined {
     return this._data.tile_height;
+  }
+
+  get tile_count(): number | undefined {
+    return this._data.tile_count;
+  }
+
+  set tile_count(value: number | undefined) {
+    this._data.tile_count = value;
+    this.markDirty();
+  }
+
+  get tile_physics(): TilePhysics | undefined {
+    return this._data.tile_physics;
+  }
+
+  set tile_physics(value: TilePhysics | undefined) {
+    this._data.tile_physics = value;
+    this.markDirty();
+  }
+
+  get tile_terrain(): TileTerrain | undefined {
+    return this._data.tile_terrain;
+  }
+
+  set tile_terrain(value: TileTerrain | undefined) {
+    this._data.tile_terrain = value;
+    this.markDirty();
   }
 
   // Returns a copy of the layers array
@@ -792,6 +825,15 @@ export class AssetClass {
     if (patch.cels) this._data.cels = JSON.parse(JSON.stringify(patch.cels)) as Record<string, Cel>;
     if (patch.width !== undefined) this._data.width = patch.width;
     if (patch.height !== undefined) this._data.height = patch.height;
+    if (patch.tile_count !== undefined) this._data.tile_count = patch.tile_count;
+    if ('tile_physics' in patch)
+      this._data.tile_physics = patch.tile_physics
+        ? (JSON.parse(JSON.stringify(patch.tile_physics)) as TilePhysics)
+        : undefined;
+    if ('tile_terrain' in patch)
+      this._data.tile_terrain = patch.tile_terrain
+        ? (JSON.parse(JSON.stringify(patch.tile_terrain)) as TileTerrain)
+        : undefined;
     this.markDirty();
   }
 }
