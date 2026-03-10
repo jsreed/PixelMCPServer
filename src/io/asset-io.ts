@@ -68,13 +68,10 @@ export async function loadAssetFile(path: string): Promise<Asset> {
     }
 
     // Strip the envelope fields to return a pure Asset
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const {
-      pixelmcp_version: _version,
-      created: _created,
-      modified: _modified,
-      ...coreAsset
-    } = parsed;
+    const coreAsset = { ...parsed } as Partial<AssetFileEnvelope>;
+    delete coreAsset.pixelmcp_version;
+    delete coreAsset.created;
+    delete coreAsset.modified;
     return coreAsset as Asset;
   } catch (error: unknown) {
     if (

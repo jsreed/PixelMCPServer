@@ -289,9 +289,9 @@ Pure functions under `src/algorithms/`, unit tested independently. Each file han
 
 Pure functions under `src/algorithms/autotile.ts`, unit tested independently.
 
-- [ ] **3.3.0.1** **Canonical slot computation** — `getCanonicalSlots(pattern)` returns the list of valid bitmask slot indices for `blob47` (47 slots), `4side` (16 slots, bits N+E+S+W), or `4corner` (16 slots, bits NE+SE+SW+NW). For `blob47`, a slot is canonical iff every set corner bit has both orthogonal neighbors set (NE requires N+E, SE requires E+S, SW requires S+W, NW requires N+W).
-- [ ] **3.3.0.2** **Godot peering bit assignment** — `assignPeeringBits(slotIndex, pattern)` maps a bitmask slot index to a Godot `CellNeighbor` peering bits object (`{ top, top_right, right, bottom_right, bottom, bottom_left, left, top_left }` with values `0` for connected or `-1` for not connected). Direction mapping: bit 0 (N) → `top`, bit 1 (NE) → `top_right`, bit 2 (E) → `right`, etc.
-- [ ] **3.3.0.3** **Autotile algorithm tests** — blob47 produces exactly 47 canonical slots, 4side produces 16, 4corner produces 16. Known slot indices verified (e.g., blob47: 0, 1, 4, 5, 7, 16, 17, 20, 21, 23, …, 255). Peering bit output verified for isolated tile (slot 0), interior tile (slot 255), and orthogonal interior (slot 85).
+- [x] **3.3.0.1** **Canonical slot computation** — `getCanonicalSlots(pattern)` returns the list of valid bitmask slot indices for `blob47` (47 slots), `4side` (16 slots, bits N+E+S+W), or `4corner` (16 slots, bits NE+SE+SW+NW). For `blob47`, a slot is canonical iff every set corner bit has both orthogonal neighbors set (NE requires N+E, SE requires E+S, SW requires S+W, NW requires N+W).
+- [x] **3.3.0.2** **Godot peering bit assignment** — `assignPeeringBits(slotIndex, pattern)` maps a bitmask slot index to a Godot `CellNeighbor` peering bits object (`{ top, top_right, right, bottom_right, bottom, bottom_left, left, top_left }` with values `0` for connected or `-1` for not connected). Direction mapping: bit 0 (N) → `top`, bit 1 (NE) → `top_right`, bit 2 (E) → `right`, etc.
+- [x] **3.3.0.3** **Autotile algorithm tests** — blob47 produces exactly 47 canonical slots, 4side produces 16, 4corner produces 16. Known slot indices verified (e.g., blob47: 0, 1, 4, 5, 7, 16, 17, 20, 21, 23, …, 255). Peering bit output verified for isolated tile (slot 0), interior tile (slot 255), and orthogonal interior (slot 85).
 
 #### 3.3.1 Tool Handler
 
