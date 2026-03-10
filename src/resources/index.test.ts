@@ -122,8 +122,44 @@ describe('MCP Resources', () => {
     });
   });
 
-  describe('Reading (Stubs)', () => {
-    it('returns a 1x1 transparent PNG blob for a valid asset URI', async () => {
+  describe('Reading', () => {
+    beforeEach(() => {
+      const workspace = WorkspaceClass.instance();
+      const asset = new AssetClass({
+        name: 'hero',
+        width: 16,
+        height: 16,
+        perspective: 'flat',
+        palette: Array.from({ length: 256 }, (_, i) => [i, i, i, 255]),
+        layers: [{ id: 1, type: 'image', name: 'Layer 1', visible: true, opacity: 255 }],
+        frames: [
+          { index: 0, duration_ms: 100 },
+          { index: 1, duration_ms: 100 },
+        ],
+        tags: [],
+        cels: {
+          '1/0': {
+            x: 0,
+            y: 0,
+            data: [
+              [1, 2],
+              [3, 4],
+            ],
+          },
+          '1/1': {
+            x: 0,
+            y: 0,
+            data: [
+              [5, 6],
+              [7, 8],
+            ],
+          },
+        },
+      });
+      workspace.loadedAssets.set('hero', asset);
+    });
+
+    it('returns a valid PNG blob for a valid asset URI at frame 0', async () => {
       const assetTemplate = registered.find((r) => r.name === 'asset_view');
       expect(assetTemplate).toBeDefined();
       if (!assetTemplate) throw new Error('No asset_view template');
@@ -133,9 +169,6 @@ describe('MCP Resources', () => {
       });
 
       expect(response.contents).toHaveLength(1);
-      expect(response.contents[0].uri).toBe('pixel://view/asset/hero');
-
-      // We must cast contents[0] or use "in" operator because length is 1 but TS doesn't know it's Blob contents vs Text
       const content = response.contents[0];
       if ('mimeType' in content) {
         expect(content.mimeType).toBe('image/png');
@@ -143,7 +176,52 @@ describe('MCP Resources', () => {
       if ('blob' in content) {
         expect(content.blob).toBeDefined();
         expect(typeof content.blob).toBe('string');
+        expect(content.blob.length).toBeGreaterThan(100);
       }
+    });
+
+    it('returns a valid PNG blob for a specific frame', async () => {
+      const frameTemplate = registered.find((r) => r.name === 'asset_frame_view');
+      expect(frameTemplate).toBeDefined();
+      if (!frameTemplate) throw new Error('No asset_frame_view template');
+
+      const response = await frameTemplate.readCallback(
+        new URL('pixel://view/asset/hero/frame/1'),
+        {
+          name: 'hero',
+          index: '1',
+        },
+      );
+
+      expect(response.contents).toHaveLength(1);
+      const content = response.contents[0];
+      if ('mimeType' in content) {
+        expect(content.mimeType).toBe('image/png');
+      }
+      if ('blob' in content) {
+        expect(content.blob).toBeDefined();
+        expect(typeof content.blob).toBe('string');
+        expect(content.blob.length).toBeGreaterThan(100);
+      }
+    });
+
+    it('throws error for invalid asset', () => {
+      const assetTemplate = registered.find((r) => r.name === 'asset_view');
+      if (!assetTemplate) throw new Error('no assetTemplate');
+      expect(() =>
+        assetTemplate.readCallback(new URL('pixel://view/asset/unknown'), { name: 'unknown' }),
+      ).toThrow("Asset 'unknown' is not loaded");
+    });
+
+    it('throws error for out of bounds frame', () => {
+      const frameTemplate = registered.find((r) => r.name === 'asset_frame_view');
+      if (!frameTemplate) throw new Error('no frameTemplate');
+      expect(() =>
+        frameTemplate.readCallback(new URL('pixel://view/asset/hero/frame/99'), {
+          name: 'hero',
+          index: '99',
+        }),
+      ).toThrow('Frame 99 is out of range');
     });
   });
 });

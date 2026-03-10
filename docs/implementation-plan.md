@@ -355,8 +355,8 @@ Visual preview resources for human users (not required for LLM operation — the
 
 #### 4.1.2 Asset View
 
-- [ ] **4.1.2.1** **`pixel://view/asset/{name}`** — composite all visible layers at frame 0 using `compositeFrame()`, encode as PNG via `pngjs`, return as base64 blob with `mimeType: "image/png"`. Validate asset is loaded.
-- [ ] **4.1.2.2** **`pixel://view/asset/{name}/frame/{index}`** — same as above but composite the specified frame index. Validate frame index in bounds.
+- [x] **4.1.2.1** **`pixel://view/asset/{name}`** — composite all visible layers at frame 0 using `compositeFrame()`, encode as PNG via `pngjs`, return as base64 blob with `mimeType: "image/png"`. Validate asset is loaded.
+- [x] **4.1.2.2** **`pixel://view/asset/{name}/frame/{index}`** — same as above but composite the specified frame index. Validate frame index in bounds.
 
 #### 4.1.3 Layer View
 
