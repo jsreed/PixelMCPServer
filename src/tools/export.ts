@@ -450,7 +450,21 @@ async function handlePerTagExport(
   for (const tag of tagsToProcess) {
     const start = tag.start;
     const end = tag.end;
-    const count = end - start + 1;
+    const sequence: number[] = [];
+    const dir = tag.direction;
+    if (dir === 'forward') {
+      for (let i = start; i <= end; i++) sequence.push(i);
+    } else if (dir === 'reverse') {
+      for (let i = end; i >= start; i--) sequence.push(i);
+    } else {
+      // ping_pong
+      for (let i = start; i <= end; i++) sequence.push(i);
+      if (end > start) {
+        for (let i = end - 1; i > start; i--) sequence.push(i);
+      }
+    }
+
+    const count = sequence.length;
 
     // We compose the frames for the tag as a horizontal strip
     const frameWidth = asset.width * scaleFactor;
@@ -461,7 +475,7 @@ async function handlePerTagExport(
     const stripBuffer = new Uint8Array(outWidth * outHeight * 4);
 
     for (let i = 0; i < count; i++) {
-      const frameIndex = start + i;
+      const frameIndex = sequence[i];
       let buffer = compositeFrame(
         asset.width,
         asset.height,

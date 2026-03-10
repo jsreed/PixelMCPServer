@@ -333,8 +333,8 @@ Shared utilities needed by multiple export actions.
 
 #### 3.4.3 Export Tests
 
-- [ ] **3.4.3.1** **Core export tests** — PNG output dimensions and pixel spot-checks at various scale factors, GIF frame count and delay values, spritesheet strip dimensions match `width × frames × scale`, atlas packing (no overlap, bounds fit, padding/extrusion), per_tag filename generation from export pattern.
-- [ ] **3.4.3.2** **Godot export tests** — `.tres` SpriteFrames structure validation (animation names match tags, frame count correct, GCD FPS calculation, ping-pong expansion), `.tres` TileSet structure (tile size, collision polygon embedding, terrain peering bits), `.png.import` sidecar format validation, `godot_static` produces only PNG + import (no .tres).
+- [x] **3.4.3.1** **Core export tests** — PNG output dimensions and pixel spot-checks at various scale factors, GIF frame count and delay values, spritesheet strip dimensions match `width × frames × scale`, atlas packing (no overlap, bounds fit, padding/extrusion), per_tag filename generation from export pattern.
+- [x] **3.4.3.2** **Godot export tests** — `.tres` SpriteFrames structure validation (animation names match tags, frame count correct, GCD FPS calculation, ping-pong expansion), `.tres` TileSet structure (tile size, collision polygon embedding, terrain peering bits), `.png.import` sidecar format validation, `godot_static` produces only PNG + import (no .tres).
 
 > **Definition of Done — Phase 3:** All 10 MCP tools from the design spec are implemented and tested. All prerequisite algorithms have dedicated unit tests. Export produces valid output files for each format. Godot .tres resources are structurally valid.
 

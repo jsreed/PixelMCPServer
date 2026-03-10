@@ -11,7 +11,20 @@ import { fileURLToPath } from 'node:url';
 // imported nothing from gifenc
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TEST_DIR = path.resolve(__dirname, '../__test_out__');
+const TEST_DIR = path.resolve(__dirname, '../__test__out__export');
+
+function getGifInfo(buffer: Buffer) {
+  let frameCount = 0;
+  const delays: number[] = [];
+  for (let i = 0; i < buffer.length - 8; i++) {
+    if (buffer[i] === 0x21 && buffer[i + 1] === 0xf9 && buffer[i + 2] === 0x04) {
+      frameCount++;
+      const delay = buffer.readUInt16LE(i + 4) * 10;
+      delays.push(delay);
+    }
+  }
+  return { frameCount, delays };
+}
 
 describe('Export Tool', () => {
   let server: McpServer;
@@ -54,6 +67,7 @@ describe('Export Tool', () => {
       frames: [
         { index: 0, duration_ms: 100 },
         { index: 1, duration_ms: 100 },
+        { index: 2, duration_ms: 100 },
       ],
       tags: [
         {
@@ -63,6 +77,13 @@ describe('Export Tool', () => {
           end: 1,
           direction: 'forward' as const,
           facing: 'S' as const,
+        },
+        {
+          type: 'frame' as const,
+          name: 'ping',
+          start: 0,
+          end: 2,
+          direction: 'ping_pong' as const,
         },
       ],
       cels: {
@@ -83,6 +104,16 @@ describe('Export Tool', () => {
             [0, 0, 1, 1],
             [0, 0, 1, 1],
             [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+        },
+        '1/2': {
+          x: 0,
+          y: 0,
+          data: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [1, 1, 1, 1],
             [0, 0, 0, 0],
           ],
         },
@@ -154,6 +185,9 @@ describe('Export Tool', () => {
     expect(fs.existsSync(outPath)).toBe(true);
     const data = fs.readFileSync(outPath);
     expect(data.length).toBeGreaterThan(0);
+    const info = getGifInfo(data);
+    expect(info.frameCount).toBe(3);
+    expect(info.delays).toEqual([100, 100, 100]);
   });
 
   it('exports a spritesheet strip correctly', async () => {
@@ -170,7 +204,7 @@ describe('Export Tool', () => {
 
     expect(result.content[0].text).toContain('Exported spritesheet strip');
     const png = PNG.sync.read(fs.readFileSync(outPath));
-    expect(png.width).toBe(8); // 4px * 2 frames
+    expect(png.width).toBe(12); // 4px * 3 frames
     expect(png.height).toBe(4);
   });
 
@@ -183,6 +217,7 @@ describe('Export Tool', () => {
         path: outPath,
         scale_factor: 1,
         pad: 1,
+        extrude: true,
       },
       {} as unknown,
     );
@@ -192,8 +227,8 @@ describe('Export Tool', () => {
     expect(parsed.regions.length).toBe(1);
 
     const png = PNG.sync.read(fs.readFileSync(outPath));
-    expect(png.width).toBeGreaterThanOrEqual(4);
-    expect(png.height).toBeGreaterThanOrEqual(4);
+    expect(png.width).toBeGreaterThanOrEqual(6);
+    expect(png.height).toBeGreaterThanOrEqual(6);
   });
 
   it('exports per_tag sequences correctly', async () => {
@@ -208,15 +243,21 @@ describe('Export Tool', () => {
       {} as unknown,
     );
 
-    expect(result.content[0].text).toContain('Exported 1 tag sequences');
+    expect(result.content[0].text).toContain('Exported 2 tag sequences');
 
     // Pattern uses "{name}_{tag}_{direction}.png" -> test_asset_idle_S.png
-    const pngPath = path.join(outDir, 'test_asset_idle_S.png');
-    expect(fs.existsSync(pngPath)).toBe(true);
+    const pngPath1 = path.join(outDir, 'test_asset_idle_S.png');
+    const pngPath2 = path.join(outDir, 'test_asset_ping_ping_pong.png');
+    expect(fs.existsSync(pngPath1)).toBe(true);
+    expect(fs.existsSync(pngPath2)).toBe(true);
 
-    const png = PNG.sync.read(fs.readFileSync(pngPath));
-    expect(png.width).toBe(8); // 2 frames from tag 0-1
-    expect(png.height).toBe(4);
+    const png1 = PNG.sync.read(fs.readFileSync(pngPath1));
+    expect(png1.width).toBe(8); // 2 frames from tag 0-1
+    expect(png1.height).toBe(4);
+
+    const png2 = PNG.sync.read(fs.readFileSync(pngPath2));
+    expect(png2.width).toBe(16); // ping-pong expands 0-2 to [0, 1, 2, 1] = 4 frames
+    expect(png2.height).toBe(4);
   });
 
   it('exports godot_spriteframes correctly', async () => {
@@ -247,6 +288,25 @@ describe('Export Tool', () => {
     const tresData = fs.readFileSync(tresPath, 'utf8');
     expect(tresData).toContain('[gd_resource type="SpriteFrames"');
     expect(tresData).toContain('"name": &"idle_S"'); // Uses facing tag S
+    expect(tresData).toContain('"name": &"ping"'); // The extra ping_pong tag
+    expect(tresData).toContain('"speed": 10.00'); // 1000 / 100 = 10 fps
+
+    const expectedPingFrames = `"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_f0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_f1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_f2")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_f1")
+}],
+"loop": true,
+"name": &"ping"`;
+    expect(tresData).toContain(expectedPingFrames);
 
     const importData = fs.readFileSync(importPath, 'utf8');
     expect(importData).toContain('[remap]');
@@ -260,6 +320,35 @@ describe('Export Tool', () => {
       assetJson.tile_width = 2;
       assetJson.tile_height = 2;
       assetJson.tile_count = 4;
+      assetJson.tile_physics = {
+        physics_layers: [{ collision_layer: 1, collision_mask: 1 }],
+        tiles: {
+          '0': {
+            polygon: [
+              [0, 0],
+              [2, 0],
+              [2, 2],
+              [0, 2],
+            ],
+          },
+        },
+      };
+      assetJson.tile_terrain = {
+        pattern: 'blob47',
+        terrain_name: 'Grass',
+        peering_bits: {
+          '0': {
+            top: 0,
+            top_right: -1,
+            right: -1,
+            bottom_right: -1,
+            bottom: 0,
+            bottom_left: -1,
+            left: -1,
+            top_left: -1,
+          },
+        },
+      };
       workspace.loadedAssets.set('test_asset', AssetClass.fromJSON(assetJson));
     }
 
@@ -290,6 +379,12 @@ describe('Export Tool', () => {
     const tresData = fs.readFileSync(tresPath, 'utf8');
     expect(tresData).toContain('[gd_resource type="TileSet"');
     expect(tresData).toContain('tile_size = Vector2i(2, 2)');
+    expect(tresData).toContain(
+      'physics_layer_0/polygon_0/points = PackedVector2Array(0, 0, 2, 0, 2, 2, 0, 2)',
+    );
+    expect(tresData).toContain('0/terrain_set = 0');
+    expect(tresData).toContain('0/terrains_peering_bit/top = 0');
+    expect(tresData).toContain('0/terrains_peering_bit/bottom = 0');
   });
 
   it('exports godot_static correctly', async () => {
