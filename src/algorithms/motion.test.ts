@@ -52,9 +52,7 @@ describe('subpixelShift', () => {
   });
 
   it('shifts content left (negative dirX)', () => {
-    const data = [
-      [1, 2, 3],
-    ];
+    const data = [[1, 2, 3]];
     const result = subpixelShift(data, 1.0, -1, 0);
     // shift left by 1: samples from (x+1, y)
     expect(result[0]).toEqual([2, 3, 0]);
@@ -78,9 +76,7 @@ describe('subpixelShift', () => {
   });
 
   it('sub-pixel intensity (0.4) with rounding', () => {
-    const data = [
-      [1, 2, 3, 4, 5],
-    ];
+    const data = [[1, 2, 3, 4, 5]];
     // intensity=0.4, dir=(1,0): offset=0.4
     // Each pixel samples from (x - 0.4), rounded:
     // x=0: round(-0.4)=0 → data[0][0]=1
@@ -101,9 +97,7 @@ describe('subpixelShift', () => {
   });
 
   it('normalizes direction vector', () => {
-    const data = [
-      [1, 2, 3],
-    ];
+    const data = [[1, 2, 3]];
     // dir=(10, 0) should behave same as dir=(1, 0) — just direction matters
     const result1 = subpixelShift(data, 1.0, 1, 0);
     const result2 = subpixelShift(data, 1.0, 10, 0);
@@ -111,7 +105,10 @@ describe('subpixelShift', () => {
   });
 
   it('does not mutate the input', () => {
-    const data = [[1, 2], [3, 4]];
+    const data = [
+      [1, 2],
+      [3, 4],
+    ];
     const copy = data.map((r) => [...r]);
     subpixelShift(data, 0.5, 1, 0);
     expect(data).toEqual(copy);
@@ -141,9 +138,7 @@ describe('smearFrame', () => {
   });
 
   it('smears pixels rightward into transparent areas', () => {
-    const data = [
-      [1, 0, 0, 0, 0],
-    ];
+    const data = [[1, 0, 0, 0, 0]];
     const result = smearFrame(data, 1.0, 1, 0);
     // Pixel at (0,0)=1 should extend rightward
     expect(result[0][0]).toBe(1); // original
@@ -168,9 +163,7 @@ describe('smearFrame', () => {
   });
 
   it('does not smear into non-transparent pixels', () => {
-    const data = [
-      [1, 2, 0, 0],
-    ];
+    const data = [[1, 2, 0, 0]];
     const result = smearFrame(data, 1.0, 1, 0);
     // Pixel at x=1 should remain 2 (it's non-transparent, not overwritten by smear from x=0)
     expect(result[0][1]).toBe(2);
@@ -188,9 +181,7 @@ describe('smearFrame', () => {
   });
 
   it('respects direction — leftward smear', () => {
-    const data = [
-      [0, 0, 0, 0, 1],
-    ];
+    const data = [[0, 0, 0, 0, 1]];
     const result = smearFrame(data, 1.0, -1, 0);
     expect(result[0][4]).toBe(1); // original
     // Some pixels to the left should get smeared
@@ -209,7 +200,10 @@ describe('smearFrame', () => {
   });
 
   it('does not mutate the input', () => {
-    const data = [[1, 0, 0], [0, 0, 0]];
+    const data = [
+      [1, 0, 0],
+      [0, 0, 0],
+    ];
     const copy = data.map((r) => [...r]);
     smearFrame(data, 0.5, 1, 0);
     expect(data).toEqual(copy);

@@ -485,7 +485,12 @@ async function handleCreate(workspace: Workspace, args: Record<string, unknown>)
   // Add initial layers
   if (args.layers && Array.isArray(args.layers)) {
     for (const l of args.layers as Array<{ name: string; type: string }>) {
-      asset.addLayer({ name: l.name, type: l.type as 'image' | 'tilemap' | 'shape', opacity: 255, visible: true });
+      asset.addLayer({
+        name: l.name,
+        type: l.type as 'image' | 'tilemap' | 'shape',
+        opacity: 255,
+        visible: true,
+      });
     }
   } else {
     // Default layer
@@ -578,7 +583,7 @@ function handleRename(
           project.removeAsset(oldName);
           project.registerAsset(oldName, { ...entryForOld, path: newRelPath });
         }
-      }
+      },
     );
     workspace.pushCommand(cmd);
   } catch (e: unknown) {

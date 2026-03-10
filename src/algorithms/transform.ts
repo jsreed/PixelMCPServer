@@ -148,7 +148,7 @@ export function shear(data: Grid, amountX = 0, amountY = 0): Grid {
   if (height === 0 || width === 0) return [];
 
   // --- X-shear ---
-  let intermediate: Grid = createGrid(height, width);
+  const intermediate: Grid = createGrid(height, width);
   const hDivisor = Math.max(height - 1, 1);
   for (let y = 0; y < height; y++) {
     const shiftX = Math.round((amountX * y) / hDivisor);

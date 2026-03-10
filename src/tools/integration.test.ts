@@ -13,7 +13,8 @@ const virtualFs = new Map<string, unknown>();
 
 vi.mock('../io/asset-io.js', () => ({
   loadAssetFile: vi.fn().mockImplementation((path: string) => {
-    if (!virtualFs.has(path)) return Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+    if (!virtualFs.has(path))
+      return Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
     return Promise.resolve(virtualFs.get(path));
   }),
   saveAssetFile: vi.fn().mockImplementation((path: string, asset: unknown) => {
@@ -24,7 +25,8 @@ vi.mock('../io/asset-io.js', () => ({
 
 vi.mock('../io/project-io.js', () => ({
   loadProjectFile: vi.fn().mockImplementation((path: string) => {
-    if (!virtualFs.has(path)) return Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+    if (!virtualFs.has(path))
+      return Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
     return Promise.resolve(virtualFs.get(path));
   }),
   saveProjectFile: vi.fn().mockImplementation((path: string, data: unknown) => {

@@ -11,9 +11,9 @@ type Grid = number[][];
 /** 4-connected neighbor offsets (N, E, S, W). */
 const NEIGHBORS_4: readonly [number, number][] = [
   [-1, 0], // up
-  [1, 0],  // down
+  [1, 0], // down
   [0, -1], // left
-  [0, 1],  // right
+  [0, 1], // right
 ];
 
 /**

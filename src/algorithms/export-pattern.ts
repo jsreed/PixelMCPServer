@@ -25,26 +25,29 @@ export function resolveExportPattern(
   // intentional adjacent separators elsewhere in the user's string.
   const EMPTY_MARKER = '\x00EMPTY\x00';
 
-  result = result.replace(tokenRegex, (_match: string, tokenName: string, paddingFormat: string | undefined) => {
-    const value = variables[tokenName];
+  result = result.replace(
+    tokenRegex,
+    (_match: string, tokenName: string, paddingFormat: string | undefined) => {
+      const value = variables[tokenName];
 
-    if (value === undefined || value === '') {
-      return EMPTY_MARKER;
-    }
-
-    let strValue = String(value);
-
-    // Handle zero padding if requested (e.g. `03` or `04`)
-    if (paddingFormat && /^[0-9]+$/.test(paddingFormat)) {
-      // Check if paddingFormat starts with '0', indicating zero-padding
-      if (paddingFormat.startsWith('0')) {
-        const length = parseInt(paddingFormat, 10);
-        strValue = strValue.padStart(length, '0');
+      if (value === undefined || value === '') {
+        return EMPTY_MARKER;
       }
-    }
 
-    return strValue;
-  });
+      let strValue = String(value);
+
+      // Handle zero padding if requested (e.g. `03` or `04`)
+      if (paddingFormat && /^[0-9]+$/.test(paddingFormat)) {
+        // Check if paddingFormat starts with '0', indicating zero-padding
+        if (paddingFormat.startsWith('0')) {
+          const length = parseInt(paddingFormat, 10);
+          strValue = strValue.padStart(length, '0');
+        }
+      }
+
+      return strValue;
+    },
+  );
 
   // 2. Clean up adjacent separators around EMPTY markers
   // Separators defined in the design doc are '_', '-', '.'

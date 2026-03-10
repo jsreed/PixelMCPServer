@@ -47,7 +47,7 @@ function buildMockAsset(): Asset {
         ],
       },
     },
-  } as unknown as Parameters<typeof AssetClass['fromJSON']>[0];
+  } as unknown as Parameters<(typeof AssetClass)['fromJSON']>[0];
 }
 
 describe('transform tool', () => {
@@ -206,10 +206,7 @@ describe('transform tool', () => {
     await handler({
       layer_id: 1,
       frame_index: 0,
-      operations: [
-        { action: 'rotate', angle: 90 },
-        { action: 'flip_h' },
-      ],
+      operations: [{ action: 'rotate', angle: 90 }, { action: 'flip_h' }],
     });
     const d = getCelData();
     if (!d) throw new Error('No data');
@@ -282,7 +279,7 @@ describe('transform tool', () => {
     // Before 3x2:
     // [1, 2, 3]
     // [5, 6, 7]
-    
+
     // Rotate 90 deg gives 2x3:
     // [5, 1]
     // [6, 2]
@@ -295,7 +292,7 @@ describe('transform tool', () => {
     // Wait, the specification: if a 3x2 is rotated to 2x3, it should either draw the full 2x3,
     // or clip. Usually it's drawn, but bounded by the mask.
     // If bounded by the mask, row 2 is outside the mask.
-    
+
     await handler({
       layer_id: 1,
       frame_index: 0,
@@ -317,10 +314,7 @@ describe('transform tool', () => {
     await handler({
       layer_id: 1,
       frame_index: 0,
-      operations: [
-        { action: 'rotate', angle: 90 },
-        { action: 'flip_h' },
-      ],
+      operations: [{ action: 'rotate', angle: 90 }, { action: 'flip_h' }],
     });
 
     const d1 = getCelData();

@@ -276,12 +276,12 @@ Pure functions under `src/algorithms/`, unit tested independently. Each file han
 
 #### 3.2.1 Tool Handler
 
-- [ ] **3.2.1.1** **Zod schema** — top-level targeting + `operations` array. Discriminated union on `action` for all 10 operations. Region parameters (`x`, `y`, `width`, `height`) optional on gradient/dither ops, default to full cel. `color1`/`color2` are palette indices 0–255. `direction` enum for gradient. `intensity` float 0.0–1.0 and `direction_x`/`direction_y` floats for motion ops.
-- [ ] **3.2.1.2** **Gradient effects**: `gradient`, `checkerboard`, `noise`, `ordered_dither`, `error_diffusion` — delegate to `gradient.ts` and `dither.ts`. Apply within optional region bounds.
-- [ ] **3.2.1.3** **Pixel art refinement**: `auto_aa`, `outline`, `cleanup_orphans` — delegate to `auto-aa.ts` and `outline.ts`.
-- [ ] **3.2.1.4** **Animation effects**: `subpixel_shift`, `smear_frame` — delegate to `motion.ts`.
-- [ ] **3.2.1.5** **Selection mask + batched command** — same pattern as draw.
-- [ ] **3.2.1.6** **Effect tool tests** — tool-level tests: schema validation, each effect returns expected result shape, region-constrained effects, selection-masked effects, batched command undo/redo.
+- [x] **3.2.1.1** **Zod schema** — top-level targeting + `operations` array. Discriminated union on `action` for all 10 operations. Region parameters (`x`, `y`, `width`, `height`) optional on gradient/dither ops, default to full cel. `color1`/`color2` are palette indices 0–255. `direction` enum for gradient. `intensity` float 0.0–1.0 and `direction_x`/`direction_y` floats for motion ops.
+- [x] **3.2.1.2** **Gradient effects**: `gradient`, `checkerboard`, `noise`, `ordered_dither`, `error_diffusion` — delegate to `gradient.ts` and `dither.ts`. Apply within optional region bounds.
+- [x] **3.2.1.3** **Pixel art refinement**: `auto_aa`, `outline`, `cleanup_orphans` — delegate to `auto-aa.ts` and `outline.ts`.
+- [x] **3.2.1.4** **Animation effects**: `subpixel_shift`, `smear_frame` — delegate to `motion.ts`.
+- [x] **3.2.1.5** **Selection mask + batched command** — same pattern as draw.
+- [x] **3.2.1.6** **Effect tool tests** — tool-level tests: schema validation, each effect returns expected result shape, region-constrained effects, selection-masked effects, batched command undo/redo.
 
 ### 3.3 `tileset` Tool
 

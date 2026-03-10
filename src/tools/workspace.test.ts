@@ -256,8 +256,8 @@ describe('workspace tool', () => {
   it('undo after push returns success with stack depths', async () => {
     // Push a mock command
     workspace.pushCommand({
-      execute: () => { },
-      undo: () => { },
+      execute: () => {},
+      undo: () => {},
     });
 
     const result = await handler({ action: 'undo' });
@@ -275,8 +275,8 @@ describe('workspace tool', () => {
 
   it('redo after undo returns success', async () => {
     workspace.pushCommand({
-      execute: () => { },
-      undo: () => { },
+      execute: () => {},
+      undo: () => {},
     });
     workspace.undo();
 

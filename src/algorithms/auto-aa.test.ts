@@ -13,9 +13,9 @@ import { autoAntiAlias, type RGBA } from './auto-aa.js';
  * Index 3: light (lum ≈ 225)
  */
 function testPalette(): (RGBA | null)[] {
-  const p: (RGBA | null)[] = new Array(256).fill(null);
-  p[0] = [0, 0, 0, 0];       // transparent
-  p[1] = [30, 30, 30, 255];   // dark
+  const p: (RGBA | null)[] = new Array<RGBA | null>(256).fill(null);
+  p[0] = [0, 0, 0, 0]; // transparent
+  p[1] = [30, 30, 30, 255]; // dark
   p[2] = [128, 128, 128, 255]; // mid
   p[3] = [225, 225, 225, 255]; // light
   return p;
@@ -91,7 +91,7 @@ describe('autoAntiAlias', () => {
 
   it('returns original when no intermediate palette color exists', () => {
     // Only two colors in palette — no intermediate available
-    const palette: (RGBA | null)[] = new Array(256).fill(null);
+    const palette: (RGBA | null)[] = new Array<RGBA | null>(256).fill(null);
     palette[0] = [0, 0, 0, 0];
     palette[1] = [0, 0, 0, 255];
     palette[3] = [255, 255, 255, 255];

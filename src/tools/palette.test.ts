@@ -8,331 +8,333 @@ import * as paletteIo from '../io/palette-io.js';
 
 // Mock I/O
 vi.mock('../io/palette-io.js', () => ({
-    loadPaletteFile: vi.fn(),
-    savePaletteFile: vi.fn(),
+  loadPaletteFile: vi.fn(),
+  savePaletteFile: vi.fn(),
 }));
 vi.mock('../io/asset-io.js', () => ({
-    loadAssetFile: vi.fn(),
-    saveAssetFile: vi.fn(),
+  loadAssetFile: vi.fn(),
+  saveAssetFile: vi.fn(),
 }));
 
 // Capture tool callback
 interface ToolResult {
-    content: Array<{ type: string; text: string }>;
-    isError?: boolean;
+  content: Array<{ type: string; text: string }>;
+  isError?: boolean;
 }
 
 type ToolCallback = (args: Record<string, unknown>) => Promise<ToolResult>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function captureToolCallback(registerFn: (server: any) => void): ToolCallback {
-    let cb!: ToolCallback;
-    const mockServer = {
-        registerTool(_name: string, _config: unknown, callback: ToolCallback) {
-            cb = callback;
-        },
-    };
-    registerFn(mockServer);
-    return cb;
+  let cb!: ToolCallback;
+  const mockServer = {
+    registerTool(_name: string, _config: unknown, callback: ToolCallback) {
+      cb = callback;
+    },
+  };
+  registerFn(mockServer);
+  return cb;
 }
 
 /** Minimal asset data with a few palette colors set */
 const mockAssetData = {
-    name: 'test_sprite',
-    width: 4,
-    height: 4,
-    perspective: 'flat' as const,
-    palette: Array.from({ length: 256 }, (_, i) => {
-        if (i === 1) return [20, 12, 28, 255];
-        if (i === 2) return [68, 36, 52, 255];
-        if (i === 5) return [200, 100, 50, 255];
-        if (i === 10) return [100, 50, 25, 255];
-        return [0, 0, 0, 0] as [number, number, number, number];
-    }) as Asset['palette'],
-    layers: [{ id: 1, name: 'Layer 1', type: 'image' as const, opacity: 255, visible: true }],
-    frames: [{ index: 0, duration_ms: 100 }],
-    tags: [],
-    cels: {
-        '1/0': {
-            x: 0,
-            y: 0,
-            data: [
-                [1, 1, 2, 0],
-                [1, 2, 2, 0],
-                [0, 0, 0, 0],
-                [0, 0, 0, 0],
-            ],
-        },
+  name: 'test_sprite',
+  width: 4,
+  height: 4,
+  perspective: 'flat' as const,
+  palette: Array.from({ length: 256 }, (_, i) => {
+    if (i === 1) return [20, 12, 28, 255];
+    if (i === 2) return [68, 36, 52, 255];
+    if (i === 5) return [200, 100, 50, 255];
+    if (i === 10) return [100, 50, 25, 255];
+    return [0, 0, 0, 0] as [number, number, number, number];
+  }) as Asset['palette'],
+  layers: [{ id: 1, name: 'Layer 1', type: 'image' as const, opacity: 255, visible: true }],
+  frames: [{ index: 0, duration_ms: 100 }],
+  tags: [],
+  cels: {
+    '1/0': {
+      x: 0,
+      y: 0,
+      data: [
+        [1, 1, 2, 0],
+        [1, 2, 2, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+      ],
     },
+  },
 };
 
 describe('palette tool', () => {
-    let handler: ToolCallback;
-    let workspace: WorkspaceClass;
+  let handler: ToolCallback;
+  let workspace: WorkspaceClass;
 
-    beforeEach(() => {
-        WorkspaceClass.reset();
-        workspace = WorkspaceClass.instance();
-        handler = captureToolCallback(registerPaletteTool);
+  beforeEach(() => {
+    WorkspaceClass.reset();
+    workspace = WorkspaceClass.instance();
+    handler = captureToolCallback(registerPaletteTool);
 
-        // Set up project and load asset
-        const project = ProjectClass.create('/tmp/test/pixelmcp.json', 'TestProject');
-        project.registerAsset('sprite', { path: 'sprites/test.json', type: 'sprite' });
-        workspace.setProject(project);
+    // Set up project and load asset
+    const project = ProjectClass.create('/tmp/test/pixelmcp.json', 'TestProject');
+    project.registerAsset('sprite', { path: 'sprites/test.json', type: 'sprite' });
+    workspace.setProject(project);
 
-        // Directly load mock asset into workspace
-        const asset = AssetClass.fromJSON(JSON.parse(JSON.stringify(mockAssetData)) as typeof mockAssetData);
-        workspace.loadedAssets.set('sprite', asset);
+    // Directly load mock asset into workspace
+    const asset = AssetClass.fromJSON(
+      JSON.parse(JSON.stringify(mockAssetData)) as typeof mockAssetData,
+    );
+    workspace.loadedAssets.set('sprite', asset);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function getAsset(name: string) {
+    const a = workspace.loadedAssets.get(name);
+    if (!a) throw new Error(`Asset ${name} not found`);
+    return a;
+  }
+
+  // ─── validation ──────────────────────────────────────────────────
+
+  it('requires asset_name', async () => {
+    const result = await handler({ action: 'info' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('asset_name');
+  });
+
+  it('returns error for unloaded asset', async () => {
+    const result = await handler({ action: 'info', asset_name: 'ghost' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('not loaded');
+  });
+
+  // ─── info action ─────────────────────────────────────────────────
+
+  it('info returns defined palette entries with usage counts', async () => {
+    const result = await handler({ action: 'info', asset_name: 'sprite' });
+
+    expect(result.isError).toBeUndefined();
+    const data = JSON.parse(result.content[0].text) as {
+      entries: Array<{ index: number; usage: number }>;
+    };
+    expect(data.entries.length).toBeGreaterThan(0);
+
+    // Index 1 should have usage count 3 (three pixels reference it)
+    const idx1 = data.entries.find((e) => e.index === 1);
+    expect(idx1).toBeDefined();
+    expect(idx1?.usage).toBe(3);
+
+    // Index 2 should have usage count 3
+    const idx2 = data.entries.find((e) => e.index === 2);
+    expect(idx2).toBeDefined();
+    expect(idx2?.usage).toBe(3);
+  });
+
+  // ─── set action ──────────────────────────────────────────────────
+
+  it('set updates a palette entry', async () => {
+    const result = await handler({
+      action: 'set',
+      asset_name: 'sprite',
+      index: 3,
+      rgba: [255, 0, 0, 255],
     });
 
-    afterEach(() => {
-        vi.restoreAllMocks();
+    expect(result.isError).toBeUndefined();
+    const asset = getAsset('sprite');
+    expect(asset.palette.get(3)).toEqual([255, 0, 0, 255]);
+  });
+
+  it('set without index returns error', async () => {
+    const result = await handler({
+      action: 'set',
+      asset_name: 'sprite',
+      rgba: [255, 0, 0, 255],
+    });
+    expect(result.isError).toBe(true);
+  });
+
+  it('set is undoable', async () => {
+    const asset = getAsset('sprite');
+    const before = asset.palette.get(3);
+
+    await handler({ action: 'set', asset_name: 'sprite', index: 3, rgba: [255, 0, 0, 255] });
+    expect(asset.palette.get(3)).toEqual([255, 0, 0, 255]);
+
+    workspace.undo();
+    expect(asset.palette.get(3)).toEqual(before);
+  });
+
+  // ─── set_bulk action ─────────────────────────────────────────────
+
+  it('set_bulk sets multiple entries', async () => {
+    const entries = [
+      { index: 3, rgba: [255, 0, 0, 255] },
+      { index: 4, rgba: [0, 255, 0, 255] },
+    ];
+    const result = await handler({ action: 'set_bulk', asset_name: 'sprite', entries });
+
+    expect(result.isError).toBeUndefined();
+    const asset = getAsset('sprite');
+    expect(asset.palette.get(3)).toEqual([255, 0, 0, 255]);
+    expect(asset.palette.get(4)).toEqual([0, 255, 0, 255]);
+  });
+
+  // ─── swap action ─────────────────────────────────────────────────
+
+  it('swap exchanges two palette entries', async () => {
+    const asset = getAsset('sprite');
+    const c1 = asset.palette.get(1);
+    const c2 = asset.palette.get(2);
+
+    const result = await handler({
+      action: 'swap',
+      asset_name: 'sprite',
+      index: 1,
+      index2: 2,
     });
 
-    function getAsset(name: string) {
-        const a = workspace.loadedAssets.get(name);
-        if (!a) throw new Error(`Asset ${name} not found`);
-        return a;
-    }
+    expect(result.isError).toBeUndefined();
+    expect(asset.palette.get(1)).toEqual(c2);
+    expect(asset.palette.get(2)).toEqual(c1);
+  });
 
-    // ─── validation ──────────────────────────────────────────────────
+  // ─── generate_ramp action ────────────────────────────────────────
 
-    it('requires asset_name', async () => {
-        const result = await handler({ action: 'info' });
-        expect(result.isError).toBe(true);
-        expect(result.content[0].text).toContain('asset_name');
+  it('generate_ramp fills interpolated colors', async () => {
+    const asset = getAsset('sprite');
+    // Set endpoints
+    asset.palette.set(20, [0, 0, 0, 255]);
+    asset.palette.set(24, [100, 200, 50, 255]);
+
+    const result = await handler({
+      action: 'generate_ramp',
+      asset_name: 'sprite',
+      color1: 20,
+      color2: 24,
     });
 
-    it('returns error for unloaded asset', async () => {
-        const result = await handler({ action: 'info', asset_name: 'ghost' });
-        expect(result.isError).toBe(true);
-        expect(result.content[0].text).toContain('not loaded');
+    expect(result.isError).toBeUndefined();
+
+    // Midpoint at index 22 should be ~halfway
+    const mid = asset.palette.get(22);
+    expect(mid[0]).toBe(50);
+    expect(mid[1]).toBe(100);
+    expect(mid[2]).toBe(25);
+    expect(mid[3]).toBe(255);
+  });
+
+  it('generate_ramp with invalid order returns error', async () => {
+    const result = await handler({
+      action: 'generate_ramp',
+      asset_name: 'sprite',
+      color1: 10,
+      color2: 5,
     });
 
-    // ─── info action ─────────────────────────────────────────────────
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('color1 < color2');
+  });
 
-    it('info returns defined palette entries with usage counts', async () => {
-        const result = await handler({ action: 'info', asset_name: 'sprite' });
+  // ─── save action ─────────────────────────────────────────────────
 
-        expect(result.isError).toBeUndefined();
-        const data = JSON.parse(result.content[0].text) as {
-            entries: Array<{ index: number; usage: number }>;
-        };
-        expect(data.entries.length).toBeGreaterThan(0);
+  it('save writes palette to file', async () => {
+    vi.mocked(paletteIo.savePaletteFile).mockResolvedValue(undefined);
 
-        // Index 1 should have usage count 3 (three pixels reference it)
-        const idx1 = data.entries.find((e) => e.index === 1);
-        expect(idx1).toBeDefined();
-        expect(idx1?.usage).toBe(3);
-
-        // Index 2 should have usage count 3
-        const idx2 = data.entries.find((e) => e.index === 2);
-        expect(idx2).toBeDefined();
-        expect(idx2?.usage).toBe(3);
+    const result = await handler({
+      action: 'save',
+      asset_name: 'sprite',
+      path: 'palettes/test.json',
+      name: 'test_pal',
     });
 
-    // ─── set action ──────────────────────────────────────────────────
+    expect(result.isError).toBeUndefined();
+    expect(paletteIo.savePaletteFile).toHaveBeenCalledOnce();
+  });
 
-    it('set updates a palette entry', async () => {
-        const result = await handler({
-            action: 'set',
-            asset_name: 'sprite',
-            index: 3,
-            rgba: [255, 0, 0, 255],
-        });
+  // ─── load action ─────────────────────────────────────────────────
 
-        expect(result.isError).toBeUndefined();
-        const asset = getAsset('sprite');
-        expect(asset.palette.get(3)).toEqual([255, 0, 0, 255]);
+  it('load reads palette from file and applies it', async () => {
+    vi.mocked(paletteIo.loadPaletteFile).mockResolvedValue({
+      name: 'loaded_pal',
+      colors: [[255, 0, 0, 255], [0, 255, 0, 255], null] as unknown as Array<
+        [number, number, number, number] | null
+      >,
     });
 
-    it('set without index returns error', async () => {
-        const result = await handler({
-            action: 'set',
-            asset_name: 'sprite',
-            rgba: [255, 0, 0, 255],
-        });
-        expect(result.isError).toBe(true);
+    const result = await handler({
+      action: 'load',
+      asset_name: 'sprite',
+      path: 'palettes/test.json',
     });
 
-    it('set is undoable', async () => {
-        const asset = getAsset('sprite');
-        const before = asset.palette.get(3);
+    expect(result.isError).toBeUndefined();
+    const data = JSON.parse(result.content[0].text) as { message: string };
+    expect(data.message).toContain('loaded');
 
-        await handler({ action: 'set', asset_name: 'sprite', index: 3, rgba: [255, 0, 0, 255] });
-        expect(asset.palette.get(3)).toEqual([255, 0, 0, 255]);
+    // Palette should be updated
+    const asset = getAsset('sprite');
+    expect(asset.palette.get(0)).toEqual([255, 0, 0, 255]);
+    expect(asset.palette.get(1)).toEqual([0, 255, 0, 255]);
+  });
 
-        workspace.undo();
-        expect(asset.palette.get(3)).toEqual(before);
+  it('load with missing file returns error', async () => {
+    vi.mocked(paletteIo.loadPaletteFile).mockRejectedValue(
+      new Error('Palette file not found: /bad'),
+    );
+
+    const result = await handler({
+      action: 'load',
+      asset_name: 'sprite',
+      path: 'palettes/missing.json',
     });
 
-    // ─── set_bulk action ─────────────────────────────────────────────
+    expect(result.isError).toBe(true);
+  });
 
-    it('set_bulk sets multiple entries', async () => {
-        const entries = [
-            { index: 3, rgba: [255, 0, 0, 255] },
-            { index: 4, rgba: [0, 255, 0, 255] },
-        ];
-        const result = await handler({ action: 'set_bulk', asset_name: 'sprite', entries });
+  // ─── fetch_lospec action ─────────────────────────────────────────
 
-        expect(result.isError).toBeUndefined();
-        const asset = getAsset('sprite');
-        expect(asset.palette.get(3)).toEqual([255, 0, 0, 255]);
-        expect(asset.palette.get(4)).toEqual([0, 255, 0, 255]);
+  it('fetch_lospec fetches and applies palette from Lospec API', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          name: 'test-palette',
+          colors: ['ff0000', '00ff00', '0000ff'],
+        }),
+    } as Response);
+
+    const result = await handler({
+      action: 'fetch_lospec',
+      asset_name: 'sprite',
+      name: 'test-palette',
     });
 
-    // ─── swap action ─────────────────────────────────────────────────
+    expect(result.isError).toBeUndefined();
 
-    it('swap exchanges two palette entries', async () => {
-        const asset = getAsset('sprite');
-        const c1 = asset.palette.get(1);
-        const c2 = asset.palette.get(2);
+    const asset = getAsset('sprite');
+    expect(asset.palette.get(0)).toEqual([0, 0, 0, 0]); // Index 0 is transparency
+    expect(asset.palette.get(1)).toEqual([255, 0, 0, 255]);
+    expect(asset.palette.get(2)).toEqual([0, 255, 0, 255]);
+    expect(asset.palette.get(3)).toEqual([0, 0, 255, 255]);
+  });
 
-        const result = await handler({
-            action: 'swap',
-            asset_name: 'sprite',
-            index: 1,
-            index2: 2,
-        });
+  it('fetch_lospec handles API errors', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+    } as Response);
 
-        expect(result.isError).toBeUndefined();
-        expect(asset.palette.get(1)).toEqual(c2);
-        expect(asset.palette.get(2)).toEqual(c1);
+    const result = await handler({
+      action: 'fetch_lospec',
+      asset_name: 'sprite',
+      name: 'missing-palette',
     });
 
-    // ─── generate_ramp action ────────────────────────────────────────
-
-    it('generate_ramp fills interpolated colors', async () => {
-        const asset = getAsset('sprite');
-        // Set endpoints
-        asset.palette.set(20, [0, 0, 0, 255]);
-        asset.palette.set(24, [100, 200, 50, 255]);
-
-        const result = await handler({
-            action: 'generate_ramp',
-            asset_name: 'sprite',
-            color1: 20,
-            color2: 24,
-        });
-
-        expect(result.isError).toBeUndefined();
-
-        // Midpoint at index 22 should be ~halfway
-        const mid = asset.palette.get(22);
-        expect(mid[0]).toBe(50);
-        expect(mid[1]).toBe(100);
-        expect(mid[2]).toBe(25);
-        expect(mid[3]).toBe(255);
-    });
-
-    it('generate_ramp with invalid order returns error', async () => {
-        const result = await handler({
-            action: 'generate_ramp',
-            asset_name: 'sprite',
-            color1: 10,
-            color2: 5,
-        });
-
-        expect(result.isError).toBe(true);
-        expect(result.content[0].text).toContain('color1 < color2');
-    });
-
-    // ─── save action ─────────────────────────────────────────────────
-
-    it('save writes palette to file', async () => {
-        vi.mocked(paletteIo.savePaletteFile).mockResolvedValue(undefined);
-
-        const result = await handler({
-            action: 'save',
-            asset_name: 'sprite',
-            path: 'palettes/test.json',
-            name: 'test_pal',
-        });
-
-        expect(result.isError).toBeUndefined();
-        expect(paletteIo.savePaletteFile).toHaveBeenCalledOnce();
-    });
-
-    // ─── load action ─────────────────────────────────────────────────
-
-    it('load reads palette from file and applies it', async () => {
-        vi.mocked(paletteIo.loadPaletteFile).mockResolvedValue({
-            name: 'loaded_pal',
-            colors: [[255, 0, 0, 255], [0, 255, 0, 255], null] as unknown as Array<
-                [number, number, number, number] | null
-            >,
-        });
-
-        const result = await handler({
-            action: 'load',
-            asset_name: 'sprite',
-            path: 'palettes/test.json',
-        });
-
-        expect(result.isError).toBeUndefined();
-        const data = JSON.parse(result.content[0].text) as { message: string };
-        expect(data.message).toContain('loaded');
-
-        // Palette should be updated
-        const asset = getAsset('sprite');
-        expect(asset.palette.get(0)).toEqual([255, 0, 0, 255]);
-        expect(asset.palette.get(1)).toEqual([0, 255, 0, 255]);
-    });
-
-    it('load with missing file returns error', async () => {
-        vi.mocked(paletteIo.loadPaletteFile).mockRejectedValue(
-            new Error('Palette file not found: /bad'),
-        );
-
-        const result = await handler({
-            action: 'load',
-            asset_name: 'sprite',
-            path: 'palettes/missing.json',
-        });
-
-        expect(result.isError).toBe(true);
-    });
-
-    // ─── fetch_lospec action ─────────────────────────────────────────
-
-    it('fetch_lospec fetches and applies palette from Lospec API', async () => {
-        global.fetch = vi.fn().mockResolvedValue({
-            ok: true,
-            json: () =>
-                Promise.resolve({
-                    name: 'test-palette',
-                    colors: ['ff0000', '00ff00', '0000ff'],
-                }),
-        } as Response);
-
-        const result = await handler({
-            action: 'fetch_lospec',
-            asset_name: 'sprite',
-            name: 'test-palette',
-        });
-
-        expect(result.isError).toBeUndefined();
-
-        const asset = getAsset('sprite');
-        expect(asset.palette.get(0)).toEqual([0, 0, 0, 0]); // Index 0 is transparency
-        expect(asset.palette.get(1)).toEqual([255, 0, 0, 255]);
-        expect(asset.palette.get(2)).toEqual([0, 255, 0, 255]);
-        expect(asset.palette.get(3)).toEqual([0, 0, 255, 255]);
-    });
-
-    it('fetch_lospec handles API errors', async () => {
-        global.fetch = vi.fn().mockResolvedValue({
-            ok: false,
-            status: 404,
-        } as Response);
-
-        const result = await handler({
-            action: 'fetch_lospec',
-            asset_name: 'sprite',
-            name: 'missing-palette',
-        });
-
-        expect(result.isError).toBe(true);
-        expect(result.content[0].text).toContain('missing-palette');
-    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('missing-palette');
+  });
 });

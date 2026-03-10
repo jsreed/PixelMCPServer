@@ -228,10 +228,10 @@ export class WorkspaceClass {
       redoDepth: this.redoDepth,
       selection: this.selection
         ? {
-          asset_name: this.selection.asset_name,
-          layer_id: this.selection.layer_id,
-          frame_index: this.selection.frame_index,
-        }
+            asset_name: this.selection.asset_name,
+            layer_id: this.selection.layer_id,
+            frame_index: this.selection.frame_index,
+          }
         : null,
     };
   }

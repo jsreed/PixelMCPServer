@@ -185,7 +185,11 @@ describe('asset-io', () => {
   it('throws on cel with no valid discriminator (data/grid/shapes/link)', async () => {
     const filePath = path.join(tempDir, 'bad_cel2.json');
     const original = makeTestAsset();
-    (original as unknown as { cels: Record<string, unknown> }).cels['0/0'] = { x: 0, y: 0, wrongField: [] };
+    (original as unknown as { cels: Record<string, unknown> }).cels['0/0'] = {
+      x: 0,
+      y: 0,
+      wrongField: [],
+    };
 
     await saveAssetFile(filePath, original);
     await expect(loadAssetFile(filePath)).rejects.toThrow('required Asset format');
@@ -380,7 +384,10 @@ describe('asset-io', () => {
 
       expect(reloaded.layers).toHaveLength(4);
       expect(reloaded.layers[3]?.name).toBe('overlay');
-      expect((reloaded.cels[`${String(asset.layers[3]?.id ?? '')}/0`] as unknown as { data: number[][] }).data).toEqual([
+      expect(
+        (reloaded.cels[`${String(asset.layers[3]?.id ?? '')}/0`] as unknown as { data: number[][] })
+          .data,
+      ).toEqual([
         [4, 4],
         [4, 4],
       ]);

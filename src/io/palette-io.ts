@@ -59,7 +59,11 @@ export async function loadPaletteFile(path: string): Promise<PaletteFileData> {
 
     return parsed;
   } catch (error: unknown) {
-    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      (error as NodeJS.ErrnoException).code === 'ENOENT'
+    ) {
       // Ideally we'd have a specific error for 'paletteFileNotFound' in errors.ts
       // but we can just use a standard Error and the tool handler will wrap it.
       throw new Error(`Palette file not found: ${path}`);

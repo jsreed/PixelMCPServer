@@ -6,11 +6,7 @@
  */
 
 /** Direction of the gradient axis. */
-export type GradientDirection =
-  | 'vertical'
-  | 'horizontal'
-  | 'diagonal_down'
-  | 'diagonal_up';
+export type GradientDirection = 'vertical' | 'horizontal' | 'diagonal_down' | 'diagonal_up';
 
 /**
  * Generates a linear gradient between two palette indices.

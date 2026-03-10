@@ -294,9 +294,7 @@ describe('flipVertical', () => {
   });
 
   it('flip_h then flip_v equals rotate180', () => {
-    expect(flipVertical(flipHorizontal(SQUARE_3x3))).toEqual(
-      rotate180(SQUARE_3x3),
-    );
+    expect(flipVertical(flipHorizontal(SQUARE_3x3))).toEqual(rotate180(SQUARE_3x3));
   });
 
   it('does not mutate the input', () => {

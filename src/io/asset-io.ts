@@ -69,10 +69,19 @@ export async function loadAssetFile(path: string): Promise<Asset> {
 
     // Strip the envelope fields to return a pure Asset
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { pixelmcp_version: _version, created: _created, modified: _modified, ...coreAsset } = parsed;
+    const {
+      pixelmcp_version: _version,
+      created: _created,
+      modified: _modified,
+      ...coreAsset
+    } = parsed;
     return coreAsset as Asset;
   } catch (error: unknown) {
-    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      (error as NodeJS.ErrnoException).code === 'ENOENT'
+    ) {
       throw new Error(errors.assetFileNotFound(path).content[0].text);
     }
     throw error;

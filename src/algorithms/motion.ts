@@ -33,12 +33,7 @@ function normalize(dx: number, dy: number): [number, number] {
  * @param dirY       Y component of direction vector (default 0).
  * @returns A new grid with the shift applied.
  */
-export function subpixelShift(
-  data: Grid,
-  intensity: number,
-  dirX = 1,
-  dirY = 0,
-): Grid {
+export function subpixelShift(data: Grid, intensity: number, dirX = 1, dirY = 0): Grid {
   const height = data.length;
   if (height === 0) return [];
   const width = data[0].length;
@@ -49,9 +44,7 @@ export function subpixelShift(
   const offsetX = ndx * intensity;
   const offsetY = ndy * intensity;
 
-  const out: Grid = Array.from({ length: height }, () =>
-    new Array<number>(width).fill(0),
-  );
+  const out: Grid = Array.from({ length: height }, () => new Array<number>(width).fill(0));
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -88,12 +81,7 @@ export function subpixelShift(
  * @param dirY       Y component of direction vector (default 0).
  * @returns A new grid with smear applied.
  */
-export function smearFrame(
-  data: Grid,
-  intensity: number,
-  dirX = 1,
-  dirY = 0,
-): Grid {
+export function smearFrame(data: Grid, intensity: number, dirX = 1, dirY = 0): Grid {
   const height = data.length;
   if (height === 0) return [];
   const width = data[0].length;

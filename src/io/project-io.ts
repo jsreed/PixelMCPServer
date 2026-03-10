@@ -44,7 +44,11 @@ export async function loadProjectFile(path: string): Promise<ProjectConfig> {
 
     return parsed;
   } catch (error: unknown) {
-    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      (error as NodeJS.ErrnoException).code === 'ENOENT'
+    ) {
       throw new Error(errors.projectFileNotFound(path).content[0].text);
     }
     throw error;

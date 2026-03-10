@@ -26,9 +26,7 @@ export function checkerboard(
   if (width <= 0 || height <= 0) return [];
 
   return Array.from({ length: height }, (_, y) =>
-    Array.from({ length: width }, (_, x) =>
-      (x + y) % 2 === 0 ? color1 : color2,
-    ),
+    Array.from({ length: width }, (_, x) => ((x + y) % 2 === 0 ? color1 : color2)),
   );
 }
 
@@ -43,18 +41,11 @@ export function checkerboard(
  * @param color2  Second palette index.
  * @returns A `height × width` 2D array of palette indices.
  */
-export function noise(
-  width: number,
-  height: number,
-  color1: number,
-  color2: number,
-): number[][] {
+export function noise(width: number, height: number, color1: number, color2: number): number[][] {
   if (width <= 0 || height <= 0) return [];
 
   return Array.from({ length: height }, () =>
-    Array.from({ length: width }, () =>
-      Math.random() < 0.5 ? color1 : color2,
-    ),
+    Array.from({ length: width }, () => (Math.random() < 0.5 ? color1 : color2)),
   );
 }
 
@@ -128,9 +119,7 @@ export function errorDiffusion(
     return new Array<number>(width).fill(t);
   });
 
-  const out: number[][] = Array.from({ length: height }, () =>
-    new Array<number>(width).fill(0),
-  );
+  const out: number[][] = Array.from({ length: height }, () => new Array<number>(width).fill(0));
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {

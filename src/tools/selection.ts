@@ -109,9 +109,7 @@ export function registerSelectionTool(server: McpServer): void {
           return errors.clipboardEmpty();
         }
 
-        const targetAsset =
-          args.target_asset_name ??
-          firstLoadedAssetName(workspace.loadedAssets);
+        const targetAsset = args.target_asset_name ?? firstLoadedAssetName(workspace.loadedAssets);
         if (!targetAsset) return errors.invalidArgument('No asset loaded to paste into.');
 
         const assetOrError = requireAsset(workspace, targetAsset);
@@ -180,8 +178,7 @@ export function registerSelectionTool(server: McpServer): void {
 
       // All other actions require a target asset
       const { assetName: rawAssetName, layerId, frameIndex } = getSharedFields(args);
-      const assetName =
-        rawAssetName ?? firstLoadedAssetName(workspace.loadedAssets);
+      const assetName = rawAssetName ?? firstLoadedAssetName(workspace.loadedAssets);
       if (!assetName) return errors.invalidArgument('No asset loaded for selection target.');
 
       const assetOrError = requireAsset(workspace, assetName);
@@ -266,16 +263,12 @@ export function registerSelectionTool(server: McpServer): void {
             workspace.selection.frame_index !== frameIndex
           ) {
             // Inverse of nothing is everything
-            newMask = Array.from({ length: maskH }, () =>
-              new Array<boolean>(maskW).fill(true),
-            );
+            newMask = Array.from({ length: maskH }, () => new Array<boolean>(maskW).fill(true));
           } else {
             const s = workspace.selection;
             // Inverse of a masked region implies we now select everything, but "unselect" what was selected.
             // So the new bounds is the whole image.
-            newMask = Array.from({ length: maskH }, () =>
-              new Array<boolean>(maskW).fill(true),
-            );
+            newMask = Array.from({ length: maskH }, () => new Array<boolean>(maskW).fill(true));
             for (let dy = 0; dy < s.height; dy++) {
               for (let dx = 0; dx < s.width; dx++) {
                 if (s.mask[dy][dx]) {

@@ -3,7 +3,16 @@ import { type McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { getWorkspace } from '../classes/workspace.js';
 import * as errors from '../errors.js';
 import { CelWriteCommand } from '../commands/cel-write-command.js';
-import { rotate90, rotate180, rotate270, flipHorizontal, flipVertical, shear, shift, type Grid } from '../algorithms/transform.js';
+import {
+  rotate90,
+  rotate180,
+  rotate270,
+  flipHorizontal,
+  flipVertical,
+  shear,
+  shift,
+  type Grid,
+} from '../algorithms/transform.js';
 
 // ---------------------------------------------------------------------------
 // Zod Schema
@@ -46,7 +55,10 @@ const transformInputSchema = {
   asset_name: z.string().optional().describe('Target asset name. Defaults to first loaded asset.'),
   layer_id: z.number().int().optional().describe('Target layer ID. Defaults to 0.'),
   frame_index: z.number().int().optional().describe('Target frame index. Defaults to 0.'),
-  operations: z.array(transformOperationSchema).min(1).describe('Ordered list of transform operations.'),
+  operations: z
+    .array(transformOperationSchema)
+    .min(1)
+    .describe('Ordered list of transform operations.'),
 };
 
 // ---------------------------------------------------------------------------
@@ -62,7 +74,8 @@ export function registerTransformTool(server: McpServer): void {
     'transform',
     {
       title: 'Transform',
-      description: 'Geometric transformations (rotate, flip, shear, shift) applied to a cel or selection.',
+      description:
+        'Geometric transformations (rotate, flip, shear, shift) applied to a cel or selection.',
       inputSchema: transformInputZodSchema,
     },
     (args: TransformInput) => {
@@ -102,7 +115,9 @@ export function registerTransformTool(server: McpServer): void {
       for (const op of args.operations) {
         if (op.action === 'shear' || op.action === 'shift') {
           if ((op.amount_x ?? 0) === 0 && (op.amount_y ?? 0) === 0) {
-            return errors.invalidArgument(`${op.action} requires at least one of amount_x or amount_y to be non-zero.`);
+            return errors.invalidArgument(
+              `${op.action} requires at least one of amount_x or amount_y to be non-zero.`,
+            );
           }
         }
       }
@@ -111,7 +126,9 @@ export function registerTransformTool(server: McpServer): void {
         const cmd = new CelWriteCommand(asset, layerId, frameIndex, () => {
           let cel = asset.getMutableCel(layerId, frameIndex);
           if (!cel) {
-            const data = Array.from({ length: asset.height }, () => new Array<number>(asset.width).fill(0));
+            const data = Array.from({ length: asset.height }, () =>
+              new Array<number>(asset.width).fill(0),
+            );
             asset.setCel(layerId, frameIndex, { x: 0, y: 0, data });
             cel = asset.getMutableCel(layerId, frameIndex);
           }
@@ -165,7 +182,7 @@ export function registerTransformTool(server: McpServer): void {
               case 'rotate':
                 if (op.angle === 90) currentGrid = rotate90(currentGrid);
                 else if (op.angle === 180) currentGrid = rotate180(currentGrid);
-                else if (op.angle === 270) currentGrid = rotate270(currentGrid);
+                else currentGrid = rotate270(currentGrid);
                 break;
               case 'flip_h':
                 currentGrid = flipHorizontal(currentGrid);
@@ -191,7 +208,7 @@ export function registerTransformTool(server: McpServer): void {
             const subH = activeSelection.height;
             const sx = activeSelection.x;
             const sy = activeSelection.y;
-            
+
             const outH = currentGrid.length;
             const outW = outH > 0 ? currentGrid[0].length : 0;
 
@@ -215,7 +232,7 @@ export function registerTransformTool(server: McpServer): void {
                 for (let c = 0; c < Math.min(subW, outW); c++) {
                   const cx = sx + c;
                   if (cx >= 0 && cx < w && activeSelection.mask[r][c]) {
-                     cel.data[cy][cx] = currentGrid[r][c];
+                    cel.data[cy][cx] = currentGrid[r][c];
                   }
                 }
               }
@@ -228,7 +245,7 @@ export function registerTransformTool(server: McpServer): void {
                 cel.data[r][c] = 0;
               }
             }
-            
+
             const outH = currentGrid.length;
             const outW = outH > 0 ? currentGrid[0].length : 0;
             for (let r = 0; r < Math.min(h, outH); r++) {

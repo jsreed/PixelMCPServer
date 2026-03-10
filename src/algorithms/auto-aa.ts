@@ -17,8 +17,8 @@ type Grid = number[][];
 /** 4-connected neighbor offsets as [dy, dx]. */
 const ORTHO: readonly [number, number][] = [
   [-1, 0], // N
-  [0, 1],  // E
-  [1, 0],  // S
+  [0, 1], // E
+  [1, 0], // S
   [0, -1], // W
 ];
 
@@ -30,9 +30,9 @@ const ORTHO: readonly [number, number][] = [
  *   where neighborA_idx / neighborB_idx index into ORTHO.
  */
 const L_SHAPES: readonly [number, number, number, number][] = [
-  [0, 1, -1, 1],  // N + E  → NE diagonal
-  [1, 2, 1, 1],   // E + S  → SE diagonal
-  [2, 3, 1, -1],  // S + W  → SW diagonal
+  [0, 1, -1, 1], // N + E  → NE diagonal
+  [1, 2, 1, 1], // E + S  → SE diagonal
+  [2, 3, 1, -1], // S + W  → SW diagonal
   [3, 0, -1, -1], // W + N  → NW diagonal
 ];
 
