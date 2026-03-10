@@ -360,8 +360,8 @@ Visual preview resources for human users (not required for LLM operation — the
 
 #### 4.1.3 Layer View
 
-- [ ] **4.1.3.1** **`pixel://view/asset/{name}/layer/{layer_id}`** — render a single layer at frame 0 in isolation: resolve cel (including linked cels), convert palette indices to RGBA, encode as PNG. Non-image layers return an error or empty image.
-- [ ] **4.1.3.2** **`pixel://view/asset/{name}/layer/{layer_id}/{frame_index}`** — same as above for a specific frame. Validate layer ID exists and frame index in bounds.
+- [x] **4.1.3.1** **`pixel://view/asset/{name}/layer/{layer_id}`** — render a single layer at frame 0 in isolation: resolve cel (including linked cels), convert palette indices to RGBA, encode as PNG. Non-image layers return an error or empty image.
+- [x] **4.1.3.2** **`pixel://view/asset/{name}/layer/{layer_id}/{frame_index}`** — same as above for a specific frame. Validate layer ID exists and frame index in bounds.
 
 #### 4.1.4 Animation View
 

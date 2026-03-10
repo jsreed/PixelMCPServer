@@ -205,6 +205,107 @@ describe('MCP Resources', () => {
       }
     });
 
+    it('returns a valid PNG blob for a specific layer at frame 0', async () => {
+      const layerTemplate = registered.find((r) => r.name === 'layer_view');
+      expect(layerTemplate).toBeDefined();
+      if (!layerTemplate) throw new Error('No layer_view template');
+
+      const response = await layerTemplate.readCallback(
+        new URL('pixel://view/asset/hero/layer/1'),
+        {
+          name: 'hero',
+          layer_id: '1',
+        },
+      );
+
+      expect(response.contents).toHaveLength(1);
+      const content = response.contents[0];
+      if ('mimeType' in content) {
+        expect(content.mimeType).toBe('image/png');
+      }
+      if ('blob' in content) {
+        expect(content.blob).toBeDefined();
+        expect(typeof content.blob).toBe('string');
+        expect(content.blob.length).toBeGreaterThan(100);
+      }
+    });
+
+    it('returns a valid PNG blob for a specific layer at a specific frame', async () => {
+      const layerFrameTemplate = registered.find((r) => r.name === 'layer_frame_view');
+      expect(layerFrameTemplate).toBeDefined();
+      if (!layerFrameTemplate) throw new Error('No layer_frame_view template');
+
+      const response = await layerFrameTemplate.readCallback(
+        new URL('pixel://view/asset/hero/layer/1/1'),
+        {
+          name: 'hero',
+          layer_id: '1',
+          frame_index: '1',
+        },
+      );
+
+      expect(response.contents).toHaveLength(1);
+      const content = response.contents[0];
+      if ('mimeType' in content) {
+        expect(content.mimeType).toBe('image/png');
+      }
+      if ('blob' in content) {
+        expect(content.blob).toBeDefined();
+        expect(typeof content.blob).toBe('string');
+        expect(content.blob.length).toBeGreaterThan(100);
+      }
+    });
+
+    it('returns a 1x1 transparent PNG for non-image/tilemap layers', async () => {
+      const layerTemplate = registered.find((r) => r.name === 'layer_view');
+      if (!layerTemplate) throw new Error('No layer_view template');
+
+      const workspace = WorkspaceClass.instance();
+      const hero = workspace.loadedAssets.get('hero');
+      hero?.addLayer({ name: 'Shapes', type: 'shape', visible: true, opacity: 255 });
+      const newLayerId = hero?.layers.find((l) => l.type === 'shape')?.id.toString() ?? '2';
+
+      const response = await layerTemplate.readCallback(
+        new URL(`pixel://view/asset/hero/layer/${newLayerId}`),
+        {
+          name: 'hero',
+          layer_id: newLayerId,
+        },
+      );
+
+      expect(response.contents).toHaveLength(1);
+      const content = response.contents[0];
+      expect(content.mimeType).toBe('image/png');
+      if ('blob' in content) {
+        expect(content.blob).toBe(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+        );
+      }
+    });
+
+    it('throws error for invalid layer', () => {
+      const layerTemplate = registered.find((r) => r.name === 'layer_view');
+      if (!layerTemplate) throw new Error('no layer_view template');
+      expect(() =>
+        layerTemplate.readCallback(new URL('pixel://view/asset/hero/layer/999'), {
+          name: 'hero',
+          layer_id: '999',
+        }),
+      ).toThrow('Layer 999 does not exist');
+    });
+
+    it('throws error for out of bounds frame in layer view', () => {
+      const layerFrameTemplate = registered.find((r) => r.name === 'layer_frame_view');
+      if (!layerFrameTemplate) throw new Error('no layer_frame_view template');
+      expect(() =>
+        layerFrameTemplate.readCallback(new URL('pixel://view/asset/hero/layer/1/99'), {
+          name: 'hero',
+          layer_id: '1',
+          frame_index: '99',
+        }),
+      ).toThrow('Frame 99 is out of range');
+    });
+
     it('throws error for invalid asset', () => {
       const assetTemplate = registered.find((r) => r.name === 'asset_view');
       if (!assetTemplate) throw new Error('no assetTemplate');

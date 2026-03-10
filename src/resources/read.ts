@@ -1,7 +1,8 @@
 import { type ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import { getWorkspace } from '../classes/workspace.js';
+import { type AssetClass } from '../classes/asset.js';
 import { PNG } from 'pngjs';
-import { compositeFrame } from '../algorithms/composite.js';
+import { compositeFrame, type CompositeLayer } from '../algorithms/composite.js';
 import { buildCompositeLayers, buildPaletteMap } from '../utils/render.js';
 
 const TRANSPARENT_1X1_PNG_B64 =
@@ -99,22 +100,87 @@ function renderAssetFrameView(
   };
 }
 
-function renderLayerView(
-  _route: Extract<ResourceRoute, { type: 'layer' }>,
+function renderLayerInternal(
+  asset: AssetClass,
+  layerId: number,
+  frameIndex: number,
   uri: URL,
-): ReadResourceResult | Promise<ReadResourceResult> {
+): ReadResourceResult {
+  const compLayers = buildCompositeLayers(asset);
+
+  const findCompLayer = (layers: CompositeLayer[], id: number): CompositeLayer | undefined => {
+    for (const l of layers) {
+      if (l.id === id) return l;
+      if (l.children) {
+        const found = findCompLayer(l.children, id);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  };
+
+  const compLayer = findCompLayer(compLayers, layerId);
+  if (!compLayer) {
+    throw new Error(`Layer ${String(layerId)} does not exist`);
+  }
+
+  if (compLayer.type !== 'image' && compLayer.type !== 'tilemap') {
+    return {
+      contents: [{ uri: uri.toString(), mimeType: 'image/png', blob: TRANSPARENT_1X1_PNG_B64 }],
+    };
+  }
+
+  const isolatedLayer: CompositeLayer = {
+    ...compLayer,
+    visible: true,
+    opacity: 255,
+  };
+
+  const buffer = compositeFrame(
+    asset.width,
+    asset.height,
+    [isolatedLayer],
+    buildPaletteMap(asset.palette),
+    frameIndex,
+  );
+
+  const png = new PNG({ width: asset.width, height: asset.height });
+  png.data = Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  const pngBuffer = PNG.sync.write(png);
+
   return {
-    contents: [{ uri: uri.toString(), mimeType: 'image/png', blob: TRANSPARENT_1X1_PNG_B64 }],
+    contents: [{ uri: uri.toString(), mimeType: 'image/png', blob: pngBuffer.toString('base64') }],
   };
 }
 
-function renderLayerFrameView(
-  _route: Extract<ResourceRoute, { type: 'layer_frame' }>,
+function renderLayerView(
+  route: Extract<ResourceRoute, { type: 'layer' }>,
   uri: URL,
 ): ReadResourceResult | Promise<ReadResourceResult> {
-  return {
-    contents: [{ uri: uri.toString(), mimeType: 'image/png', blob: TRANSPARENT_1X1_PNG_B64 }],
-  };
+  const workspace = getWorkspace();
+  const asset = workspace.loadedAssets.get(route.name);
+  if (!asset) {
+    throw new Error(`Asset '${route.name}' is not loaded`);
+  }
+
+  return renderLayerInternal(asset, route.layerId, 0, uri);
+}
+
+function renderLayerFrameView(
+  route: Extract<ResourceRoute, { type: 'layer_frame' }>,
+  uri: URL,
+): ReadResourceResult | Promise<ReadResourceResult> {
+  const workspace = getWorkspace();
+  const asset = workspace.loadedAssets.get(route.name);
+  if (!asset) {
+    throw new Error(`Asset '${route.name}' is not loaded`);
+  }
+
+  if (route.frameIndex < 0 || route.frameIndex >= asset.frames.length) {
+    throw new Error(`Frame ${String(route.frameIndex)} is out of range`);
+  }
+
+  return renderLayerInternal(asset, route.layerId, route.frameIndex, uri);
 }
 
 function renderAnimationView(
