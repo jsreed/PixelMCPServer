@@ -4,6 +4,7 @@ import { getWorkspace } from '../classes/workspace.js';
 import { requireAsset, isError } from './asset.js';
 import { CelWriteCommand } from '../commands/cel-write-command.js';
 import * as errors from '../errors.js';
+import { createResourceLink } from '../utils/resource-link.js';
 
 /**
  * Zod schema for selection tool.
@@ -169,6 +170,10 @@ export function registerSelectionTool(server: McpServer): void {
                   message: `Pasted clipboard to layer ${String(layerId)} frame ${String(frameIndex)} at (${String(pasteX)}, ${String(pasteY)}).`,
                 }),
               },
+              createResourceLink(
+                targetAsset,
+                `pixel://view/asset/${targetAsset}/layer/${String(layerId)}/${String(frameIndex)}`,
+              ),
             ],
           };
         } catch (e: unknown) {
@@ -451,6 +456,10 @@ export function registerSelectionTool(server: McpServer): void {
                 type: 'text' as const,
                 text: JSON.stringify({ message: 'Cut to clipboard.' }),
               },
+              createResourceLink(
+                assetName,
+                `pixel://view/asset/${assetName}/layer/${String(layerId)}/${String(frameIndex)}`,
+              ),
             ],
           };
         }

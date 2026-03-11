@@ -13,6 +13,7 @@ import {
   shift,
   type Grid,
 } from '../algorithms/transform.js';
+import { createResourceLink } from '../utils/resource-link.js';
 
 // ---------------------------------------------------------------------------
 // Zod Schema
@@ -269,6 +270,10 @@ export function registerTransformTool(server: McpServer): void {
               message: `Applied ${String(args.operations.length)} transform operations.`,
             }),
           },
+          createResourceLink(
+            assetName,
+            `pixel://view/asset/${assetName}/layer/${String(layerId)}/${String(frameIndex)}`,
+          ),
         ],
       };
     },

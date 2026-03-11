@@ -7,6 +7,7 @@ import { bresenhamLine } from '../algorithms/bresenham.js';
 import { midpointCircle, midpointEllipse } from '../algorithms/midpoint.js';
 import { floodFill } from '../algorithms/flood-fill.js';
 import { isoToPixel, isoFillRhombus } from '../algorithms/isometric.js';
+import { createResourceLink } from '../utils/resource-link.js';
 
 // ---------------------------------------------------------------------------
 // Zod Schema
@@ -492,6 +493,10 @@ export function registerDrawTool(server: McpServer): void {
               message: `Applied ${String(args.operations.length)} drawing operations.`,
             }),
           },
+          createResourceLink(
+            assetName,
+            `pixel://view/asset/${assetName}/layer/${String(layerId)}/${String(frameIndex)}`,
+          ),
         ],
       };
     },

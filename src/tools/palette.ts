@@ -6,6 +6,7 @@ import { loadPaletteFile, savePaletteFile } from '../io/palette-io.js';
 import * as errors from '../errors.js';
 import * as path from 'node:path';
 import { type Color } from '../types/palette.js';
+import { createResourceLink } from '../utils/resource-link.js';
 
 /**
  * Zod input schema for the `palette` tool.
@@ -151,6 +152,7 @@ function handleSet(
         type: 'text' as const,
         text: JSON.stringify({ message: `Palette index ${String(index)} set.` }),
       },
+      createResourceLink(asset.name, `pixel://view/palette/${asset.name}`),
     ],
   };
 }
@@ -183,6 +185,7 @@ function handleSetBulk(
         type: 'text' as const,
         text: JSON.stringify({ message: `${String(entries.length)} palette entries set.` }),
       },
+      createResourceLink(asset.name, `pixel://view/palette/${asset.name}`),
     ],
   };
 }
@@ -214,6 +217,7 @@ function handleSwap(
           message: `Swapped palette indices ${String(index)} and ${String(index2)}.`,
         }),
       },
+      createResourceLink(asset.name, `pixel://view/palette/${asset.name}`),
     ],
   };
 }
@@ -245,6 +249,7 @@ function handleGenerateRamp(
           message: `Ramp generated from index ${String(color1)} to ${String(color2)}.`,
         }),
       },
+      createResourceLink(asset.name, `pixel://view/palette/${asset.name}`),
     ],
   };
 }
@@ -302,6 +307,7 @@ async function handleLoad(workspace: Workspace, asset: Asset, filePath: string |
           name: paletteData.name,
         }),
       },
+      createResourceLink(asset.name, `pixel://view/palette/${asset.name}`),
     ],
   };
 }
@@ -390,6 +396,7 @@ async function handleFetchLospec(workspace: Workspace, asset: Asset, slug: strin
           color_count: data.colors.length,
         }),
       },
+      createResourceLink(asset.name, `pixel://view/palette/${asset.name}`),
     ],
   };
 }

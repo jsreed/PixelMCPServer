@@ -8,6 +8,7 @@ import { checkerboard, noise, orderedDither, errorDiffusion } from '../algorithm
 import { generateOutline, cleanupOrphans } from '../algorithms/outline.js';
 import { autoAntiAlias } from '../algorithms/auto-aa.js';
 import { subpixelShift, smearFrame } from '../algorithms/motion.js';
+import { createResourceLink } from '../utils/resource-link.js';
 
 // ---------------------------------------------------------------------------
 // Zod Schema
@@ -250,6 +251,10 @@ export function registerEffectTool(server: McpServer): void {
               message: `Applied ${String(args.operations.length)} effect operations.`,
             }),
           },
+          createResourceLink(
+            assetName,
+            `pixel://view/asset/${assetName}/layer/${String(layerId)}/${String(frameIndex)}`,
+          ),
         ],
       };
     },

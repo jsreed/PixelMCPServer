@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { type McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { getWorkspace } from '../classes/workspace.js';
 import * as errors from '../errors.js';
+import { createResourceLink } from '../utils/resource-link.js';
 import { TilesetCommand } from '../commands/tileset-command.js';
 import { getCanonicalSlots, assignPeeringBits } from '../algorithms/autotile.js';
 import { isoToPixel } from '../algorithms/isometric.js';
@@ -176,6 +177,7 @@ export function registerTilesetTool(server: McpServer): void {
                   slot_index: (asset.tile_count ?? 1) - 1,
                 }),
               },
+              createResourceLink(assetName, `pixel://view/tileset/${assetName}`),
             ],
           };
         }
@@ -285,6 +287,7 @@ export function registerTilesetTool(server: McpServer): void {
           return {
             content: [
               { type: 'text', text: JSON.stringify({ message: 'Tile placed successfully' }) },
+              createResourceLink(assetName, `pixel://view/tileset/${assetName}`),
             ],
           };
         }
@@ -347,6 +350,7 @@ export function registerTilesetTool(server: McpServer): void {
                   missing_slots: missing,
                 }),
               },
+              createResourceLink(assetName, `pixel://view/tileset/${assetName}`),
             ],
           };
         }

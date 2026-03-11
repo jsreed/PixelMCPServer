@@ -379,13 +379,13 @@ Visual preview resources for human users (not required for LLM operation — the
 
 Retrofit existing mutation tool handlers to include relevant `pixel://` URIs in their response content, so clients that support resources can render inline previews.
 
-- [ ] **4.1.7.1** **`draw` tool** — append `pixel://view/asset/{name}/layer/{layer_id}/{frame_index}` after successful draw operations.
-- [ ] **4.1.7.2** **`transform` tool** — append `pixel://view/asset/{name}/layer/{layer_id}/{frame_index}` after successful transform operations.
-- [ ] **4.1.7.3** **`effect` tool** — append `pixel://view/asset/{name}/layer/{layer_id}/{frame_index}` after successful effect operations.
-- [ ] **4.1.7.4** **`palette` tool** — append `pixel://view/palette/{name}` after palette mutations (`set`, `set_bulk`, `swap`, `load`, `fetch_lospec`, `generate_ramp`).
-- [ ] **4.1.7.5** **`asset` tool** — append `pixel://view/asset/{name}` after structural mutations (`create`, `resize`, `add_layer`, `remove_layer`, `add_frame`, `remove_frame`).
-- [ ] **4.1.7.6** **`tileset` tool** — append `pixel://view/tileset/{name}` after tileset mutations (`extract_tile`, `place_tile`, `autotile_generate`).
-- [ ] **4.1.7.7** **`selection` tool** — append `pixel://view/asset/{name}/layer/{layer_id}/{frame_index}` after `paste` and `cut` operations.
+- [x] **4.1.7.1** **`draw` tool** — append `pixel://view/asset/{name}/layer/{layer_id}/{frame_index}` after successful draw operations.
+- [x] **4.1.7.2** **`transform` tool** — append `pixel://view/asset/{name}/layer/{layer_id}/{frame_index}` after successful transform operations.
+- [x] **4.1.7.3** **`effect` tool** — append `pixel://view/asset/{name}/layer/{layer_id}/{frame_index}` after successful effect operations.
+- [x] **4.1.7.4** **`palette` tool** — append `pixel://view/palette/{name}` after palette mutations (`set`, `set_bulk`, `swap`, `load`, `fetch_lospec`, `generate_ramp`).
+- [x] **4.1.7.5** **`asset` tool** — append `pixel://view/asset/{name}` after structural mutations (`create`, `resize`, `add_layer`, `remove_layer`, `add_frame`, `remove_frame`).
+- [x] **4.1.7.6** **`tileset` tool** — append `pixel://view/tileset/{name}` after tileset mutations (`extract_tile`, `place_tile`, `autotile_generate`).
+- [x] **4.1.7.7** **`selection` tool** — append `pixel://view/asset/{name}/layer/{layer_id}/{frame_index}` after `paste` and `cut` operations.
 
 #### 4.1.8 Resource Tests
 

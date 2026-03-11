@@ -15,6 +15,7 @@ import { marchingSquares, simplifyOrthogonal } from '../algorithms/marching-squa
 import { simplifyPolygon } from '../algorithms/ramer-douglas-peucker.js';
 import { detectBanding } from '../algorithms/banding.js';
 import * as errors from '../errors.js';
+import { createResourceLink } from '../utils/resource-link.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { type Asset, type Perspective, type Anchor } from '../types/asset.js';
@@ -289,6 +290,15 @@ function ok(data: object) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] };
 }
 
+function okWithAssetLink(data: object, assetName: string) {
+  return {
+    content: [
+      { type: 'text' as const, text: JSON.stringify(data) },
+      createResourceLink(assetName, `pixel://view/asset/${assetName}`),
+    ],
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Read-only actions
 // ---------------------------------------------------------------------------
@@ -525,7 +535,7 @@ async function handleCreate(workspace: Workspace, args: Record<string, unknown>)
   // Load into workspace
   workspace.loadedAssets.set(name, asset);
 
-  return ok({ message: `Asset '${name}' created.`, path: filePath });
+  return okWithAssetLink({ message: `Asset '${name}' created.`, path: filePath }, name);
 }
 
 function handleRename(
@@ -759,9 +769,10 @@ function handleResize(
     return errors.domainError(e instanceof Error ? e.message : String(e));
   }
 
-  return ok({
-    message: `Asset '${assetName as string}' resized to ${String(width)}x${String(height)}.`,
-  });
+  return okWithAssetLink(
+    { message: `Asset '${assetName as string}' resized to ${String(width)}x${String(height)}.` },
+    assetName as string,
+  );
 }
 
 function handleAddLayer(workspace: Workspace, args: Record<string, unknown>) {
@@ -791,7 +802,10 @@ function handleAddLayer(workspace: Workspace, args: Record<string, unknown>) {
     return errors.domainError(e instanceof Error ? e.message : String(e));
   }
 
-  return ok({ message: `Layer '${args.name as string}' added.`, layer_id: newId });
+  return okWithAssetLink(
+    { message: `Layer '${args.name as string}' added.`, layer_id: newId },
+    args.asset_name as string,
+  );
 }
 
 function handleAddGroup(
@@ -837,7 +851,7 @@ function handleRemoveLayer(
     return errors.domainError(e instanceof Error ? e.message : String(e));
   }
 
-  return ok({ message: `Layer ${String(layerId)} removed.` });
+  return okWithAssetLink({ message: `Layer ${String(layerId)} removed.` }, assetName as string);
 }
 
 function handleReorderLayer(
@@ -889,7 +903,10 @@ function handleAddFrame(
     return errors.domainError(e instanceof Error ? e.message : String(e));
   }
 
-  return ok({ message: `Frame added at index ${String(insertedAt)}.`, frame_index: insertedAt });
+  return okWithAssetLink(
+    { message: `Frame added at index ${String(insertedAt)}.`, frame_index: insertedAt },
+    assetName as string,
+  );
 }
 
 function handleRemoveFrame(
@@ -911,7 +928,7 @@ function handleRemoveFrame(
     return errors.domainError(e instanceof Error ? e.message : String(e));
   }
 
-  return ok({ message: `Frame ${String(frameIndex)} removed.` });
+  return okWithAssetLink({ message: `Frame ${String(frameIndex)} removed.` }, assetName as string);
 }
 
 function handleSetFrameDuration(
