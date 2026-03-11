@@ -825,7 +825,7 @@ export class AssetClass {
     if (patch.cels) this._data.cels = JSON.parse(JSON.stringify(patch.cels)) as Record<string, Cel>;
     if (patch.width !== undefined) this._data.width = patch.width;
     if (patch.height !== undefined) this._data.height = patch.height;
-    if (patch.tile_count !== undefined) this._data.tile_count = patch.tile_count;
+    if ('tile_count' in patch) this._data.tile_count = patch.tile_count;
     if ('tile_physics' in patch)
       this._data.tile_physics = patch.tile_physics
         ? (JSON.parse(JSON.stringify(patch.tile_physics)) as TilePhysics)

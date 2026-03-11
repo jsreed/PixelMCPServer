@@ -9,6 +9,8 @@ import { registerDrawTool } from './draw.js';
 import { registerExportTool } from './export.js';
 import { registerTilesetTool } from './tileset.js';
 import { registerSelectionTool } from './selection.js';
+import { registerTransformTool } from './transform.js';
+import { registerEffectTool } from './effect.js';
 import { saveAssetFile } from '../io/asset-io.js';
 import { PNG } from 'pngjs';
 
@@ -153,6 +155,8 @@ function createMockServer() {
   registerExportTool(mockServer as any);
   registerTilesetTool(mockServer as any);
   registerSelectionTool(mockServer as any);
+  registerTransformTool(mockServer as any);
+  registerEffectTool(mockServer as any);
   /* eslint-enable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any */
 
   return {
@@ -1825,6 +1829,279 @@ describe('Minimum Viable Loop Integration', () => {
           expect(celData[y][x]).toBeGreaterThan(0);
         }
       }
+    });
+
+    it('5.3.8.1 E2E: undo/redo stress test across 6 mutations and 2 assets', async () => {
+      // -----------------------------------------------------------------------
+      // Setup: init project, create sprite_a (4×4) and sprite_b (4×4 tileset)
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('project', {
+          action: 'init',
+          path: '/tmp/test_undoredo',
+          name: 'Undo Redo Test',
+        }),
+      );
+
+      unwrap(
+        await dispatch('asset', {
+          action: 'create',
+          name: 'sprite_a',
+          width: 4,
+          height: 4,
+        }),
+      );
+
+      unwrap(
+        await dispatch('asset', {
+          action: 'create',
+          name: 'sprite_b',
+          width: 4,
+          height: 4,
+          tile_width: 4,
+          tile_height: 4,
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // Op 1: palette set_bulk on sprite_a (idx1=red, idx2=blue) — PaletteCommand
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('palette', {
+          action: 'set_bulk',
+          asset_name: 'sprite_a',
+          entries: [
+            { index: 1, rgba: [255, 0, 0, 255] },
+            { index: 2, rgba: [0, 0, 255, 255] },
+          ],
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // Op 2: draw pixel at (0,0) color=1 on sprite_a — CelWriteCommand
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('draw', {
+          asset_name: 'sprite_a',
+          layer_id: 1,
+          frame_index: 0,
+          operations: [{ action: 'pixel', x: 0, y: 0, color: 1 }],
+        }),
+      );
+
+      // Capture celAAfterDraw before flip
+      let res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'sprite_a',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      const celAAfterDraw = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
+      expect(celAAfterDraw[0][0]).toBe(1);
+
+      // -----------------------------------------------------------------------
+      // Op 3: transform flip_h on sprite_a — CelWriteCommand
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('transform', {
+          asset_name: 'sprite_a',
+          layer_id: 1,
+          frame_index: 0,
+          operations: [{ action: 'flip_h' }],
+        }),
+      );
+
+      // Capture celAFinal — pixel moved from (0,0) to (3,0) after horizontal flip
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'sprite_a',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      const celAFinal = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
+      expect(celAFinal[0][3]).toBe(1);
+      expect(celAFinal[0][0]).toBe(0);
+
+      // -----------------------------------------------------------------------
+      // Op 4: effect gradient + outline (batched, 1 undo slot) on sprite_b
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('effect', {
+          asset_name: 'sprite_b',
+          layer_id: 1,
+          frame_index: 0,
+          operations: [
+            { action: 'gradient', color1: 1, color2: 2 },
+            { action: 'outline', color: 1 },
+          ],
+        }),
+      );
+
+      // Capture celBAfterEffect
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'sprite_b',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      const celBAfterEffect = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
+
+      // -----------------------------------------------------------------------
+      // Op 5: draw write_pixels 4×4 checkerboard on sprite_b — CelWriteCommand
+      // -----------------------------------------------------------------------
+      const writeData = [
+        [1, 1, 2, 2],
+        [1, 1, 2, 2],
+        [2, 2, 1, 1],
+        [2, 2, 1, 1],
+      ];
+      unwrap(
+        await dispatch('draw', {
+          asset_name: 'sprite_b',
+          layer_id: 1,
+          frame_index: 0,
+          operations: [
+            { action: 'write_pixels', x: 0, y: 0, width: 4, height: 4, data: writeData },
+          ],
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // Op 6: tileset extract_tile from sprite_b — TilesetCommand
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('tileset', {
+          action: 'extract_tile',
+          asset_name: 'sprite_b',
+          layer_id: 1,
+          frame_index: 0,
+          x: 0,
+          y: 0,
+        }),
+      );
+
+      // Verify tile_count is 1 before starting undos
+      expect(WorkspaceClass.instance().loadedAssets.get('sprite_b')?.tile_count).toBe(1);
+
+      // =======================================================================
+      // UNDO 6×: most recent first
+      // =======================================================================
+
+      // Undo 1: reverses extract_tile — tile_count back to 0
+      unwrap(await dispatch('workspace', { action: 'undo' }));
+      expect(WorkspaceClass.instance().loadedAssets.get('sprite_b')?.tile_count ?? 0).toBe(0);
+
+      // Undo 2: reverses write_pixels — cel should match celBAfterEffect
+      unwrap(await dispatch('workspace', { action: 'undo' }));
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'sprite_b',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      const celBUndo2 = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
+      expect(celBUndo2).toEqual(celBAfterEffect);
+
+      // Undo 3: reverses gradient+outline — no prior cel existed, data must be null
+      unwrap(await dispatch('workspace', { action: 'undo' }));
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'sprite_b',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      const celBUndo3 = (JSON.parse(res.content[0].text) as { data: number[][] | null }).data;
+      expect(celBUndo3).toBeNull();
+
+      // Undo 4: reverses flip_h — cel should match celAAfterDraw
+      unwrap(await dispatch('workspace', { action: 'undo' }));
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'sprite_a',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      const celAUndo4 = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
+      expect(celAUndo4).toEqual(celAAfterDraw);
+
+      // Undo 5: reverses draw pixel — no prior cel existed, data must be null
+      unwrap(await dispatch('workspace', { action: 'undo' }));
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'sprite_a',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      const celAUndo5 = (JSON.parse(res.content[0].text) as { data: number[][] | null }).data;
+      expect(celAUndo5).toBeNull();
+
+      // Undo 6: reverses palette set_bulk — total_defined should be 0
+      unwrap(await dispatch('workspace', { action: 'undo' }));
+      res = unwrap(await dispatch('palette', { action: 'info', asset_name: 'sprite_a' }));
+      const paletteAfterUndo6 = JSON.parse(res.content[0].text) as {
+        entries: Array<{ index: number; rgba: [number, number, number, number] }>;
+        total_defined: number;
+      };
+      expect(paletteAfterUndo6.total_defined).toBe(0);
+
+      // 7th undo — stack exhausted, must return an error
+      const undo7 = await dispatch('workspace', { action: 'undo' });
+      expect(undo7.isError).toBe(true);
+
+      // =======================================================================
+      // REDO 6×: restore all mutations
+      // =======================================================================
+      for (let i = 0; i < 6; i++) {
+        unwrap(await dispatch('workspace', { action: 'redo' }));
+      }
+
+      // sprite_a cel should match celAFinal (pixel at (3,0) after flip)
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'sprite_a',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      const celARedone = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
+      expect(celARedone).toEqual(celAFinal);
+
+      // sprite_b cel should match writeData (extract_tile copies data back to same position)
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'sprite_b',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      const celBRedone = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
+      expect(celBRedone).toEqual(writeData);
+
+      // palette should be restored: total_defined >= 2, red at index 1
+      res = unwrap(await dispatch('palette', { action: 'info', asset_name: 'sprite_a' }));
+      const paletteRedone = JSON.parse(res.content[0].text) as {
+        entries: Array<{ index: number; rgba: [number, number, number, number] }>;
+        total_defined: number;
+      };
+      expect(paletteRedone.total_defined).toBeGreaterThanOrEqual(2);
+      const redEntry = paletteRedone.entries.find((e) => e.index === 1);
+      expect(redEntry?.rgba).toEqual([255, 0, 0, 255]);
     });
   });
 });

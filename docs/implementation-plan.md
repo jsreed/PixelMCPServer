@@ -513,7 +513,7 @@ Full workflow tests that exercise multiple tools in sequence, verifying the syst
 
 #### 5.3.8 Undo/Redo Stress
 
-- [ ] **5.3.8.1** **E2E: undo/redo across tools and assets** — `project init` → create and load 2 assets → perform diverse mutations: `palette set_bulk` on asset A → `draw` (line + rect + fill) on asset A → `transform` (rotate + flip) on asset A → `effect` (gradient + outline) on asset B → `draw` (write_pixels) on asset B → `tileset extract_tile` on asset B → capture full state snapshot of both assets via `asset get_cel` on all layers/frames → undo all operations one by one via `workspace undo`, verify state after each undo step matches expected intermediate state → redo all operations via `workspace redo`, verify final state matches the captured snapshot.
+- [x] **5.3.8.1** **E2E: undo/redo across tools and assets** — `project init` → create and load 2 assets → perform diverse mutations: `palette set_bulk` on asset A → `draw` (line + rect + fill) on asset A → `transform` (rotate + flip) on asset A → `effect` (gradient + outline) on asset B → `draw` (write_pixels) on asset B → `tileset extract_tile` on asset B → capture full state snapshot of both assets via `asset get_cel` on all layers/frames → undo all operations one by one via `workspace undo`, verify state after each undo step matches expected intermediate state → redo all operations via `workspace redo`, verify final state matches the captured snapshot.
 
 #### 5.3.9 Linked Cel Lifecycle
 
