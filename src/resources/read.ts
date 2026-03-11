@@ -333,10 +333,123 @@ function renderPaletteView(
 }
 
 function renderTilesetView(
-  _route: Extract<ResourceRoute, { type: 'tileset' }>,
+  route: Extract<ResourceRoute, { type: 'tileset' }>,
   uri: URL,
 ): ReadResourceResult | Promise<ReadResourceResult> {
+  const workspace = getWorkspace();
+  const asset = workspace.loadedAssets.get(route.name);
+  if (!asset) {
+    throw new Error(`Asset '${route.name}' is not loaded`);
+  }
+
+  if (
+    asset.tile_width === undefined ||
+    asset.tile_height === undefined ||
+    asset.tile_count === undefined
+  ) {
+    throw new Error(`Asset '${route.name}' is not a tileset`);
+  }
+
+  const tw = asset.tile_width;
+  const th = asset.tile_height;
+  const count = asset.tile_count;
+
+  if (count === 0) {
+    return {
+      contents: [{ uri: uri.toString(), mimeType: 'image/png', blob: TRANSPARENT_1X1_PNG_B64 }],
+    };
+  }
+
+  const cols = Math.ceil(Math.sqrt(count));
+  const rows = Math.ceil(count / cols);
+
+  const outWidth = cols * tw + Math.max(0, cols - 1);
+  const outHeight = rows * th + Math.max(0, rows - 1);
+
+  const png = new PNG({ width: outWidth, height: outHeight });
+
+  // Pre-fill with checkerboard and grid lines
+  for (let y = 0; y < outHeight; y++) {
+    for (let x = 0; x < outWidth; x++) {
+      const outIdx = (outWidth * y + x) << 2;
+
+      // Check if we are on a grid line
+      const isGridCol = x % (tw + 1) === tw;
+      const isGridRow = y % (th + 1) === th;
+
+      if (isGridCol || isGridRow) {
+        png.data[outIdx] = 128; // R
+        png.data[outIdx + 1] = 128; // G
+        png.data[outIdx + 2] = 128; // B
+        png.data[outIdx + 3] = 255; // A
+      } else {
+        // Checkerboard
+        const checkerSize = 4;
+        const isCheckerDark = (Math.floor(x / checkerSize) + Math.floor(y / checkerSize)) % 2 === 0;
+        const bg = isCheckerDark ? 204 : 255;
+        png.data[outIdx] = bg;
+        png.data[outIdx + 1] = bg;
+        png.data[outIdx + 2] = bg;
+        png.data[outIdx + 3] = 255;
+      }
+    }
+  }
+
+  // Composite frame 0 (tileset layers are typically laid out on frame 0)
+  const buffer = compositeFrame(
+    asset.width,
+    asset.height,
+    buildCompositeLayers(asset),
+    buildPaletteMap(asset.palette),
+    0,
+  );
+
+  // Copy tiles into grid
+  for (let i = 0; i < count; i++) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+
+    const dstX = col * (tw + 1);
+    const dstY = row * (th + 1);
+
+    const srcX = i * tw;
+    const srcY = 0; // Tiles are stored horizontally in the asset's image layer
+
+    for (let y = 0; y < th; y++) {
+      for (let x = 0; x < tw; x++) {
+        const sx = srcX + x;
+        const sy = srcY + y;
+
+        if (sx >= asset.width || sy >= asset.height) continue;
+
+        const srcIdx = (sy * asset.width + sx) << 2;
+        const r = buffer[srcIdx];
+        const g = buffer[srcIdx + 1];
+        const b = buffer[srcIdx + 2];
+        const a = buffer[srcIdx + 3];
+
+        if (a > 0) {
+          const dx = dstX + x;
+          const dy = dstY + y;
+          const outIdx = (outWidth * dy + dx) << 2;
+
+          const alpha = a / 255;
+          const bgR = png.data[outIdx];
+          const bgG = png.data[outIdx + 1];
+          const bgB = png.data[outIdx + 2];
+
+          png.data[outIdx] = Math.round(r * alpha + bgR * (1 - alpha));
+          png.data[outIdx + 1] = Math.round(g * alpha + bgG * (1 - alpha));
+          png.data[outIdx + 2] = Math.round(b * alpha + bgB * (1 - alpha));
+          png.data[outIdx + 3] = 255; // Over checkerboard is always opaque
+        }
+      }
+    }
+  }
+
+  const pngBuffer = PNG.sync.write(png);
+
   return {
-    contents: [{ uri: uri.toString(), mimeType: 'image/png', blob: TRANSPARENT_1X1_PNG_B64 }],
+    contents: [{ uri: uri.toString(), mimeType: 'image/png', blob: pngBuffer.toString('base64') }],
   };
 }

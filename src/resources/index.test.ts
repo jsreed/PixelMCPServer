@@ -429,5 +429,84 @@ describe('MCP Resources', () => {
         }),
       ).toThrow("Asset 'unknown' is not loaded");
     });
+
+    it('returns a valid PNG blob for a valid tileset URI', async () => {
+      const workspace = WorkspaceClass.instance();
+      const asset = new AssetClass({
+        name: 'tree',
+        width: 64, // 4 tiles wide
+        height: 16,
+        perspective: 'flat',
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 3, // 3 tiles total
+        palette: Array.from(
+          { length: 256 },
+          () => [0, 0, 0, 0] as [number, number, number, number],
+        ),
+        layers: [{ id: 1, type: 'image', name: 'Tile Map', visible: true, opacity: 255 }],
+        frames: [{ index: 0, duration_ms: 100 }],
+        tags: [],
+        cels: {
+          '1/0': {
+            x: 0,
+            y: 0,
+            data: Array.from({ length: 16 }, () => new Array<number>(64).fill(1)),
+          },
+        },
+      });
+      // Just set one color in palette so it's not transparent
+      asset.palette.set(1, [255, 0, 0, 255]);
+      workspace.loadedAssets.set('tree', asset);
+
+      const tilesetTemplate = registered.find((r) => r.name === 'tileset_view');
+      expect(tilesetTemplate).toBeDefined();
+      if (!tilesetTemplate) throw new Error('No tileset_view template');
+
+      const response = await tilesetTemplate.readCallback(new URL('pixel://view/tileset/tree'), {
+        name: 'tree',
+      });
+
+      expect(response.contents).toHaveLength(1);
+      const content = response.contents[0];
+      if ('mimeType' in content) {
+        expect(content.mimeType).toBe('image/png');
+      }
+      if ('blob' in content) {
+        expect(content.blob).toBeDefined();
+        expect(typeof content.blob).toBe('string');
+        const buffer = Buffer.from(content.blob, 'base64');
+        const png = PNG.sync.read(buffer);
+
+        // 3 tiles -> sqrt(3) ~ 1.732 -> 2 columns
+        // ceil(3 / 2) -> 2 rows
+        // width: 2 cols * 16px + 1px gap = 33
+        // height: 2 rows * 16px + 1px gap = 33
+        expect(png.width).toBe(33);
+        expect(png.height).toBe(33);
+      }
+    });
+
+    it('throws error for invalid asset in tileset view', () => {
+      const tilesetTemplate = registered.find((r) => r.name === 'tileset_view');
+      if (!tilesetTemplate) throw new Error('no tileset_view template');
+      expect(() =>
+        tilesetTemplate.readCallback(new URL('pixel://view/tileset/unknown'), {
+          name: 'unknown',
+        }),
+      ).toThrow("Asset 'unknown' is not loaded");
+    });
+
+    it('throws error for non-tileset asset in tileset view', () => {
+      const tilesetTemplate = registered.find((r) => r.name === 'tileset_view');
+      if (!tilesetTemplate) throw new Error('no tileset_view template');
+
+      // 'hero' is already mock-loaded but it lacks tile_width/height/count
+      expect(() =>
+        tilesetTemplate.readCallback(new URL('pixel://view/tileset/hero'), {
+          name: 'hero',
+        }),
+      ).toThrow("Asset 'hero' is not a tileset");
+    });
   });
 });

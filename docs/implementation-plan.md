@@ -369,11 +369,11 @@ Visual preview resources for human users (not required for LLM operation — the
 
 #### 4.1.5 Palette View
 
-- [ ] **4.1.5.1** **`pixel://view/palette/{name}`** — render the asset's palette as a swatch grid PNG. Layout: 16 columns × ceil(colorCount/16) rows, each swatch a fixed pixel size (e.g., 8×8 or 16×16). Transparent (index 0) rendered with a checkerboard background. Include index labels or distinguishing marks for empty vs. occupied slots.
+- [x] **4.1.5.1** **`pixel://view/palette/{name}`** — render the asset's palette as a swatch grid PNG. Layout: 16 columns × ceil(colorCount/16) rows, each swatch a fixed pixel size (e.g., 8×8 or 16×16). Transparent (index 0) rendered with a checkerboard background. Include index labels or distinguishing marks for empty vs. occupied slots.
 
 #### 4.1.6 Tileset View
 
-- [ ] **4.1.6.1** **`pixel://view/tileset/{name}`** — render all tile slots in a grid PNG. Layout: tiles arranged in rows of `ceil(sqrt(tile_count))` columns, each tile at `tile_width × tile_height`. Composite each tile slot's pixel data, convert to RGBA via palette. Draw 1px grid lines between tiles for visual separation. Validate asset has tileset fields (`tile_width`, `tile_height`, `tile_count`).
+- [x] **4.1.6.1** **`pixel://view/tileset/{name}`** — render all tile slots in a grid PNG. Layout: tiles arranged in rows of `ceil(sqrt(tile_count))` columns, each tile at `tile_width × tile_height`. Composite each tile slot's pixel data, convert to RGBA via palette. Draw 1px grid lines between tiles for visual separation. Validate asset has tileset fields (`tile_width`, `tile_height`, `tile_count`).
 
 #### 4.1.7 Resource Links in Tool Responses
 
