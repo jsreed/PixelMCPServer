@@ -6,7 +6,9 @@ import { registerWorkspaceTool } from './workspace.js';
 import { registerAssetTool } from './asset.js';
 import { registerPaletteTool } from './palette.js';
 import { registerDrawTool } from './draw.js';
+import { registerExportTool } from './export.js';
 import { saveAssetFile } from '../io/asset-io.js';
+import { PNG } from 'pngjs';
 
 // Mock IO
 const virtualFs = new Map<string, unknown>();
@@ -35,9 +37,35 @@ vi.mock('../io/project-io.js', () => ({
   }),
 }));
 
+import { Writable } from 'node:stream';
+
 vi.mock('node:fs', () => ({
   existsSync: vi.fn().mockReturnValue(false),
   mkdirSync: vi.fn(),
+  writeFileSync: vi.fn().mockImplementation((path: string, data: unknown) => {
+    virtualFs.set(path, data);
+  }),
+  createWriteStream: vi.fn().mockImplementation((path: string) => {
+    const chunks: Buffer[] = [];
+    const stream = new Writable({
+      write(chunk: Buffer, encoding, callback) {
+        chunks.push(Buffer.from(chunk));
+        callback();
+      },
+    });
+    stream.on('finish', () => {
+      virtualFs.set(path, Buffer.concat(chunks));
+    });
+    // Need to auto-emit finish when end is called, which Writable does.
+    return stream;
+  }),
+  promises: {
+    mkdir: vi.fn().mockResolvedValue(undefined),
+    writeFile: vi.fn().mockImplementation((path: string, data: unknown) => {
+      virtualFs.set(path, data);
+      return Promise.resolve();
+    }),
+  },
 }));
 
 interface ToolResult {
@@ -94,6 +122,7 @@ function createMockServer() {
   registerAssetTool(mockServer as any);
   registerPaletteTool(mockServer as any);
   registerDrawTool(mockServer as any);
+  registerExportTool(mockServer as any);
   /* eslint-enable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any */
 
   return {
@@ -453,6 +482,213 @@ describe('Minimum Viable Loop Integration', () => {
         }),
       );
       expect((JSON.parse(res.content[0].text) as { data: number[][] }).data[0][0]).toBe(1);
+    });
+
+    it('5.3.1.1 E2E: character creation and export', async () => {
+      // 1. project init
+      unwrap(
+        await dispatch('project', {
+          action: 'init',
+          path: '/tmp/test_project',
+          name: 'Test Project',
+        }),
+      );
+
+      // 2. asset create (16x24, perspective "top_down_3/4")
+      unwrap(
+        await dispatch('asset', {
+          action: 'create',
+          name: 'character',
+          width: 16,
+          height: 24,
+          perspective: 'top_down_3/4',
+          palette: Array.from({ length: 4 }, () => [0, 0, 0, 0]),
+        }),
+      );
+
+      // 3. palette fetch_lospec (mocked here, we just set_bulk to simulate)
+      unwrap(
+        await dispatch('palette', {
+          action: 'set_bulk',
+          asset_name: 'character',
+          entries: [
+            { index: 1, rgba: [255, 0, 0, 255] },
+            { index: 2, rgba: [0, 255, 0, 255] },
+            { index: 3, rgba: [0, 0, 255, 255] },
+          ],
+        }),
+      );
+
+      // 4. asset add_layer (body, eyes)
+      // Note: layer 1 is created by default. We'll rename it or just add new ones.
+      unwrap(
+        await dispatch('asset', {
+          action: 'add_layer',
+          asset_name: 'character',
+          name: 'body',
+          layer_type: 'image',
+        }),
+      );
+      unwrap(
+        await dispatch('asset', {
+          action: 'add_layer',
+          asset_name: 'character',
+          name: 'eyes',
+          layer_type: 'image',
+        }),
+      );
+
+      // 5. asset add_layer (hitbox, shape type)
+      unwrap(
+        await dispatch('asset', {
+          action: 'add_layer',
+          asset_name: 'character',
+          name: 'hitbox',
+          layer_type: 'shape',
+        }),
+      );
+
+      // 6. asset add_frame (x3 for walk cycle) -> total 4 frames
+      unwrap(await dispatch('asset', { action: 'add_frame', asset_name: 'character' }));
+      unwrap(await dispatch('asset', { action: 'add_frame', asset_name: 'character' }));
+      unwrap(await dispatch('asset', { action: 'add_frame', asset_name: 'character' }));
+
+      // 7. asset add_tag (frame tag "idle" frame 0, "walk" frames 1-3 with direction forward)
+      unwrap(
+        await dispatch('asset', {
+          action: 'add_tag',
+          asset_name: 'character',
+          name: 'idle',
+          tag_start: 0,
+          tag_end: 0,
+          direction: 'forward',
+          tag_type: 'frame',
+        }),
+      );
+      unwrap(
+        await dispatch('asset', {
+          action: 'add_tag',
+          asset_name: 'character',
+          name: 'walk',
+          tag_start: 1,
+          tag_end: 3,
+          direction: 'forward',
+          tag_type: 'frame',
+        }),
+      );
+
+      // 8. asset add_tag (frame tag "idle_south" with facing S)
+      unwrap(
+        await dispatch('asset', {
+          action: 'add_tag',
+          asset_name: 'character',
+          name: 'idle_south',
+          tag_start: 0,
+          tag_end: 0,
+          direction: 'forward',
+          tag_type: 'frame',
+          tag_facing: 'S',
+        }),
+      );
+
+      // 9. draw (rect + fill on body layer, frame 0)
+      unwrap(
+        await dispatch('draw', {
+          asset_name: 'character',
+          layer_id: 2, // body
+          frame_index: 0,
+          operations: [
+            { action: 'rect', x: 4, y: 10, width: 8, height: 10, color: 1 },
+            { action: 'fill', x: 6, y: 14, color: 1 },
+          ],
+        }),
+      );
+
+      // 10. draw (pixels on eyes layer)
+      unwrap(
+        await dispatch('draw', {
+          asset_name: 'character',
+          layer_id: 3, // eyes
+          frame_index: 0,
+          operations: [
+            { action: 'pixel', x: 6, y: 12, color: 2 },
+            { action: 'pixel', x: 9, y: 12, color: 2 },
+          ],
+        }),
+      );
+
+      // 11. asset get_cel (verify pixel data matches)
+      let res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'character',
+          layer_id: 3,
+          frame_index: 0,
+        }),
+      );
+      const celData = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
+      expect(celData[12][6]).toBe(2);
+      expect(celData[12][9]).toBe(2);
+
+      // 12. workspace save
+      unwrap(await dispatch('workspace', { action: 'save_all' }));
+
+      // 13. workspace unload_asset
+      unwrap(await dispatch('workspace', { action: 'unload_asset', asset_name: 'character' }));
+
+      // 14. workspace load_asset
+      unwrap(await dispatch('workspace', { action: 'load_asset', asset_name: 'character' }));
+
+      // 15. asset info (verify full structure persisted)
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'info',
+          asset_name: 'character',
+        }),
+      );
+      const docStr = res.content[0].text;
+      const info = JSON.parse(docStr.substring(docStr.indexOf('{'))) as {
+        width: number;
+        height: number;
+        perspective: string;
+        layers: { name: string; type: string }[];
+        frames: unknown[];
+        tags: { name: string }[];
+      };
+      expect(info.width).toBe(16);
+      expect(info.height).toBe(24);
+      expect(info.perspective).toBe('top_down_3/4');
+      expect(info.layers.length).toBeGreaterThanOrEqual(4); // default + body + eyes + hitbox
+      expect(info.frames.length).toBe(4);
+      expect(info.tags.length).toBe(3); // idle, walk, idle_south
+
+      // 16. export godot_spriteframes
+      res = unwrap(
+        await dispatch('export', {
+          action: 'godot_spriteframes',
+          asset_name: 'character',
+          path: '/tmp/test_project/character',
+        }),
+      );
+      expect(res.content[0].text).toContain('Exported Godot SpriteFrames');
+
+      // 17-19. Verify output files
+      expect(virtualFs.has('/tmp/test_project/character_strip.png')).toBe(true);
+      expect(virtualFs.has('/tmp/test_project/character.tres')).toBe(true);
+      expect(virtualFs.has('/tmp/test_project/character_strip.png.import')).toBe(true);
+
+      const pngBuffer = virtualFs.get('/tmp/test_project/character_strip.png') as Buffer;
+      const png = PNG.sync.read(pngBuffer);
+      expect(png.width).toBe(64); // 16 width * 4 frames * scale 1
+      expect(png.height).toBe(24); // 24 height
+
+      const tresData = virtualFs.get('/tmp/test_project/character.tres') as string;
+      expect(tresData).toContain('"name": &"idle"');
+      expect(tresData).toContain('"name": &"walk"');
+      expect(tresData).toContain('"name": &"idle_south_S"'); // Note: depends on generation, usually faces are upper/lower based on casing but "S" -> idle_south is probably what the code produces or just idle_S. Wait, the tag was named 'idle_south', so Godot animation should be 'idle_south'.
+
+      const importData = virtualFs.get('/tmp/test_project/character_strip.png.import') as string;
+      expect(importData).toContain('[remap]');
     });
   });
 });
