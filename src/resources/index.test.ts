@@ -4,6 +4,7 @@ import { ReadResourceResult, Resource } from '@modelcontextprotocol/sdk/types.js
 import { WorkspaceClass } from '../classes/workspace.js';
 import { AssetClass } from '../classes/asset.js';
 import { registerResources } from './index.js';
+import { PNG } from 'pngjs';
 
 interface RegisteredResourceMock {
   name: string;
@@ -391,6 +392,40 @@ describe('MCP Resources', () => {
         animationTemplate.readCallback(new URL('pixel://view/animation/unknown/walk'), {
           name: 'unknown',
           tag: 'walk',
+        }),
+      ).toThrow("Asset 'unknown' is not loaded");
+    });
+
+    it('returns a valid PNG blob for a valid palette URI', async () => {
+      const paletteTemplate = registered.find((r) => r.name === 'palette_view');
+      expect(paletteTemplate).toBeDefined();
+      if (!paletteTemplate) throw new Error('No palette_view template');
+
+      const response = await paletteTemplate.readCallback(new URL('pixel://view/palette/hero'), {
+        name: 'hero',
+      });
+
+      expect(response.contents).toHaveLength(1);
+      const content = response.contents[0];
+      if ('mimeType' in content) {
+        expect(content.mimeType).toBe('image/png');
+      }
+      if ('blob' in content) {
+        expect(content.blob).toBeDefined();
+        expect(typeof content.blob).toBe('string');
+        const buffer = Buffer.from(content.blob, 'base64');
+        const png = PNG.sync.read(buffer);
+        expect(png.width).toBe(256);
+        expect(png.height).toBe(256);
+      }
+    });
+
+    it('throws error for invalid asset in palette view', () => {
+      const paletteTemplate = registered.find((r) => r.name === 'palette_view');
+      if (!paletteTemplate) throw new Error('no palette_view template');
+      expect(() =>
+        paletteTemplate.readCallback(new URL('pixel://view/palette/unknown'), {
+          name: 'unknown',
         }),
       ).toThrow("Asset 'unknown' is not loaded");
     });

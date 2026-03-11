@@ -262,11 +262,73 @@ function renderAnimationView(
 }
 
 function renderPaletteView(
-  _route: Extract<ResourceRoute, { type: 'palette' }>,
+  route: Extract<ResourceRoute, { type: 'palette' }>,
   uri: URL,
 ): ReadResourceResult | Promise<ReadResourceResult> {
+  const workspace = getWorkspace();
+  const asset = workspace.loadedAssets.get(route.name);
+  if (!asset) {
+    throw new Error(`Asset '${route.name}' is not loaded`);
+  }
+
+  const cols = 16;
+  const rows = 16;
+  const swatchSize = 16;
+  const width = cols * swatchSize;
+  const height = rows * swatchSize;
+
+  const png = new PNG({ width, height });
+
+  for (let idx = 0; idx < 256; idx++) {
+    const col = idx % cols;
+    const row = Math.floor(idx / cols);
+    const startX = col * swatchSize;
+    const startY = row * swatchSize;
+
+    const [r, g, b, a] = asset.palette.get(idx);
+
+    const isEmpty = a === 0 && r === 0 && g === 0 && b === 0;
+
+    for (let sy = 0; sy < swatchSize; sy++) {
+      for (let sx = 0; sx < swatchSize; sx++) {
+        const x = startX + sx;
+        const y = startY + sy;
+        const outIdx = (width * y + x) << 2;
+
+        // Checkerboard details
+        const checkerSize = 4;
+        const isCheckerDark = (Math.floor(x / checkerSize) + Math.floor(y / checkerSize)) % 2 === 0;
+        const bg = isCheckerDark ? 204 : 255;
+
+        // Empty cross logic (a red X)
+        let isCross = false;
+        if (isEmpty) {
+          if ((sx === sy || sx === swatchSize - 1 - sy) && sx >= 2 && sx < swatchSize - 2) {
+            isCross = true;
+          }
+        }
+
+        if (isCross) {
+          png.data[outIdx] = 255;
+          png.data[outIdx + 1] = 0;
+          png.data[outIdx + 2] = 0;
+          png.data[outIdx + 3] = 255;
+        } else {
+          // standard alpha composite over checkerboard
+          const alpha = a / 255;
+          png.data[outIdx] = Math.round(r * alpha + bg * (1 - alpha));
+          png.data[outIdx + 1] = Math.round(g * alpha + bg * (1 - alpha));
+          png.data[outIdx + 2] = Math.round(b * alpha + bg * (1 - alpha));
+          png.data[outIdx + 3] = 255; // Output PNG is fully opaque
+        }
+      }
+    }
+  }
+
+  const pngBuffer = PNG.sync.write(png);
+
   return {
-    contents: [{ uri: uri.toString(), mimeType: 'image/png', blob: TRANSPARENT_1X1_PNG_B64 }],
+    contents: [{ uri: uri.toString(), mimeType: 'image/png', blob: pngBuffer.toString('base64') }],
   };
 }
 
