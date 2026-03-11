@@ -404,12 +404,12 @@ MCP Prompts are user-invoked workflow templates (triggered from the host UI, not
 
 #### 4.2.1 Prompt Registration
 
-- [ ] **4.2.1.1** **Prompt registration infrastructure** — register all prompts with the MCP server using the SDK's prompt API. Each prompt defines its `name`, `description`, and `arguments` array (with `name`, `description`, `required` fields). Wire into `src/index.ts` via `register*Prompt(server)` functions following the same pattern as tool registration.
+- [x] **4.2.1.1** **Prompt registration infrastructure** — register all prompts with the MCP server using the SDK's prompt API. Each prompt defines its `name`, `description`, and `arguments` array (with `name`, `description`, `required` fields). Wire into `src/index.ts` via `register*Prompt(server)` functions following the same pattern as tool registration.
 
 #### 4.2.2 `scaffold_character`
 
-- [ ] **4.2.2.1** **Arguments**: `name` (required — asset name), `directions` (optional — `"4"` or `"8"` directional, default `"4"`), `width` (optional — canvas width in pixels, default 16), `height` (optional — canvas height in pixels, default 24), `palette` (optional — Lospec slug or palette file path, default project default).
-- [ ] **4.2.2.2** **Messages generation** — return messages array guiding the LLM through: (1) create asset with specified dimensions and perspective, (2) set up palette (fetch from Lospec or load from file), (3) create layer structure (body, eyes/detail, optional hitbox shape layer), (4) create directional frame tags with `facing` values based on `directions` arg (4-dir: N/E/S/W or 8-dir: all 8), (5) draw base pose on frame 0, (6) guidance for animation frames (idle, walk cycles).
+- [x] **4.2.2.1** **Arguments**: `name` (required — asset name), `directions` (optional — `"4"` or `"8"` directional, default `"4"`), `width` (optional — canvas width in pixels, default 16), `height` (optional — canvas height in pixels, default 24), `palette` (optional — Lospec slug or palette file path, default project default).
+- [x] **4.2.2.2** **Messages generation** — return messages array guiding the LLM through: (1) create asset with specified dimensions and perspective, (2) set up palette (fetch from Lospec or load from file), (3) create layer structure (body, eyes/detail, optional hitbox shape layer), (4) create directional frame tags with `facing` values based on `directions` arg (4-dir: N/E/S/W or 8-dir: all 8), (5) draw base pose on frame 0, (6) guidance for animation frames (idle, walk cycles).
 
 #### 4.2.3 `scaffold_tileset`
 
