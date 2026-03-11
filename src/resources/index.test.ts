@@ -508,5 +508,148 @@ describe('MCP Resources', () => {
         }),
       ).toThrow("Asset 'hero' is not a tileset");
     });
+
+    // ── 4.1.8.3 Asset view PNG dimensions ─────────────────────────────────
+
+    it('asset view PNG has correct dimensions matching asset width/height (16×16)', async () => {
+      const assetTemplate = registered.find((r) => r.name === 'asset_view');
+      if (!assetTemplate) throw new Error('No asset_view template');
+
+      const response = await assetTemplate.readCallback(new URL('pixel://view/asset/hero'), {
+        name: 'hero',
+      });
+
+      const content = response.contents[0];
+      if ('blob' in content) {
+        const png = PNG.sync.read(Buffer.from(content.blob, 'base64'));
+        expect(png.width).toBe(16);
+        expect(png.height).toBe(16);
+      }
+    });
+
+    // ── 4.1.8.4 Layer view isolation ──────────────────────────────────────
+
+    it('layer view renders only the requested layer, not other layers', async () => {
+      const workspace = WorkspaceClass.instance();
+      const hero = workspace.loadedAssets.get('hero');
+      if (!hero) throw new Error('hero not loaded');
+
+      // Add a second layer with palette index 50 at pixel (0,0)
+      hero.addLayer({ name: 'Layer 2', type: 'image', visible: true, opacity: 255 });
+      const layer2 = hero.layers.find((l) => l.name === 'Layer 2');
+      if (!layer2) throw new Error('Layer 2 not added');
+
+      hero.setCel(layer2.id, 0, {
+        x: 0,
+        y: 0,
+        data: [
+          [50, 0],
+          [0, 0],
+        ],
+      } as Parameters<typeof hero.setCel>[2]);
+
+      const layerTemplate = registered.find((r) => r.name === 'layer_view');
+      if (!layerTemplate) throw new Error('No layer_view template');
+
+      const response = await layerTemplate.readCallback(
+        new URL('pixel://view/asset/hero/layer/1'),
+        {
+          name: 'hero',
+          layer_id: '1',
+        },
+      );
+
+      const content = response.contents[0];
+      if ('blob' in content) {
+        const png = PNG.sync.read(Buffer.from(content.blob, 'base64'));
+        // palette[1] = [1, 1, 1, 255]; palette[50] = [50, 50, 50, 255]
+        // pixel (0,0) should show layer 1's value (index 1) not layer 2's (index 50)
+        const pixelOffset = 0; // (y=0 * width=16 + x=0) * 4
+        expect(png.data[pixelOffset]).toBe(1); // R from palette[1]
+        expect(png.data[pixelOffset + 1]).toBe(1); // G
+        expect(png.data[pixelOffset + 2]).toBe(1); // B
+        expect(png.data[pixelOffset + 3]).toBe(255); // A
+      }
+    });
+
+    it('layer_frame_view resolves linked cels and returns a valid PNG', async () => {
+      const workspace = WorkspaceClass.instance();
+      const hero = workspace.loadedAssets.get('hero');
+      if (!hero) throw new Error('hero not loaded');
+
+      // Replace cel 1/1 with a linked cel pointing to 1/0
+      hero.setCel(1, 1, { link: '1/0' } as Parameters<typeof hero.setCel>[2]);
+
+      const layerFrameTemplate = registered.find((r) => r.name === 'layer_frame_view');
+      if (!layerFrameTemplate) throw new Error('No layer_frame_view template');
+
+      const response = await layerFrameTemplate.readCallback(
+        new URL('pixel://view/asset/hero/layer/1/1'),
+        { name: 'hero', layer_id: '1', frame_index: '1' },
+      );
+
+      expect(response.contents).toHaveLength(1);
+      const content = response.contents[0];
+      expect(content.mimeType).toBe('image/png');
+      if ('blob' in content) {
+        const png = PNG.sync.read(Buffer.from(content.blob, 'base64'));
+        expect(png.width).toBe(16);
+        expect(png.height).toBe(16);
+      }
+    });
+
+    // ── 4.1.8.5 Animation GIF frame count and per-frame delays ────────────
+
+    it('animation GIF contains the correct number of frames (2 for walk tag)', async () => {
+      const animationTemplate = registered.find((r) => r.name === 'animation_view');
+      if (!animationTemplate) throw new Error('No animation_view template');
+
+      const response = await animationTemplate.readCallback(
+        new URL('pixel://view/animation/hero/walk'),
+        { name: 'hero', tag: 'walk' },
+      );
+
+      const content = response.contents[0];
+      if ('blob' in content) {
+        const bytes = Buffer.from(content.blob, 'base64');
+        // Count Graphic Control Extension blocks (0x21 0xF9) — one per frame
+        let gceCount = 0;
+        for (let i = 0; i < bytes.length - 1; i++) {
+          if (bytes[i] === 0x21 && bytes[i + 1] === 0xf9) {
+            gceCount++;
+          }
+        }
+        // walk tag spans frames 0–1 → 2 GCE blocks
+        expect(gceCount).toBe(2);
+      }
+    });
+
+    it('animation GIF encodes correct per-frame delay (100ms = 10 centiseconds = 0x0A 0x00)', async () => {
+      const animationTemplate = registered.find((r) => r.name === 'animation_view');
+      if (!animationTemplate) throw new Error('No animation_view template');
+
+      const response = await animationTemplate.readCallback(
+        new URL('pixel://view/animation/hero/walk'),
+        { name: 'hero', tag: 'walk' },
+      );
+
+      const content = response.contents[0];
+      if ('blob' in content) {
+        const bytes = Buffer.from(content.blob, 'base64');
+        // GCE block: 0x21 0xF9 0x04 <flags> <delay_lo> <delay_hi> <transparent> 0x00
+        // Find first GCE block and check delay bytes at offsets +4 and +5
+        let gcePos = -1;
+        for (let i = 0; i < bytes.length - 1; i++) {
+          if (bytes[i] === 0x21 && bytes[i + 1] === 0xf9) {
+            gcePos = i;
+            break;
+          }
+        }
+        expect(gcePos).toBeGreaterThanOrEqual(0);
+        // 100ms ÷ 10 = 10 centiseconds = 0x0A (little-endian: lo=0x0A, hi=0x00)
+        expect(bytes[gcePos + 4]).toBe(0x0a); // delay lo
+        expect(bytes[gcePos + 5]).toBe(0x00); // delay hi
+      }
+    });
   });
 });

@@ -138,6 +138,28 @@ describe('project tool', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('No project loaded');
   });
+
+  // ─── sendResourceListChanged notification (4.1.8.1) ─────────────
+
+  it('open notifies sendResourceListChanged', async () => {
+    const sendResourceListChanged = vi.fn();
+    let toolHandler!: ToolCallback;
+    registerProjectTool({
+      registerTool(_name: string, _config: unknown, callback: ToolCallback) {
+        toolHandler = callback;
+      },
+      sendResourceListChanged,
+    } as unknown as Parameters<typeof registerProjectTool>[0]);
+
+    vi.mocked(projectIo.loadProjectFile).mockResolvedValue({
+      pixelmcp_version: '1.0',
+      name: 'Notify Test',
+      assets: {},
+    });
+
+    await toolHandler({ action: 'open', path: '/game/pixelmcp.json' });
+    expect(sendResourceListChanged).toHaveBeenCalledOnce();
+  });
 });
 
 // ─── add_file action ─────────────────────────────────────────────────────────

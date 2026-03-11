@@ -293,4 +293,41 @@ describe('workspace tool', () => {
     expect(text.undoDepth).toBe(1);
     expect(text.redoDepth).toBe(0);
   });
+
+  // ─── sendResourceListChanged notifications (4.1.8.1) ────────────
+
+  it('load_asset notifies sendResourceListChanged', async () => {
+    const sendResourceListChanged = vi.fn();
+    let toolHandler!: ToolCallback;
+    registerWorkspaceTool({
+      registerTool(_name: string, _config: unknown, callback: ToolCallback) {
+        toolHandler = callback;
+      },
+      sendResourceListChanged,
+    } as unknown as Parameters<typeof registerWorkspaceTool>[0]);
+
+    setupProject();
+    vi.mocked(assetIo.loadAssetFile).mockResolvedValue(mockAssetData);
+
+    await toolHandler({ action: 'load_asset', asset_name: 'player' });
+    expect(sendResourceListChanged).toHaveBeenCalledOnce();
+  });
+
+  it('unload_asset notifies sendResourceListChanged', async () => {
+    const sendResourceListChanged = vi.fn();
+    let toolHandler!: ToolCallback;
+    registerWorkspaceTool({
+      registerTool(_name: string, _config: unknown, callback: ToolCallback) {
+        toolHandler = callback;
+      },
+      sendResourceListChanged,
+    } as unknown as Parameters<typeof registerWorkspaceTool>[0]);
+
+    setupProject();
+    vi.mocked(assetIo.loadAssetFile).mockResolvedValue(mockAssetData);
+    await workspace.loadAsset('player');
+
+    await toolHandler({ action: 'unload_asset', asset_name: 'player' });
+    expect(sendResourceListChanged).toHaveBeenCalledOnce();
+  });
 });

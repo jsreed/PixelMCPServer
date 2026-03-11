@@ -304,4 +304,16 @@ describe('tileset tool', () => {
       expect(asset.tile_physics?.tiles['0'].polygon).toBeUndefined();
     });
   });
+
+  // ─── 4.1.8.8 Resource link in response ──────────────────────────
+
+  it('extract_tile response includes pixel:// tileset resource link', async () => {
+    const result = await callTool({ action: 'extract_tile', x: 0, y: 0 });
+
+    expect(result.isError).toBeFalsy();
+    const allContent = (result.content ?? []) as unknown as Array<{ type: string; uri?: string }>;
+    const links = allContent.filter((c) => c.type === 'resource_link');
+    expect(links.length).toBeGreaterThan(0);
+    expect(links[0]?.uri).toContain('pixel://view/tileset/');
+  });
 });

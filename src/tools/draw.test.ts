@@ -321,6 +321,20 @@ describe('draw tool', () => {
     expect(data[3][3]).toBe(1);
   });
 
+  // ─── 4.1.8.8 Resource link in response ──────────────────────────
+
+  it('response includes pixel:// resource link after successful draw', async () => {
+    const r = (await handler({
+      layer_id: 1,
+      frame_index: 0,
+      operations: [{ action: 'pixel', x: 0, y: 0, color: 1 }],
+    })) as { content?: Array<{ type: string; uri?: string }> };
+
+    const links = (r.content ?? []).filter((c) => c.type === 'resource_link');
+    expect(links.length).toBeGreaterThan(0);
+    expect(links[0]?.uri).toContain('pixel://view/');
+  });
+
   it('flood fill respects selection boundaries', async () => {
     workspace.selection = {
       asset_name: 'test_sprite',

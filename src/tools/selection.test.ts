@@ -244,4 +244,29 @@ describe('selection tool', () => {
     expect(undoneData[6]?.[6]).toBe(0);
     expect(undoneData[7]?.[7]).toBe(0);
   });
+
+  // ─── 4.1.8.8 Resource link in response ──────────────────────────
+
+  it('cut response includes pixel:// resource link', async () => {
+    await handle({ action: 'rect', asset_name: 'test_asset', x: 2, y: 2, width: 2, height: 2 });
+    const r = await handle({ action: 'cut', asset_name: 'test_asset' });
+
+    expect(r.isError).toBeUndefined();
+    const allContent = (r.content ?? []) as unknown as Array<{ type: string; uri?: string }>;
+    const links = allContent.filter((c) => c.type === 'resource_link');
+    expect(links.length).toBeGreaterThan(0);
+    expect(links[0]?.uri).toContain('pixel://view/asset/test_asset');
+  });
+
+  it('paste response includes pixel:// resource link', async () => {
+    await handle({ action: 'rect', asset_name: 'test_asset', x: 2, y: 2, width: 2, height: 2 });
+    await handle({ action: 'copy', asset_name: 'test_asset' });
+    const r = await handle({ action: 'paste', target_asset_name: 'test_asset' });
+
+    expect(r.isError).toBeUndefined();
+    const allContent = (r.content ?? []) as unknown as Array<{ type: string; uri?: string }>;
+    const links = allContent.filter((c) => c.type === 'resource_link');
+    expect(links.length).toBeGreaterThan(0);
+    expect(links[0]?.uri).toContain('pixel://view/asset/test_asset');
+  });
 });

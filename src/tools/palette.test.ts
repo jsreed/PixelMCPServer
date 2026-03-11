@@ -322,6 +322,24 @@ describe('palette tool', () => {
     expect(asset.palette.get(3)).toEqual([0, 0, 255, 255]);
   });
 
+  // ─── 4.1.8.8 Resource link in response ──────────────────────────
+
+  it('response includes pixel:// palette resource link after set', async () => {
+    const result = await handler({
+      action: 'set',
+      asset_name: 'sprite',
+      index: 5,
+      rgba: [100, 150, 200, 255],
+    });
+
+    expect(result.isError).toBeUndefined();
+    const links = (result.content as Array<{ type: string; uri?: string }>).filter(
+      (c) => c.type === 'resource_link',
+    );
+    expect(links.length).toBeGreaterThan(0);
+    expect(links[0]?.uri).toContain('pixel://view/palette/');
+  });
+
   it('fetch_lospec handles API errors', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,

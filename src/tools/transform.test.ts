@@ -310,6 +310,20 @@ describe('transform tool', () => {
     ]);
   });
 
+  // ─── 4.1.8.8 Resource link in response ──────────────────────────
+
+  it('response includes pixel:// resource link after successful transform', async () => {
+    const r = (await handler({
+      layer_id: 1,
+      frame_index: 0,
+      operations: [{ action: 'flip_h' }],
+    })) as { content?: Array<{ type: string; uri?: string }> };
+
+    const links = (r.content ?? []).filter((c) => c.type === 'resource_link');
+    expect(links.length).toBeGreaterThan(0);
+    expect(links[0]?.uri).toContain('pixel://view/');
+  });
+
   it('undo/redo: reverts and reinstates batched command', async () => {
     await handler({
       layer_id: 1,

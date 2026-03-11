@@ -389,14 +389,14 @@ Retrofit existing mutation tool handlers to include relevant `pixel://` URIs in 
 
 #### 4.1.8 Resource Tests
 
-- [ ] **4.1.8.1** **Registration & discovery tests** — templates list returns expected templates, resources list returns valid concrete URIs for loaded assets, list_changed notification is fired on workspace asset load/unload.
-- [ ] **4.1.8.2** **URI routing tests** — valid URIs dispatch to correct renderer, malformed URIs return errors, unknown asset names return domain errors.
-- [ ] **4.1.8.3** **Asset view tests** — returns valid PNG data, correct dimensions, frame index bounds validation.
-- [ ] **4.1.8.4** **Layer view tests** — single layer isolation (other layers excluded), linked cel resolution, layer ID and frame validation.
-- [ ] **4.1.8.5** **Animation view tests** — GIF frame count matches tag range, per-frame delays match asset durations, tag-not-found error.
-- [ ] **4.1.8.6** **Palette view tests** — PNG dimensions match expected grid layout, swatch count matches palette size.
-- [ ] **4.1.8.7** **Tileset view tests** — PNG dimensions match expected grid layout, tile count correct, error for non-tileset assets.
-- [ ] **4.1.8.8** **Resource link tests** — verify mutation tool responses include expected `pixel://` URIs for draw, transform, effect, palette, asset, tileset, and selection tools.
+- [x] **4.1.8.1** **Registration & discovery tests** — templates list returns expected templates, resources list returns valid concrete URIs for loaded assets, list_changed notification is fired on workspace asset load/unload.
+- [x] **4.1.8.2** **URI routing tests** — valid URIs dispatch to correct renderer, malformed URIs return errors, unknown asset names return domain errors.
+- [x] **4.1.8.3** **Asset view tests** — returns valid PNG data, correct dimensions, frame index bounds validation.
+- [x] **4.1.8.4** **Layer view tests** — single layer isolation (other layers excluded), linked cel resolution, layer ID and frame validation.
+- [x] **4.1.8.5** **Animation view tests** — GIF frame count matches tag range, per-frame delays match asset durations, tag-not-found error.
+- [x] **4.1.8.6** **Palette view tests** — PNG dimensions match expected grid layout, swatch count matches palette size.
+- [x] **4.1.8.7** **Tileset view tests** — PNG dimensions match expected grid layout, tile count correct, error for non-tileset assets.
+- [x] **4.1.8.8** **Resource link tests** — verify mutation tool responses include expected `pixel://` URIs for draw, transform, effect, palette, asset, tileset, and selection tools.
 
 ### 4.2 MCP Prompts (Workflow Templates)
 

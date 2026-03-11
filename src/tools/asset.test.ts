@@ -403,6 +403,24 @@ describe('asset tool', () => {
     expect(asset?.frames).toHaveLength(2);
   });
 
+  // ─── 4.1.8.8 Resource link in response ──────────────────────────
+
+  it('create response includes pixel:// asset resource link', async () => {
+    const r = await handler({
+      action: 'create',
+      name: 'link_test_sprite',
+      width: 8,
+      height: 8,
+    });
+
+    expect(r.isError).toBeUndefined();
+    const links = (r.content as Array<{ type: string; uri?: string }>).filter(
+      (c) => c.type === 'resource_link',
+    );
+    expect(links.length).toBeGreaterThan(0);
+    expect(links[0]?.uri).toContain('pixel://view/asset/link_test_sprite');
+  });
+
   // ─── delete ──────────────────────────────────────────────────────
 
   it('delete removes asset from registry and workspace', async () => {
