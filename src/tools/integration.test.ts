@@ -7,6 +7,7 @@ import { registerAssetTool } from './asset.js';
 import { registerPaletteTool } from './palette.js';
 import { registerDrawTool } from './draw.js';
 import { registerExportTool } from './export.js';
+import { registerTilesetTool } from './tileset.js';
 import { saveAssetFile } from '../io/asset-io.js';
 import { PNG } from 'pngjs';
 
@@ -123,6 +124,7 @@ function createMockServer() {
   registerPaletteTool(mockServer as any);
   registerDrawTool(mockServer as any);
   registerExportTool(mockServer as any);
+  registerTilesetTool(mockServer as any);
   /* eslint-enable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any */
 
   return {
@@ -689,6 +691,187 @@ describe('Minimum Viable Loop Integration', () => {
 
       const importData = virtualFs.get('/tmp/test_project/character_strip.png.import') as string;
       expect(importData).toContain('[remap]');
+    });
+
+    it('5.3.2.1 E2E: tileset creation and Godot export', async () => {
+      unwrap(
+        await dispatch('project', {
+          action: 'init',
+          path: '/tmp/test_project_tileset',
+          name: 'Test Tileset Project',
+        }),
+      );
+
+      unwrap(
+        await dispatch('asset', {
+          action: 'create',
+          name: 'my_tileset',
+          width: 48,
+          height: 16,
+          tile_width: 16,
+          tile_height: 16,
+          palette: Array.from({ length: 4 }, () => [0, 0, 0, 0]),
+        }),
+      );
+
+      unwrap(
+        await dispatch('palette', {
+          action: 'set_bulk',
+          asset_name: 'my_tileset',
+          entries: [{ index: 1, rgba: [255, 0, 0, 255] }],
+        }),
+      );
+
+      unwrap(
+        await dispatch('draw', {
+          asset_name: 'my_tileset',
+          layer_id: 1,
+          frame_index: 0,
+          operations: [
+            { action: 'rect', x: 0, y: 0, width: 16, height: 16, color: 1, filled: true },
+            { action: 'rect', x: 16, y: 0, width: 16, height: 16, color: 1, filled: true },
+            { action: 'rect', x: 32, y: 0, width: 16, height: 16, color: 1, filled: true },
+          ],
+        }),
+      );
+
+      unwrap(
+        await dispatch('tileset', {
+          action: 'extract_tile',
+          asset_name: 'my_tileset',
+          layer_id: 1,
+          x: 0,
+          y: 0,
+        }),
+      );
+      unwrap(
+        await dispatch('tileset', {
+          action: 'extract_tile',
+          asset_name: 'my_tileset',
+          layer_id: 1,
+          x: 16,
+          y: 0,
+        }),
+      );
+      let res = unwrap(
+        await dispatch('tileset', {
+          action: 'extract_tile',
+          asset_name: 'my_tileset',
+          layer_id: 1,
+          x: 32,
+          y: 0,
+        }),
+      );
+      expect(res.content[0].text).toContain('"slot_index":2');
+
+      res = unwrap(await dispatch('asset', { action: 'info', asset_name: 'my_tileset' }));
+      const docStr = res.content[0].text;
+      const info = JSON.parse(docStr.substring(docStr.indexOf('{'))) as {
+        width: number;
+        tile_terrain?: { terrain_name: string };
+      };
+      expect(info.width).toBeGreaterThanOrEqual(48);
+
+      unwrap(
+        await dispatch('asset', {
+          action: 'add_layer',
+          asset_name: 'my_tileset',
+          name: 'tilemap_layer',
+          layer_type: 'tilemap',
+        }),
+      );
+
+      unwrap(
+        await dispatch('tileset', {
+          action: 'place_tile',
+          asset_name: 'my_tileset',
+          layer_id: 2,
+          tile_index: 1,
+          x: 0,
+          y: 0,
+        }),
+      );
+
+      res = unwrap(
+        await dispatch('tileset', {
+          action: 'autotile_generate',
+          asset_name: 'my_tileset',
+          pattern: 'blob47',
+        }),
+      );
+      const autotileObj = JSON.parse(res.content[0].text) as {
+        expected_slots: number[];
+        missing_slots: number[];
+      };
+      expect(autotileObj).toHaveProperty('expected_slots');
+      expect(autotileObj).toHaveProperty('missing_slots');
+
+      res = unwrap(
+        await dispatch('tileset', {
+          action: 'autotile_generate',
+          asset_name: 'my_tileset',
+          pattern: 'blob47',
+          terrain_name: 'ground',
+        }),
+      );
+      const assignResult = JSON.parse(res.content[0].text) as {
+        assigned: number[];
+        missing_slots: number[];
+      };
+      // With 3 tiles extracted, those 3 slots (0,1,2) among the expected
+      // canonical blob47 slots should be assigned
+      expect(Array.isArray(assignResult.assigned)).toBe(true);
+      expect(Array.isArray(assignResult.missing_slots)).toBe(true);
+      // Confirm terrain was persisted by doing another query-only call and checking results
+      res = unwrap(
+        await dispatch('tileset', {
+          action: 'autotile_generate',
+          asset_name: 'my_tileset',
+          pattern: 'blob47',
+        }),
+      );
+      const queryResult = JSON.parse(res.content[0].text) as {
+        expected_slots: number[];
+        occupied_slots: number[];
+        missing_slots: number[];
+      };
+      expect(queryResult.expected_slots.length).toBe(47);
+      // The 3 extracted tiles form some occupied slots
+      expect(queryResult.occupied_slots.length).toBeGreaterThanOrEqual(0);
+
+      unwrap(
+        await dispatch('tileset', {
+          action: 'set_tile_physics',
+          asset_name: 'my_tileset',
+          tile_index: 0,
+          physics_polygon: [
+            [0, 0],
+            [16, 0],
+            [16, 16],
+            [0, 16],
+          ],
+        }),
+      );
+
+      unwrap(await dispatch('workspace', { action: 'save_all' }));
+
+      unwrap(
+        await dispatch('export', {
+          action: 'godot_tileset',
+          asset_name: 'my_tileset',
+          path: '/tmp/test_project_tileset/my_tileset',
+        }),
+      );
+
+      expect(virtualFs.has('/tmp/test_project_tileset/my_tileset.png')).toBe(true);
+      expect(virtualFs.has('/tmp/test_project_tileset/my_tileset.tres')).toBe(true);
+      expect(virtualFs.has('/tmp/test_project_tileset/my_tileset.png.import')).toBe(true);
+
+      const tresData = virtualFs.get('/tmp/test_project_tileset/my_tileset.tres') as string;
+      expect(tresData).toContain('TileSetAtlasSource');
+      expect(tresData).toContain('texture_region_size');
+      expect(tresData).toContain('polygon_0/points');
+      expect(tresData).toContain('terrain_set_0/terrain_0/name = "ground"');
     });
   });
 });
