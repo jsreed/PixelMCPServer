@@ -413,8 +413,8 @@ MCP Prompts are user-invoked workflow templates (triggered from the host UI, not
 
 #### 4.2.3 `scaffold_tileset`
 
-- [ ] **4.2.3.1** **Arguments**: `name` (required — asset name), `tile_size` (optional — tile pixel size as integer, default project default), `terrain_name` (optional — Godot terrain name, default asset name).
-- [ ] **4.2.3.2** **Messages generation** — return messages array guiding the LLM through: (1) create asset with `tile_width`/`tile_height` set to `tile_size`, (2) set up palette, (3) explain blob47 canonical slot layout and bitmask indexing, (4) draw each of the 47 tile variants at their correct slot positions, (5) call `autotile_generate` with `terrain_name` to assign peering bits, (6) set tile physics for relevant slots, (7) export via `godot_tileset`.
+- [x] **4.2.3.1** **Arguments**: `name` (required — asset name), `tile_size` (optional — tile pixel size as integer, default project default), `terrain_name` (optional — Godot terrain name, default asset name).
+- [x] **4.2.3.2** **Messages generation** — return messages array guiding the LLM through: (1) create asset with `tile_width`/`tile_height` set to `tile_size`, (2) set up palette, (3) explain blob47 canonical slot layout and bitmask indexing, (4) draw each of the 47 tile variants at their correct slot positions, (5) call `autotile_generate` with `terrain_name` to assign peering bits, (6) set tile physics for relevant slots, (7) export via `godot_tileset`.
 
 #### 4.2.4 `scaffold_equipment`
 
