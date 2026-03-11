@@ -423,8 +423,8 @@ MCP Prompts are user-invoked workflow templates (triggered from the host UI, not
 
 #### 4.2.5 `analyze_asset`
 
-- [ ] **4.2.5.1** **Arguments**: `asset_name` (required — the asset to analyze).
-- [ ] **4.2.5.2** **Messages generation** — return messages array prompting the LLM to: (1) call `asset info` and `palette info` to gather structural data, (2) call `asset detect_banding` to check for banding issues, (3) analyze palette usage (unused colors, duplicate near-colors, missing ramp continuity), (4) check animation completeness (missing frames in tags, inconsistent durations), (5) for tilesets: check for missing canonical slots via `autotile_generate` query mode, (6) return a structured critique with specific fix suggestions referencing the correct tool actions.
+- [x] **4.2.5.1** **Arguments**: `asset_name` (required — the asset to analyze).
+- [x] **4.2.5.2** **Messages generation** — return messages array prompting the LLM to: (1) call `asset info` and `palette info` to gather structural data, (2) call `asset detect_banding` to check for banding issues, (3) analyze palette usage (unused colors, duplicate near-colors, missing ramp continuity), (4) check animation completeness (missing frames in tags, inconsistent durations), (5) for tilesets: check for missing canonical slots via `autotile_generate` query mode, (6) return a structured critique with specific fix suggestions referencing the correct tool actions.
 
 #### 4.2.6 `export_for_godot`
 
