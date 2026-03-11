@@ -435,10 +435,10 @@ MCP Prompts are user-invoked workflow templates (triggered from the host UI, not
 
 - [x] **4.2.7.1** **Registration tests** — all 5 prompts registered, each has correct name, description, and argument definitions.
 - [x] **4.2.7.2** **Argument validation tests** — required arguments enforced, optional arguments apply defaults correctly, invalid argument values rejected.
-- [ ] **4.2.7.3** **`scaffold_character` tests** — messages reference `asset create`, `palette` tool, `asset add_layer`, `asset add_tag`; 4-dir vs 8-dir produces different facing values; custom dimensions passed through.
-- [ ] **4.2.7.4** **`scaffold_tileset` tests** — messages reference `asset create` with tile fields, `autotile_generate`, `godot_tileset` export; terrain_name defaults to asset name.
-- [ ] **4.2.7.5** **`scaffold_equipment` tests** — messages reference `asset info` for reference character, correct equipment type guidance.
-- [ ] **4.2.7.6** **`analyze_asset` tests** — messages include calls to `asset info`, `palette info`, `detect_banding`; output is a structured critique.
+- [x] **4.2.7.3** **`scaffold_character` tests** — messages reference `asset create`, `palette` tool, `asset add_layer`, `asset add_tag`; 4-dir vs 8-dir produces different facing values; custom dimensions passed through.
+- [x] **4.2.7.4** **`scaffold_tileset` tests** — messages reference `asset create` with tile fields, `autotile_generate`, `godot_tileset` export; terrain_name defaults to asset name.
+- [x] **4.2.7.5** **`scaffold_equipment` tests** — messages reference `asset info` for reference character, correct equipment type guidance.
+- [x] **4.2.7.6** **`analyze_asset` tests** — messages include calls to `asset info`, `palette info`, `detect_banding`; output is a structured critique.
 - [x] **4.2.7.7** **`export_for_godot` tests** — messages include `asset info` inspection, correct export action selection logic for each asset type.
 
 > **Definition of Done — Phase 4:** All resource URIs resolve and return valid image data. All prompts return well-formed message arrays with correct argument validation. Resource links appear in mutation tool responses for all 7 mutation tools. Prompt messages reference correct tool names and actions.
