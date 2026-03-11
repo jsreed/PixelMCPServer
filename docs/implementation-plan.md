@@ -501,7 +501,7 @@ Full workflow tests that exercise multiple tools in sequence, verifying the syst
 
 #### 5.3.5 Variant Resolution Workflow
 
-- [ ] **5.3.5.1** **E2E: asset variants** — `project init` → `asset create` "iron_sword" → `workspace save` → manually register a `variants` map in the project (standard → path_a, slim → path_b) by creating two asset files → `workspace load_asset` "iron_sword" (no variant — loads first defined) → verify loaded → `workspace unload_asset` → `workspace load_asset` "iron_sword" with `variant: "slim"` → verify loads the slim variant path.
+- [x] **5.3.5.1** **E2E: asset variants** — `project init` → `asset create` "iron_sword" → `workspace save` → manually register a `variants` map in the project (standard → path_a, slim → path_b) by creating two asset files → `workspace load_asset` "iron_sword" (no variant — loads first defined) → verify loaded → `workspace unload_asset` → `workspace load_asset` "iron_sword" with `variant: "slim"` → verify loads the slim variant path.
 
 #### 5.3.6 Palette Workflow
 

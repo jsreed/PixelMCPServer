@@ -1339,5 +1339,175 @@ describe('Minimum Viable Loop Integration', () => {
       expect('alt_char' in projectInfo.assets).toBe(true);
       expect(projectInfo.assets['alt_char'].recolor_of).toBe('base_char');
     });
+
+    it('5.3.5.1 E2E: asset variants - load default and named variant', async () => {
+      const projectPath = '/tmp/test_project_variants';
+      const projectFile = `${projectPath}/pixelmcp.json`;
+
+      // -----------------------------------------------------------------------
+      // 1. project init
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('project', {
+          action: 'init',
+          path: projectPath,
+          name: 'Test Variant Project',
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 2. asset create "iron_sword" (8x8 for simplicity)
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('asset', {
+          action: 'create',
+          name: 'iron_sword',
+          width: 8,
+          height: 8,
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 3. palette set_bulk — define colors to distinguish variants
+      //    Index 1 = standard color, Index 2 = slim color
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('palette', {
+          action: 'set_bulk',
+          asset_name: 'iron_sword',
+          entries: [
+            { index: 1, rgba: [50, 100, 200, 255] },
+            { index: 2, rgba: [200, 50, 50, 255] },
+          ],
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 4. Draw standard variant marker: pixel (0,0) = color 1
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('draw', {
+          asset_name: 'iron_sword',
+          layer_id: 1,
+          frame_index: 0,
+          operations: [{ action: 'pixel', x: 0, y: 0, color: 1 }],
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 5. workspace save — standard variant data is now in virtualFs
+      // -----------------------------------------------------------------------
+      unwrap(await dispatch('workspace', { action: 'save_all' }));
+
+      // -----------------------------------------------------------------------
+      // 6. Manually register variants in virtualFs:
+      //    - Create slim variant asset (pixel (0,0) = color 2)
+      //    - Update project config to have variants map for iron_sword
+      // -----------------------------------------------------------------------
+      const standardAssetPath = `${projectPath}/sprites/iron_sword.json`;
+      const slimAssetPath = `${projectPath}/sprites/iron_sword_slim.json`;
+
+      // Deep copy standard asset data, modify pixel (0,0) to color 2 for slim variant
+      interface AssetSnapshot {
+        cels: Record<string, { data: number[][] }>;
+      }
+      const standardSnapshot = JSON.parse(
+        JSON.stringify(virtualFs.get(standardAssetPath)),
+      ) as AssetSnapshot;
+      const slimSnapshot = JSON.parse(JSON.stringify(standardSnapshot)) as AssetSnapshot;
+      slimSnapshot.cels['1/0'].data[0][0] = 2;
+      virtualFs.set(slimAssetPath, slimSnapshot);
+
+      // Update project config: replace single path entry with variants map
+      interface ProjectSnapshot {
+        assets: Record<string, { type: string; path?: string; variants?: Record<string, string> }>;
+      }
+      const projectSnapshot = JSON.parse(
+        JSON.stringify(virtualFs.get(projectFile)),
+      ) as ProjectSnapshot;
+      projectSnapshot.assets['iron_sword'] = {
+        type: 'sprite',
+        variants: {
+          standard: 'sprites/iron_sword.json',
+          slim: 'sprites/iron_sword_slim.json',
+        },
+      };
+      virtualFs.set(projectFile, projectSnapshot);
+
+      // Unload iron_sword (loaded automatically by asset create) before reloading project
+      unwrap(await dispatch('workspace', { action: 'unload_asset', asset_name: 'iron_sword' }));
+
+      // -----------------------------------------------------------------------
+      // 7. project open — reload config that now has variants map for iron_sword
+      // -----------------------------------------------------------------------
+      unwrap(await dispatch('project', { action: 'open', path: projectFile }));
+
+      // -----------------------------------------------------------------------
+      // 8. workspace load_asset "iron_sword" with no variant
+      //    → resolves to first defined variant ("standard")
+      // -----------------------------------------------------------------------
+      unwrap(await dispatch('workspace', { action: 'load_asset', asset_name: 'iron_sword' }));
+
+      // -----------------------------------------------------------------------
+      // 9. Verify standard variant is loaded
+      // -----------------------------------------------------------------------
+      let res = unwrap(await dispatch('workspace', { action: 'info' }));
+      const wsInfoStd = JSON.parse(res.content[0].text) as {
+        loadedAssets: Array<{ name: string; variant?: string }>;
+      };
+      const stdEntry = wsInfoStd.loadedAssets.find((a) => a.name === 'iron_sword');
+      expect(stdEntry).toBeDefined();
+      // No variant param was passed → workspace tracks no variant for this load
+      expect(stdEntry?.variant).toBeUndefined();
+
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'iron_sword',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      const stdCelData = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
+      expect(stdCelData[0][0]).toBe(1); // standard: color 1 at (0,0)
+
+      // -----------------------------------------------------------------------
+      // 10. workspace unload_asset
+      // -----------------------------------------------------------------------
+      unwrap(await dispatch('workspace', { action: 'unload_asset', asset_name: 'iron_sword' }));
+
+      // -----------------------------------------------------------------------
+      // 11. workspace load_asset "iron_sword" with variant: "slim"
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('workspace', {
+          action: 'load_asset',
+          asset_name: 'iron_sword',
+          variant: 'slim',
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 12. Verify slim variant is loaded
+      // -----------------------------------------------------------------------
+      res = unwrap(await dispatch('workspace', { action: 'info' }));
+      const wsInfoSlim = JSON.parse(res.content[0].text) as {
+        loadedAssets: Array<{ name: string; variant?: string }>;
+      };
+      const slimEntry = wsInfoSlim.loadedAssets.find((a) => a.name === 'iron_sword');
+      expect(slimEntry).toBeDefined();
+      expect(slimEntry?.variant).toBe('slim');
+
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'iron_sword',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      const slimCelData = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
+      expect(slimCelData[0][0]).toBe(2); // slim: color 2 at (0,0)
+    });
   });
 });
