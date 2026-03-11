@@ -14,6 +14,11 @@ import { registerEffectTool } from './tools/effect.js';
 import { registerTilesetTool } from './tools/tileset.js';
 import { registerExportTool } from './tools/export.js';
 import { registerResources } from './resources/index.js';
+import { registerScaffoldCharacterPrompt } from './prompts/scaffold-character.js';
+import { registerScaffoldTilesetPrompt } from './prompts/scaffold-tileset.js';
+import { registerScaffoldEquipmentPrompt } from './prompts/scaffold-equipment.js';
+import { registerAnalyzeAssetPrompt } from './prompts/analyze-asset.js';
+import { registerExportForGodotPrompt } from './prompts/export-for-godot.js';
 
 // Create the MCP server instance
 const server = new McpServer({
@@ -33,6 +38,13 @@ registerEffectTool(server);
 registerTilesetTool(server);
 registerExportTool(server);
 registerResources(server);
+
+// Register all prompt handlers
+registerScaffoldCharacterPrompt(server);
+registerScaffoldTilesetPrompt(server);
+registerScaffoldEquipmentPrompt(server);
+registerAnalyzeAssetPrompt(server);
+registerExportForGodotPrompt(server);
 
 async function main() {
   const transport = new StdioServerTransport();
