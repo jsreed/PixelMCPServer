@@ -476,8 +476,8 @@ Verify that each domain error returns sufficient information for recovery. For e
 
 ### 5.2 Tool Surface Completeness Check
 
-- [ ] **5.2.1** **Action inventory** — verify all 10 tools are registered with all actions from [design §2.2](design.md). Cross-reference every action enum value in the design spec against the implemented Zod schemas. Report any missing or extra actions.
-- [ ] **5.2.2** **Parameter completeness** — for each tool action, verify all parameters from the design spec are accepted (required params enforced, optional params have correct defaults). Spot-check against the design spec's parameter tables.
+- [x] **5.2.1** **Action inventory** — verify all 10 tools are registered with all actions from [design §2.2](design.md). Cross-reference every action enum value in the design spec against the implemented Zod schemas. Report any missing or extra actions.
+- [x] **5.2.2** **Parameter completeness** — for each tool action, verify all parameters from the design spec are accepted (required params enforced, optional params have correct defaults). Spot-check against the design spec's parameter tables.
 
 ### 5.3 End-to-End Integration Testing
 
