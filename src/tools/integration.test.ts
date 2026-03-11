@@ -51,6 +51,20 @@ vi.mock('../io/palette-io.js', () => ({
   }),
 }));
 
+vi.mock('node:fs/promises', () => ({
+  readFile: vi.fn().mockImplementation((filePath: string) => {
+    const data = virtualFs.get(filePath);
+    if (data === undefined)
+      return Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+    return Promise.resolve(data);
+  }),
+  writeFile: vi.fn().mockImplementation((filePath: string, data: unknown) => {
+    virtualFs.set(filePath, data);
+    return Promise.resolve();
+  }),
+  mkdir: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { Writable } from 'node:stream';
 
 vi.mock('node:fs', () => ({
@@ -1667,6 +1681,150 @@ describe('Minimum Viable Loop Integration', () => {
       };
       const idx2AfterRedo = infoAfterRedo.entries.find((e) => e.index === 2);
       expect(idx2AfterRedo?.rgba).toEqual([128, 0, 128, 255]); // interpolated restored
+    });
+
+    it('5.3.7.1 E2E: project add_file - import PNG, quantize, register', async () => {
+      const projectPath = '/tmp/test_project_import';
+
+      // -----------------------------------------------------------------------
+      // 1. project init
+      // -----------------------------------------------------------------------
+      unwrap(await dispatch('project', { action: 'init', path: projectPath, name: 'Import Test' }));
+
+      // -----------------------------------------------------------------------
+      // Build a 4×4 PNG:
+      //   (0,0): fully transparent → quantize reserves index 0 for transparency
+      //   top 2 rows (minus top-left): red
+      //   bottom 2 rows: green
+      // The transparent pixel ensures all opaque pixels get indices > 0.
+      // -----------------------------------------------------------------------
+      const testPng = new PNG({ width: 4, height: 4 });
+      const pixelData = Buffer.alloc(4 * 4 * 4);
+      for (let y = 0; y < 4; y++) {
+        for (let x = 0; x < 4; x++) {
+          const i = (y * 4 + x) * 4;
+          if (y === 0 && x === 0) {
+            // top-left: fully transparent
+            pixelData[i] = 0;
+            pixelData[i + 1] = 0;
+            pixelData[i + 2] = 0;
+            pixelData[i + 3] = 0;
+          } else if (y < 2) {
+            // top half (except top-left): red
+            pixelData[i] = 255;
+            pixelData[i + 1] = 0;
+            pixelData[i + 2] = 0;
+            pixelData[i + 3] = 255;
+          } else {
+            // bottom half: green
+            pixelData[i] = 0;
+            pixelData[i + 1] = 255;
+            pixelData[i + 2] = 0;
+            pixelData[i + 3] = 255;
+          }
+        }
+      }
+      testPng.data = pixelData;
+      const pngBuffer = PNG.sync.write(testPng);
+
+      const importPath = '/tmp/test_sprite.png';
+      virtualFs.set(importPath, pngBuffer);
+
+      // -----------------------------------------------------------------------
+      // 2. project add_file — import the PNG
+      // -----------------------------------------------------------------------
+      const addRes = unwrap(
+        await dispatch('project', {
+          action: 'add_file',
+          name: 'imported_sprite',
+          import_path: importPath,
+          type: 'sprite',
+        }),
+      );
+      const addData = JSON.parse(addRes.content[0].text) as {
+        asset_name: string;
+        path: string;
+        width: number;
+        height: number;
+        color_count: number;
+      };
+      expect(addData.asset_name).toBe('imported_sprite');
+      expect(addData.width).toBe(4);
+      expect(addData.height).toBe(4);
+      expect(addData.color_count).toBeLessThanOrEqual(256);
+
+      // -----------------------------------------------------------------------
+      // 3. project info — verify asset registered
+      // -----------------------------------------------------------------------
+      const infoRes = unwrap(await dispatch('project', { action: 'info' }));
+      const projectInfo = JSON.parse(infoRes.content[0].text) as {
+        assets: Record<string, { type: string; path: string }>;
+      };
+      expect(projectInfo.assets).toHaveProperty('imported_sprite');
+      expect(projectInfo.assets['imported_sprite'].type).toBe('sprite');
+
+      // -----------------------------------------------------------------------
+      // 4. workspace load_asset — load the imported asset
+      // -----------------------------------------------------------------------
+      unwrap(await dispatch('workspace', { action: 'load_asset', asset_name: 'imported_sprite' }));
+
+      // -----------------------------------------------------------------------
+      // 5. asset info — verify dimensions match PNG
+      // -----------------------------------------------------------------------
+      let res = unwrap(await dispatch('asset', { action: 'info', asset_name: 'imported_sprite' }));
+      const docStr = res.content[0].text;
+      const assetInfo = JSON.parse(docStr.substring(docStr.indexOf('{'))) as {
+        width: number;
+        height: number;
+      };
+      expect(assetInfo.width).toBe(4);
+      expect(assetInfo.height).toBe(4);
+
+      // -----------------------------------------------------------------------
+      // 6. palette info — verify ≤ 256 entries, colors match quantized PNG
+      //    The PNG has exactly 2 solid colors (red + green) + 1 transparent.
+      //    The quantizer uses the exact-match path (≤256 unique colors), so
+      //    palette entries must contain recognizable red and green values.
+      // -----------------------------------------------------------------------
+      res = unwrap(await dispatch('palette', { action: 'info', asset_name: 'imported_sprite' }));
+      const paletteData = JSON.parse(res.content[0].text) as {
+        entries: Array<{ index: number; rgba: [number, number, number, number] }>;
+        total_defined: number;
+      };
+      expect(paletteData.total_defined).toBeLessThanOrEqual(256);
+      expect(paletteData.total_defined).toBeGreaterThanOrEqual(2);
+      // Verify the palette actually contains the source colors (red and green)
+      const redEntry = paletteData.entries.find(
+        (e) => e.rgba[0] > 200 && e.rgba[1] < 50 && e.rgba[2] < 50,
+      );
+      const greenEntry = paletteData.entries.find(
+        (e) => e.rgba[0] < 50 && e.rgba[1] > 200 && e.rgba[2] < 50,
+      );
+      expect(redEntry).toBeDefined();
+      expect(greenEntry).toBeDefined();
+
+      // -----------------------------------------------------------------------
+      // 7. asset get_cel — verify pixel data is indexed, non-zero for all opaque pixels
+      // -----------------------------------------------------------------------
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'imported_sprite',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      const celData = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
+      expect(celData.length).toBe(4); // 4 rows
+      expect(celData[0].length).toBe(4); // 4 columns
+      // Transparent pixel (0,0) → index 0; all opaque pixels → non-zero indices
+      expect(celData[0][0]).toBe(0);
+      for (let y = 0; y < 4; y++) {
+        for (let x = 0; x < 4; x++) {
+          if (y === 0 && x === 0) continue; // transparent pixel — already asserted above
+          expect(celData[y][x]).toBeGreaterThan(0);
+        }
+      }
     });
   });
 });

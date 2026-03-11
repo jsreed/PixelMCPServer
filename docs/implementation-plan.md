@@ -509,7 +509,7 @@ Full workflow tests that exercise multiple tools in sequence, verifying the syst
 
 #### 5.3.7 PNG Import Workflow
 
-- [ ] **5.3.7.1** **E2E: project add_file** — `project init` → place a test PNG file (small, ≤256 colors) → `project add_file` (import the PNG) → `project info` (verify asset registered) → `workspace load_asset` (load the imported asset) → `asset info` (verify dimensions match PNG) → `palette info` (verify palette ≤ 256 entries, colors match quantized PNG) → `asset get_cel` (verify pixel data is indexed, non-zero for non-transparent regions).
+- [x] **5.3.7.1** **E2E: project add_file** — `project init` → place a test PNG file (small, ≤256 colors) → `project add_file` (import the PNG) → `project info` (verify asset registered) → `workspace load_asset` (load the imported asset) → `asset info` (verify dimensions match PNG) → `palette info` (verify palette ≤ 256 entries, colors match quantized PNG) → `asset get_cel` (verify pixel data is indexed, non-zero for non-transparent regions).
 
 #### 5.3.8 Undo/Redo Stress
 
