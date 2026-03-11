@@ -1151,5 +1151,193 @@ describe('Minimum Viable Loop Integration', () => {
       expect(heroInfo.name).toBe('hero');
       expect(heroInfo.tags.some((t) => t.name === 'idle')).toBe(true);
     });
+
+    it('5.3.4.1 E2E: recolor creation and variant resolution', async () => {
+      // -----------------------------------------------------------------------
+      // 1. project init
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('project', {
+          action: 'init',
+          path: '/tmp/test_project_recolor',
+          name: 'Test Recolor Project',
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 2. asset create "base_char" (8x8 for simplicity)
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('asset', {
+          action: 'create',
+          name: 'base_char',
+          width: 8,
+          height: 8,
+          palette: Array.from({ length: 4 }, () => [0, 0, 0, 0]),
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 3. palette set_bulk — define a distinctive base palette
+      //    Index 0 = transparent, 1 = red, 2 = blue
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('palette', {
+          action: 'set_bulk',
+          asset_name: 'base_char',
+          entries: [
+            { index: 1, rgba: [255, 0, 0, 255] }, // red body
+            { index: 2, rgba: [0, 0, 255, 255] }, // blue detail
+          ],
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 4. draw base character: filled rect with color 1 and a pixel with color 2
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('draw', {
+          asset_name: 'base_char',
+          layer_id: 1,
+          frame_index: 0,
+          operations: [
+            { action: 'rect', x: 1, y: 1, width: 6, height: 6, color: 1, filled: true },
+            { action: 'pixel', x: 3, y: 3, color: 2 },
+          ],
+        }),
+      );
+
+      // Verify base pixel data before saving
+      let res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'base_char',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      const baseData = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
+      expect(baseData[1][1]).toBe(1); // rect corner — color index 1
+      expect(baseData[3][3]).toBe(2); // center pixel — color index 2
+      expect(baseData[0][0]).toBe(0); // corner outside rect — transparent
+
+      // -----------------------------------------------------------------------
+      // 5. workspace save — persist base_char to virtual FS
+      // -----------------------------------------------------------------------
+      unwrap(await dispatch('workspace', { action: 'save_all' }));
+
+      // -----------------------------------------------------------------------
+      // 6. asset create_recolor "alt_char" from "base_char"
+      //    Override: index 1 → green (was red), index 2 → yellow (was blue)
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('asset', {
+          action: 'create_recolor',
+          asset_name: 'base_char',
+          name: 'alt_char',
+          palette_entries: [
+            { index: 1, rgba: [0, 255, 0, 255] }, // green replaces red
+            { index: 2, rgba: [255, 255, 0, 255] }, // yellow replaces blue
+          ],
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 7. asset get_cel on alt_char — pixel INDEX structure must match base_char
+      //    (the palette indices are the same, only palette colours differ)
+      // -----------------------------------------------------------------------
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'alt_char',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      const altData = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
+      // Pixel indices must mirror base_char — same logical structure
+      expect(altData[1][1]).toBe(1); // same index as base
+      expect(altData[3][3]).toBe(2); // same index as base
+      expect(altData[0][0]).toBe(0); // transparent corner unchanged
+
+      // -----------------------------------------------------------------------
+      // 8. palette info on alt_char — palette entries must differ from base_char
+      // -----------------------------------------------------------------------
+      res = unwrap(
+        await dispatch('palette', {
+          action: 'info',
+          asset_name: 'alt_char',
+        }),
+      );
+      const altPaletteInfo = JSON.parse(res.content[0].text) as {
+        entries: Array<{ index: number; rgba: number[] }>;
+      };
+      const altIdx1 = altPaletteInfo.entries.find((e) => e.index === 1);
+      const altIdx2 = altPaletteInfo.entries.find((e) => e.index === 2);
+      // Index 1 should now be green, not red
+      expect(altIdx1?.rgba[0]).toBe(0);
+      expect(altIdx1?.rgba[1]).toBe(255);
+      // Index 2 should now be yellow, not blue
+      expect(altIdx2?.rgba[0]).toBe(255);
+      expect(altIdx2?.rgba[1]).toBe(255);
+      expect(altIdx2?.rgba[2]).toBe(0);
+
+      // -----------------------------------------------------------------------
+      // 9. asset info on alt_char — verify structural fidelity (same W/H,
+      //    same layer count, same frame count as base_char)
+      // -----------------------------------------------------------------------
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'info',
+          asset_name: 'alt_char',
+        }),
+      );
+      const altDocStr = res.content[0].text;
+      const altInfo = JSON.parse(altDocStr.substring(altDocStr.indexOf('{'))) as {
+        name: string;
+        width: number;
+        height: number;
+        layers: unknown[];
+        frames: unknown[];
+      };
+      expect(altInfo.name).toBe('alt_char');
+      expect(altInfo.width).toBe(8);
+      expect(altInfo.height).toBe(8);
+      expect(altInfo.layers.length).toBe(1); // single default layer, same as base
+      expect(altInfo.frames.length).toBe(1); // single default frame, same as base
+
+      // -----------------------------------------------------------------------
+      // 10. workspace load_asset "alt_char" (it is already loaded after create_recolor,
+      //     but unload then reload to verify persistence via the virtual FS)
+      // -----------------------------------------------------------------------
+      unwrap(await dispatch('workspace', { action: 'save_all' }));
+      unwrap(await dispatch('workspace', { action: 'unload_asset', asset_name: 'alt_char' }));
+      unwrap(await dispatch('workspace', { action: 'load_asset', asset_name: 'alt_char' }));
+
+      // Re-verify pixel indices are preserved after round-trip
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'alt_char',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      const reloadedData = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
+      expect(reloadedData[1][1]).toBe(1);
+      expect(reloadedData[3][3]).toBe(2);
+
+      // -----------------------------------------------------------------------
+      // 11. project info — verify both assets in registry and alt_char carries
+      //     recolor_of: "base_char"
+      // -----------------------------------------------------------------------
+      res = unwrap(await dispatch('project', { action: 'info' }));
+      const projectInfo = JSON.parse(res.content[0].text) as {
+        assets: Record<string, { type: string; path?: string; recolor_of?: string }>;
+      };
+      expect('base_char' in projectInfo.assets).toBe(true);
+      expect('alt_char' in projectInfo.assets).toBe(true);
+      expect(projectInfo.assets['alt_char'].recolor_of).toBe('base_char');
+    });
   });
 });

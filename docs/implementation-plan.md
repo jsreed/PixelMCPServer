@@ -497,7 +497,7 @@ Full workflow tests that exercise multiple tools in sequence, verifying the syst
 
 #### 5.3.4 Recolor Workflow
 
-- [ ] **5.3.4.1** **E2E: recolor creation and variant resolution** — `project init` → `asset create` "base_char" → `palette set_bulk` → `draw` (draw base character) → `workspace save` → `asset create_recolor` "alt_char" (with `palette_entries` providing replacement colors) → `workspace load_asset` "alt_char" → `asset get_cel` (verify pixel structure matches base but palette differs) → `asset info` (verify `recolor_of` in registry) → `project info` (verify both assets in registry, alt_char has `recolor_of: "base_char"`).
+- [x] **5.3.4.1** **E2E: recolor creation and variant resolution** — `project init` → `asset create` "base_char" → `palette set_bulk` → `draw` (draw base character) → `workspace save` → `asset create_recolor` "alt_char" (with `palette_entries` providing replacement colors) → `workspace load_asset` "alt_char" → `asset get_cel` (verify pixel structure matches base but palette differs) → `asset info` (verify `recolor_of` in registry) → `project info` (verify both assets in registry, alt_char has `recolor_of: "base_char"`).
 
 #### 5.3.5 Variant Resolution Workflow
 
