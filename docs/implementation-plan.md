@@ -418,8 +418,8 @@ MCP Prompts are user-invoked workflow templates (triggered from the host UI, not
 
 #### 4.2.4 `scaffold_equipment`
 
-- [ ] **4.2.4.1** **Arguments**: `name` (required — asset name), `type` (optional — `"weapon"`, `"armor_head"`, `"armor_chest"`, `"cape"`, etc.; informs default variant structure), `reference_character` (optional — registered asset name of the base body to use as anchor reference).
-- [ ] **4.2.4.2** **Messages generation** — return messages array guiding the LLM through: (1) create asset with dimensions matching the reference character (if provided, query its info), (2) set up palette (possibly shared with reference character), (3) create layer structure appropriate for the equipment type, (4) create directional frame tags aligned with the reference character's tags, (5) draw equipment with alignment guidance relative to the character rig, (6) create fit variants if applicable.
+- [x] **4.2.4.1** **Arguments**: `name` (required — asset name), `type` (optional — `"weapon"`, `"armor_head"`, `"armor_chest"`, `"cape"`, etc.; informs default variant structure), `reference_character` (optional — registered asset name of the base body to use as anchor reference).
+- [x] **4.2.4.2** **Messages generation** — return messages array guiding the LLM through: (1) create asset with dimensions matching the reference character (if provided, query its info), (2) set up palette (possibly shared with reference character), (3) create layer structure appropriate for the equipment type, (4) create directional frame tags aligned with the reference character's tags, (5) draw equipment with alignment guidance relative to the character rig, (6) create fit variants if applicable.
 
 #### 4.2.5 `analyze_asset`
 
