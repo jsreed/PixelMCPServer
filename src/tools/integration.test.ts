@@ -153,6 +153,144 @@ describe('Minimum Viable Loop Integration', () => {
     });
   });
 
+  describe('Error Recovery Tests', () => {
+    it('5.1.2.1 Project recovery: failure then init then success', async () => {
+      // call any tool before project init -> get error
+      const errRes = await dispatch('asset', {
+        action: 'create',
+        name: 'test_asset',
+        width: 16,
+        height: 16,
+      });
+      expect(errRes.isError).toBe(true);
+      expect(errRes.content[0].text).toContain('No project loaded');
+
+      // call project init
+      unwrap(
+        await dispatch('project', { action: 'init', path: '/tmp/test_project', name: 'Test' }),
+      );
+
+      // retry -> success
+      const successRes = await dispatch('asset', {
+        action: 'create',
+        name: 'test_asset',
+        width: 16,
+        height: 16,
+      });
+      expect(successRes.isError).toBeFalsy();
+    });
+
+    it('5.1.2.2 Workspace recovery: asset not loaded then load then success', async () => {
+      unwrap(
+        await dispatch('project', { action: 'init', path: '/tmp/test_project', name: 'Test' }),
+      );
+      // create and save an asset, then unload it
+      unwrap(
+        await dispatch('asset', { action: 'create', name: 'my_asset', width: 16, height: 16 }),
+      );
+      unwrap(await dispatch('workspace', { action: 'save', asset_name: 'my_asset' }));
+      unwrap(await dispatch('workspace', { action: 'unload_asset', asset_name: 'my_asset' }));
+
+      // call asset info on unloaded asset -> get error
+      const errRes = await dispatch('asset', { action: 'info', asset_name: 'my_asset' });
+      expect(errRes.isError).toBe(true);
+      expect(errRes.content[0].text).toContain("Asset 'my_asset' is not loaded");
+
+      // call workspace load_asset
+      unwrap(await dispatch('workspace', { action: 'load_asset', asset_name: 'my_asset' }));
+
+      // retry -> success
+      const successRes = await dispatch('asset', { action: 'info', asset_name: 'my_asset' });
+      expect(successRes.isError).toBeFalsy();
+    });
+
+    it('5.1.2.3 Layer type recovery: get_cel on shape layer -> get_shapes -> success', async () => {
+      unwrap(
+        await dispatch('project', { action: 'init', path: '/tmp/test_project', name: 'Test' }),
+      );
+      unwrap(
+        await dispatch('asset', { action: 'create', name: 'my_asset', width: 16, height: 16 }),
+      );
+      unwrap(
+        await dispatch('asset', {
+          action: 'add_layer',
+          asset_name: 'my_asset',
+          layer_type: 'shape',
+          name: 'hitbox',
+        }),
+      );
+
+      // call get_cel on shape layer -> get redirect message
+      const errRes = await dispatch('asset', {
+        action: 'get_cel',
+        asset_name: 'my_asset',
+        layer_id: 2,
+        frame_index: 0,
+      });
+      expect(errRes.isError).toBe(true);
+      expect(errRes.content[0].text).toContain(
+        'is a shape layer. Use asset get_shapes to read shape data.',
+      );
+
+      // call asset get_shapes -> success
+      const successRes = await dispatch('asset', {
+        action: 'get_shapes',
+        asset_name: 'my_asset',
+        layer_id: 2,
+        frame_index: 0,
+      });
+      expect(successRes.isError).toBeFalsy();
+      expect(JSON.parse(successRes.content[0].text)).toHaveProperty('shapes');
+    });
+
+    it('5.1.2.4 Palette recovery: generate_ramp with undefined endpoint -> set endpoint -> success', async () => {
+      unwrap(
+        await dispatch('project', { action: 'init', path: '/tmp/test_project', name: 'Test' }),
+      );
+      unwrap(
+        await dispatch('asset', {
+          action: 'create',
+          name: 'my_asset',
+          width: 16,
+          height: 16,
+          palette: [
+            [0, 0, 0, 0],
+            [255, 255, 255, 255],
+          ],
+        }),
+      );
+
+      // generate_ramp from 1 to 5 (endpoint 5 is undefined) -> get error
+      const errRes = await dispatch('palette', {
+        action: 'generate_ramp',
+        asset_name: 'my_asset',
+        color1: 1,
+        color2: 5,
+      });
+      expect(errRes.isError).toBe(true);
+      expect(errRes.content[0].text).toContain('has no color defined. Set it before');
+
+      // call palette set on endpoint
+      unwrap(
+        await dispatch('palette', {
+          action: 'set',
+          asset_name: 'my_asset',
+          index: 5,
+          rgba: [255, 0, 0, 255],
+        }),
+      );
+
+      // retry -> success
+      const successRes = await dispatch('palette', {
+        action: 'generate_ramp',
+        asset_name: 'my_asset',
+        color1: 1,
+        color2: 5,
+      });
+      expect(successRes.isError).toBeFalsy();
+    });
+  });
+
   describe('End-to-End Workflow', () => {
     it('executes Minimum Viable Loop (init -> create -> set -> draw -> verify -> save)', async () => {
       // 1. Init Project

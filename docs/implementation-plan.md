@@ -455,24 +455,24 @@ Verify every domain error from [design §2.6](design.md) is implemented correctl
 
 Verify each tool returns the exact error message text from §2.6, with `isError: true` set, for every documented error condition.
 
-- [ ] **5.1.1.1** **`project` errors** — (1) "No project loaded" on any action without active project, (2) "Project file not found: {path}" on `open` with missing file.
-- [ ] **5.1.1.2** **`workspace` errors** — (1) "Asset '{name}' not found in project registry" on `load_asset` with unknown name, (2) "Asset file not found: {path}" on `load_asset` with missing file on disk, (3) "Asset '{name}' is not loaded" on `unload_asset`/`save` with unloaded asset, (4) unsaved changes warning (non-error) on `unload_asset` with dirty asset.
-- [ ] **5.1.1.3** **`asset` errors** — (1) "Asset '{name}' is not loaded" on any action, (2) "Layer {id} is a shape layer" redirect on `get_cel`/`get_cels`, (3) tilemap layer returns grid array (non-error), (4) "Layer {id} does not exist" on invalid `layer_id`, (5) "Frame {index} is out of range" on out-of-bounds `frame_index`, (6) "Layer {id} is not a group layer" on invalid `parent_layer_id` in `add_layer`, (7) "Layer {id} is not an image layer" on `generate_collision_polygon`, (8) "No target shape layer specified" when no hitbox shape layer found, (9) "Layer {id} is not a shape layer" on `add_shape`/`update_shape`, (10) "At least one palette source" on `create_recolor` with no palette.
-- [ ] **5.1.1.4** **`draw` errors** — (1) "Color index {color} is out of range (0–255)" on any operation, (2) "write_pixels data dimensions ({dw}×{dh}) do not match declared width×height ({w}×{h})" on `write_pixels`.
-- [ ] **5.1.1.5** **`effect` errors** — (1) "Color index {color} is out of range (0–255)" for `color1`/`color2`.
-- [ ] **5.1.1.6** **`palette` errors** — (1) "Palette index {index} is out of range (0–255)" on `set`/`swap`, (2) "Palette index {index} has no color defined" on `generate_ramp` endpoints, (3) "generate_ramp requires color1 < color2", (4) "Lospec palette '{slug}' not found or API unavailable" on `fetch_lospec`, (5) "Palette file not found: {path}" on `load`, (6) "Invalid palette file: {path}" on `load` with malformed JSON.
-- [ ] **5.1.1.7** **`tileset` errors** — (1) "Asset '{name}' has no tile dimensions" on `autotile_generate` for non-tileset, (2) "autotile_generate requires a pattern" when `pattern` missing, (3) "Tile index {index} does not exist" on `set_tile_physics`.
-- [ ] **5.1.1.8** **`export` errors** — (1) "Asset '{name}' is not loaded" on any action, (2) "Cannot write to path: {path}" on non-writable output.
-- [ ] **5.1.1.9** **`selection` errors** — (1) "Clipboard is empty" on `paste` without prior copy/cut, (2) "Target asset '{name}' is not loaded" on `paste` with unloaded target.
+- [x] **5.1.1.1** **`project` errors** — (1) "No project loaded" on any action without active project, (2) "Project file not found: {path}" on `open` with missing file.
+- [x] **5.1.1.2** **`workspace` errors** — (1) "Asset '{name}' not found in project registry" on `load_asset` with unknown name, (2) "Asset file not found: {path}" on `load_asset` with missing file on disk, (3) "Asset '{name}' is not loaded" on `unload_asset`/`save` with unloaded asset, (4) unsaved changes warning (non-error) on `unload_asset` with dirty asset.
+- [x] **5.1.1.3** **`asset` errors** — (1) "Asset '{name}' is not loaded" on any action, (2) "Layer {id} is a shape layer" redirect on `get_cel`/`get_cels`, (3) tilemap layer returns grid array (non-error), (4) "Layer {id} does not exist" on invalid `layer_id`, (5) "Frame {index} is out of range" on out-of-bounds `frame_index`, (6) "Layer {id} is not a group layer" on invalid `parent_layer_id` in `add_layer`, (7) "Layer {id} is not an image layer" on `generate_collision_polygon`, (8) "No target shape layer specified" when no hitbox shape layer found, (9) "Layer {id} is not a shape layer" on `add_shape`/`update_shape`, (10) "At least one palette source" on `create_recolor` with no palette.
+- [x] **5.1.1.4** **`draw` errors** — (1) "Color index {color} is out of range (0–255)" on any operation, (2) "write_pixels data dimensions ({dw}×{dh}) do not match declared width×height ({w}×{h})" on `write_pixels`.
+- [x] **5.1.1.5** **`effect` errors** — (1) "Color index {color} is out of range (0–255)" for `color1`/`color2`.
+- [x] **5.1.1.6** **`palette` errors** — (1) "Palette index {index} is out of range (0–255)" on `set`/`swap`, (2) "Palette index {index} has no color defined" on `generate_ramp` endpoints, (3) "generate_ramp requires color1 < color2", (4) "Lospec palette '{slug}' not found or API unavailable" on `fetch_lospec`, (5) "Palette file not found: {path}" on `load`, (6) "Invalid palette file: {path}" on `load` with malformed JSON.
+- [x] **5.1.1.7** **`tileset` errors** — (1) "Asset '{name}' has no tile dimensions" on `autotile_generate` for non-tileset, (2) "autotile_generate requires a pattern" when `pattern` missing, (3) "Tile index {index} does not exist" on `set_tile_physics`.
+- [x] **5.1.1.8** **`export` errors** — (1) "Asset '{name}' is not loaded" on any action, (2) "Cannot write to path: {path}" on non-writable output.
+- [x] **5.1.1.9** **`selection` errors** — (1) "Clipboard is empty" on `paste` without prior copy/cut, (2) "Target asset '{name}' is not loaded" on `paste` with unloaded target.
 
 #### 5.1.2 Error Recovery Tests
 
 Verify that each domain error returns sufficient information for recovery. For each error, test the pattern: trigger error → verify `isError: true` + message text → perform the corrective action suggested by the message → retry original operation → verify success.
 
-- [ ] **5.1.2.1** **Project recovery** — call any tool before project init → get error → call `project init` → retry → success.
-- [ ] **5.1.2.2** **Workspace recovery** — call `asset info` on unloaded asset → get error → call `workspace load_asset` → retry → success.
-- [ ] **5.1.2.3** **Layer type recovery** — call `get_cel` on shape layer → get redirect message → call `asset get_shapes` → success.
-- [ ] **5.1.2.4** **Palette recovery** — call `generate_ramp` with undefined endpoint → get error → call `palette set` on endpoint → retry → success.
+- [x] **5.1.2.1** **Project recovery** — call any tool before project init → get error → call `project init` → retry → success.
+- [x] **5.1.2.2** **Workspace recovery** — call `asset info` on unloaded asset → get error → call `workspace load_asset` → retry → success.
+- [x] **5.1.2.3** **Layer type recovery** — call `get_cel` on shape layer → get redirect message → call `asset get_shapes` → success.
+- [x] **5.1.2.4** **Palette recovery** — call `generate_ramp` with undefined endpoint → get error → call `palette set` on endpoint → retry → success.
 
 ### 5.2 Tool Surface Completeness Check
 

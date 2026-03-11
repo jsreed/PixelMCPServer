@@ -806,7 +806,7 @@ export class AssetClass {
   // Private Helpers
   // ------------------------------------------------------------------------
 
-  private getLayer(id: number): Layer | undefined {
+  public getLayer(id: number): Layer | undefined {
     return this._data.layers.find((l) => l.id === id);
   }
 

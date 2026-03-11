@@ -333,6 +333,14 @@ function handleGetCel(
   if (layerId === undefined) return errors.invalidArgument('get_cel requires "layer_id".');
   if (frameIndex === undefined) return errors.invalidArgument('get_cel requires "frame_index".');
 
+  const layer = asset.getLayer(layerId);
+  if (!layer) return errors.layerNotFound(layerId, asset.name);
+  if (layer.type === 'shape') return errors.layerIsShapeLayer(layerId);
+
+  if (frameIndex < 0 || frameIndex >= asset.frames.length) {
+    return errors.frameOutOfRange(frameIndex, asset.name, asset.frames.length);
+  }
+
   // Check if it's a linked cel (before resolution)
   const rawKey = packCelKey(layerId, frameIndex);
   const rawCels = asset.cels;
@@ -385,6 +393,16 @@ function handleGetCels(
     );
   }
 
+  // Validate layers
+  for (const t of targets) {
+    const layer = asset.getLayer(t.layer_id);
+    if (!layer) return errors.layerNotFound(t.layer_id, asset.name);
+    if (layer.type === 'shape') return errors.layerIsShapeLayer(t.layer_id);
+    if (t.frame_index < 0 || t.frame_index >= asset.frames.length) {
+      return errors.frameOutOfRange(t.frame_index, asset.name, asset.frames.length);
+    }
+  }
+
   const results = targets.map((t) => {
     const cel = asset.getCel(t.layer_id, t.frame_index);
     if (!cel || !('data' in cel)) {
@@ -429,6 +447,13 @@ function handleDetectBanding(
   if (layerId === undefined) return errors.invalidArgument('detect_banding requires "layer_id".');
   if (frameIndex === undefined)
     return errors.invalidArgument('detect_banding requires "frame_index".');
+
+  const layer = asset.getLayer(layerId);
+  if (!layer) return errors.layerNotFound(layerId, asset.name);
+
+  if (frameIndex < 0 || frameIndex >= asset.frames.length) {
+    return errors.frameOutOfRange(frameIndex, asset.name, asset.frames.length);
+  }
 
   const cel = asset.getCel(layerId, frameIndex);
   if (!cel || !('data' in cel)) return ok({ clean: true });
@@ -648,6 +673,14 @@ async function handleCreateRecolor(workspace: Workspace, args: Record<string, un
   const project = workspace.project;
   const sourceName = args.asset_name as string;
   const newName = args.name as string;
+
+  if (
+    !args.palette_file &&
+    !args.palette_slug &&
+    !(Array.isArray(args.palette_entries) && args.palette_entries.length > 0)
+  ) {
+    return errors.noRecolorPaletteSource();
+  }
 
   // Clone asset
   const clonedData = JSON.parse(JSON.stringify(asset.toJSON())) as Asset;
