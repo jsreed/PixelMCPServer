@@ -505,7 +505,7 @@ Full workflow tests that exercise multiple tools in sequence, verifying the syst
 
 #### 5.3.6 Palette Workflow
 
-- [ ] **5.3.6.1** **E2E: palette lifecycle** — `project init` → `asset create` → `palette fetch_lospec` (known slug) → `palette info` (verify colors populated) → `palette save` (write to palette file) → `palette set` (modify a color) → `palette load` (reload saved file, verify color reverted) → `palette generate_ramp` (between two existing colors) → `palette info` (verify ramp entries interpolated) → `workspace undo` (verify ramp reverted) → `workspace redo` (verify ramp restored).
+- [x] **5.3.6.1** **E2E: palette lifecycle** — `project init` → `asset create` → `palette fetch_lospec` (known slug) → `palette info` (verify colors populated) → `palette save` (write to palette file) → `palette set` (modify a color) → `palette load` (reload saved file, verify color reverted) → `palette generate_ramp` (between two existing colors) → `palette info` (verify ramp entries interpolated) → `workspace undo` (verify ramp reverted) → `workspace redo` (verify ramp restored).
 
 #### 5.3.7 PNG Import Workflow
 

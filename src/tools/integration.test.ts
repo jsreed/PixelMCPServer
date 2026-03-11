@@ -39,6 +39,18 @@ vi.mock('../io/project-io.js', () => ({
   }),
 }));
 
+vi.mock('../io/palette-io.js', () => ({
+  loadPaletteFile: vi.fn().mockImplementation((filePath: string) => {
+    if (!virtualFs.has(filePath))
+      return Promise.reject(new Error(`Palette file not found: ${filePath}`));
+    return Promise.resolve(JSON.parse(JSON.stringify(virtualFs.get(filePath))));
+  }),
+  savePaletteFile: vi.fn().mockImplementation((filePath: string, name: string, colors: unknown) => {
+    virtualFs.set(filePath, JSON.parse(JSON.stringify({ name, colors })));
+    return Promise.resolve();
+  }),
+}));
+
 import { Writable } from 'node:stream';
 
 vi.mock('node:fs', () => ({
@@ -1508,6 +1520,153 @@ describe('Minimum Viable Loop Integration', () => {
       );
       const slimCelData = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
       expect(slimCelData[0][0]).toBe(2); // slim: color 2 at (0,0)
+    });
+
+    it('5.3.6.1 E2E: palette lifecycle - fetch_lospec, save, load, generate_ramp, undo/redo', async () => {
+      const projectPath = '/tmp/test_project_palette';
+
+      // -----------------------------------------------------------------------
+      // 1. project init
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('project', { action: 'init', path: projectPath, name: 'Palette Test' }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 2. asset create
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('asset', { action: 'create', name: 'my_sprite', width: 16, height: 16 }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 3. palette fetch_lospec — mock returns 3 known colors
+      //    Lospec convention: index 0 = transparent, colors start at index 1
+      //    Returned hex: "ff0000" (red), "00ff00" (green), "0000ff" (blue)
+      // -----------------------------------------------------------------------
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            name: 'Test Palette',
+            colors: ['ff0000', '00ff00', '0000ff'],
+          }),
+      } as Response);
+
+      unwrap(
+        await dispatch('palette', {
+          action: 'fetch_lospec',
+          asset_name: 'my_sprite',
+          name: 'test-palette',
+        }),
+      );
+      fetchSpy.mockRestore();
+
+      // -----------------------------------------------------------------------
+      // 4. palette info — verify colors populated
+      // -----------------------------------------------------------------------
+      let res = unwrap(await dispatch('palette', { action: 'info', asset_name: 'my_sprite' }));
+      const infoAfterFetch = JSON.parse(res.content[0].text) as {
+        entries: Array<{ index: number; rgba: [number, number, number, number] }>;
+      };
+      const idx1After = infoAfterFetch.entries.find((e) => e.index === 1);
+      const idx2After = infoAfterFetch.entries.find((e) => e.index === 2);
+      const idx3After = infoAfterFetch.entries.find((e) => e.index === 3);
+      expect(idx1After?.rgba).toEqual([255, 0, 0, 255]); // red
+      expect(idx2After?.rgba).toEqual([0, 255, 0, 255]); // green
+      expect(idx3After?.rgba).toEqual([0, 0, 255, 255]); // blue
+
+      // -----------------------------------------------------------------------
+      // 5. palette save — persist palette to file
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('palette', {
+          action: 'save',
+          asset_name: 'my_sprite',
+          path: 'palettes/my_palette.json',
+          name: 'my_palette',
+        }),
+      );
+      const paletteFilePath = `${projectPath}/palettes/my_palette.json`;
+      expect(virtualFs.has(paletteFilePath)).toBe(true);
+
+      // -----------------------------------------------------------------------
+      // 6. palette set — modify index 1 to gray
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('palette', {
+          action: 'set',
+          asset_name: 'my_sprite',
+          index: 1,
+          rgba: [100, 100, 100, 255],
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 7. palette load — reload saved file, verify index 1 reverts to red
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('palette', {
+          action: 'load',
+          asset_name: 'my_sprite',
+          path: 'palettes/my_palette.json',
+        }),
+      );
+
+      res = unwrap(await dispatch('palette', { action: 'info', asset_name: 'my_sprite' }));
+      const infoAfterLoad = JSON.parse(res.content[0].text) as {
+        entries: Array<{ index: number; rgba: [number, number, number, number] }>;
+      };
+      const idx1Restored = infoAfterLoad.entries.find((e) => e.index === 1);
+      expect(idx1Restored?.rgba).toEqual([255, 0, 0, 255]); // back to red
+
+      // -----------------------------------------------------------------------
+      // 8. palette generate_ramp from index 1 (red) to index 3 (blue)
+      //    → fills index 2 with interpolated midpoint: [128, 0, 128, 255]
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('palette', {
+          action: 'generate_ramp',
+          asset_name: 'my_sprite',
+          color1: 1,
+          color2: 3,
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 9. palette info — verify ramp entries interpolated
+      // -----------------------------------------------------------------------
+      res = unwrap(await dispatch('palette', { action: 'info', asset_name: 'my_sprite' }));
+      const infoAfterRamp = JSON.parse(res.content[0].text) as {
+        entries: Array<{ index: number; rgba: [number, number, number, number] }>;
+      };
+      const idx2AfterRamp = infoAfterRamp.entries.find((e) => e.index === 2);
+      // Midpoint between red [255,0,0,255] and blue [0,0,255,255]: t=0.5
+      expect(idx2AfterRamp?.rgba).toEqual([128, 0, 128, 255]);
+
+      // -----------------------------------------------------------------------
+      // 10. workspace undo — ramp reverted; index 2 should be green again
+      // -----------------------------------------------------------------------
+      unwrap(await dispatch('workspace', { action: 'undo' }));
+
+      res = unwrap(await dispatch('palette', { action: 'info', asset_name: 'my_sprite' }));
+      const infoAfterUndo = JSON.parse(res.content[0].text) as {
+        entries: Array<{ index: number; rgba: [number, number, number, number] }>;
+      };
+      const idx2AfterUndo = infoAfterUndo.entries.find((e) => e.index === 2);
+      expect(idx2AfterUndo?.rgba).toEqual([0, 255, 0, 255]); // green restored
+
+      // -----------------------------------------------------------------------
+      // 11. workspace redo — ramp re-applied; index 2 is interpolated again
+      // -----------------------------------------------------------------------
+      unwrap(await dispatch('workspace', { action: 'redo' }));
+
+      res = unwrap(await dispatch('palette', { action: 'info', asset_name: 'my_sprite' }));
+      const infoAfterRedo = JSON.parse(res.content[0].text) as {
+        entries: Array<{ index: number; rgba: [number, number, number, number] }>;
+      };
+      const idx2AfterRedo = infoAfterRedo.entries.find((e) => e.index === 2);
+      expect(idx2AfterRedo?.rgba).toEqual([128, 0, 128, 255]); // interpolated restored
     });
   });
 });
