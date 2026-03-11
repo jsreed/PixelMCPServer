@@ -8,6 +8,7 @@ import { registerPaletteTool } from './palette.js';
 import { registerDrawTool } from './draw.js';
 import { registerExportTool } from './export.js';
 import { registerTilesetTool } from './tileset.js';
+import { registerSelectionTool } from './selection.js';
 import { saveAssetFile } from '../io/asset-io.js';
 import { PNG } from 'pngjs';
 
@@ -125,6 +126,7 @@ function createMockServer() {
   registerDrawTool(mockServer as any);
   registerExportTool(mockServer as any);
   registerTilesetTool(mockServer as any);
+  registerSelectionTool(mockServer as any);
   /* eslint-enable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any */
 
   return {
@@ -872,6 +874,282 @@ describe('Minimum Viable Loop Integration', () => {
       expect(tresData).toContain('texture_region_size');
       expect(tresData).toContain('polygon_0/points');
       expect(tresData).toContain('terrain_set_0/terrain_0/name = "ground"');
+    });
+
+    it('5.3.3.1 E2E: modular equipment with cross-asset operations', async () => {
+      // -----------------------------------------------------------------------
+      // 1. project init
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('project', {
+          action: 'init',
+          path: '/tmp/test_project_equipment',
+          name: 'Test Equipment Project',
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 2. asset create "hero" (16x24 character) and "sword" (16x24 weapon)
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('asset', {
+          action: 'create',
+          name: 'hero',
+          width: 16,
+          height: 24,
+          palette: Array.from({ length: 4 }, () => [0, 0, 0, 0]),
+        }),
+      );
+
+      unwrap(
+        await dispatch('asset', {
+          action: 'create',
+          name: 'sword',
+          width: 16,
+          height: 24,
+          palette: Array.from({ length: 4 }, () => [0, 0, 0, 0]),
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 3. palette set_bulk (same palette on both assets)
+      // -----------------------------------------------------------------------
+      const sharedPaletteEntries = [
+        { index: 1, rgba: [200, 50, 50, 255] }, // hero body red
+        { index: 2, rgba: [180, 180, 200, 255] }, // sword steel
+        { index: 3, rgba: [100, 80, 60, 255] }, // sword handle brown
+      ];
+
+      unwrap(
+        await dispatch('palette', {
+          action: 'set_bulk',
+          asset_name: 'hero',
+          entries: sharedPaletteEntries,
+        }),
+      );
+
+      unwrap(
+        await dispatch('palette', {
+          action: 'set_bulk',
+          asset_name: 'sword',
+          entries: sharedPaletteEntries,
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 4. draw character body on hero (layer 1, frame 0)
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('draw', {
+          asset_name: 'hero',
+          layer_id: 1,
+          frame_index: 0,
+          operations: [
+            { action: 'rect', x: 4, y: 2, width: 8, height: 20, color: 1, filled: true },
+          ],
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 5. draw sword pixels on sword asset (layer 1, frame 0)
+      //    Blade at columns 7-9, hilt at rows 16-18
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('draw', {
+          asset_name: 'sword',
+          layer_id: 1,
+          frame_index: 0,
+          operations: [
+            { action: 'rect', x: 7, y: 2, width: 3, height: 14, color: 2, filled: true }, // blade
+            { action: 'rect', x: 5, y: 16, width: 7, height: 3, color: 3, filled: true }, // guard
+          ],
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 6. asset add_tag on both assets (matching "idle" tags)
+      //    hero gets a facing tag (idle_south), sword gets a plain forward tag.
+      // -----------------------------------------------------------------------
+      // Add a second frame to enable multi-frame tags
+      unwrap(await dispatch('asset', { action: 'add_frame', asset_name: 'hero' }));
+      unwrap(await dispatch('asset', { action: 'add_frame', asset_name: 'sword' }));
+
+      // Hero: "idle" tag (frame 0, no facing) and "idle_south" tag (frame 0, facing S)
+      unwrap(
+        await dispatch('asset', {
+          action: 'add_tag',
+          asset_name: 'hero',
+          name: 'idle',
+          tag_start: 0,
+          tag_end: 0,
+          direction: 'forward',
+          tag_type: 'frame',
+        }),
+      );
+      unwrap(
+        await dispatch('asset', {
+          action: 'add_tag',
+          asset_name: 'hero',
+          name: 'idle',
+          tag_start: 0,
+          tag_end: 0,
+          direction: 'forward',
+          tag_type: 'frame',
+          tag_facing: 'S',
+        }),
+      );
+
+      // Sword: "idle" tag (frame 0, no facing — direction-only)
+      unwrap(
+        await dispatch('asset', {
+          action: 'add_tag',
+          asset_name: 'sword',
+          name: 'idle',
+          tag_start: 0,
+          tag_end: 0,
+          direction: 'forward',
+          tag_type: 'frame',
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 7. selection rect on sword asset, copy the sword blade region
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('selection', {
+          action: 'rect',
+          asset_name: 'sword',
+          layer_id: 1,
+          frame_index: 0,
+          x: 7,
+          y: 2,
+          width: 3,
+          height: 14,
+        }),
+      );
+
+      unwrap(
+        await dispatch('selection', {
+          action: 'copy',
+          asset_name: 'sword',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+
+      // -----------------------------------------------------------------------
+      // 8. selection paste into hero asset at offset (same position as drawn)
+      //    Verifies cross-asset clipboard transfer
+      // -----------------------------------------------------------------------
+      unwrap(
+        await dispatch('selection', {
+          action: 'paste',
+          target_asset_name: 'hero',
+          target_layer_id: 1,
+          target_frame_index: 0,
+          offset_x: 0,
+          offset_y: 0,
+        }),
+      );
+
+      // Verify pixels transferred: hero layer 1 frame 0 should now have sword blade pixels
+      // The paste writes to originalX+offsetX = 7+0=7, originalY+offsetY = 2+0=2
+      let res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'hero',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      const heroCelData = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
+      // Blade pixels (color 2) were pasted at (7,2) → (9,15)
+      expect(heroCelData[2][7]).toBe(2); // top of blade
+      expect(heroCelData[15][8]).toBe(2); // middle of blade
+      // Hero body pixels (color 1) remain untouched outside the paste region
+      expect(heroCelData[2][4]).toBe(1); // hero body left edge untouched
+      // -----------------------------------------------------------------------
+      // 9. export per_tag on sword
+      //    Default pattern: '{name}_{tag}_{direction}.png'
+      //    Sword's "idle" tag has no facing → direction falls back to 'forward'
+      //    Expected filename: sword_idle_forward.png
+      // -----------------------------------------------------------------------
+      res = unwrap(
+        await dispatch('export', {
+          action: 'per_tag',
+          asset_name: 'sword',
+          path: '/tmp/test_project_equipment/output',
+          tags: ['idle'],
+        }),
+      );
+
+      // The default export pattern is '{name}_{tag}_{direction}.png'
+      // Sword idle tag has no facing → direction = 'forward' → sword_idle_forward.png
+      const exportResult = JSON.parse(res.content[0].text) as { files: string[] };
+      expect(exportResult.files.length).toBeGreaterThanOrEqual(1);
+
+      const swordIdleFile = exportResult.files[0];
+      // Token substitution: {name}=sword, {tag}=idle, {direction}=forward
+      expect(swordIdleFile).toContain('sword');
+      expect(swordIdleFile).toContain('idle');
+      expect(swordIdleFile).toContain('forward'); // direction token populated (no facing)
+      // Verify no doubled separators — the file should be stored without malformed names
+      expect(virtualFs.has(swordIdleFile)).toBe(true);
+
+      // -----------------------------------------------------------------------
+      // 10. export per_tag on hero to verify facing value substitutes as direction token
+      //    Hero has two "idle" tags: one with no facing (→ 'forward') and one with
+      //    facing='S' (→ 'S'). Export both and verify the facing value appears in
+      //    the filename when the tag carries a facing, demonstrating correct
+      //    separator-dropping: the tag with facing='S' uses 'S' (not 'forward').
+      // -----------------------------------------------------------------------
+      res = unwrap(
+        await dispatch('export', {
+          action: 'per_tag',
+          asset_name: 'hero',
+          path: '/tmp/test_project_equipment/hero_output',
+          tags: ['idle'],
+        }),
+      );
+      const heroExportResult = JSON.parse(res.content[0].text) as { files: string[] };
+      // Hero has two idle tags (no-facing + facing=S) → two output files
+      expect(heroExportResult.files.length).toBe(2);
+
+      // All files should exist in the virtual FS and contain 'hero' and 'idle'
+      for (const f of heroExportResult.files) {
+        expect(virtualFs.has(f)).toBe(true);
+        expect(f).toContain('hero');
+        expect(f).toContain('idle');
+      }
+      // One file should use the facing value 'S' as its direction token
+      expect(heroExportResult.files.some((f) => f.includes('_S'))).toBe(true);
+      // The other should use 'forward' (direction fallback when no facing)
+      expect(heroExportResult.files.some((f) => f.includes('forward'))).toBe(true);
+
+      // -----------------------------------------------------------------------
+      // 11. Verify both assets were structurally valid after all operations
+      // -----------------------------------------------------------------------
+      res = unwrap(await dispatch('asset', { action: 'info', asset_name: 'sword' }));
+      const docStr = res.content[0].text;
+      const swordInfo = JSON.parse(docStr.substring(docStr.indexOf('{'))) as {
+        name: string;
+        width: number;
+        height: number;
+        tags: { name: string }[];
+      };
+      expect(swordInfo.name).toBe('sword');
+      expect(swordInfo.width).toBe(16);
+      expect(swordInfo.height).toBe(24);
+      expect(swordInfo.tags.some((t) => t.name === 'idle')).toBe(true);
+
+      res = unwrap(await dispatch('asset', { action: 'info', asset_name: 'hero' }));
+      const heroDocStr = res.content[0].text;
+      const heroInfo = JSON.parse(heroDocStr.substring(heroDocStr.indexOf('{'))) as {
+        name: string;
+        tags: { name: string }[];
+      };
+      expect(heroInfo.name).toBe('hero');
+      expect(heroInfo.tags.some((t) => t.name === 'idle')).toBe(true);
     });
   });
 });

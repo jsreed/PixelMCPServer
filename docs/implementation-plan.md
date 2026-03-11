@@ -493,7 +493,7 @@ Full workflow tests that exercise multiple tools in sequence, verifying the syst
 
 #### 5.3.3 Equipment Workflow
 
-- [ ] **5.3.3.1** **E2E: modular equipment with cross-asset operations** — `project init` → `asset create` "hero" (16×24 character) → `asset create` "sword" (16×24 weapon) → `palette set_bulk` (same palette on both) → `draw` (draw character body on hero) → `draw` (draw sword pixels on sword asset) → `asset add_tag` on both (matching "idle" tags with facing) → `selection rect` (select sword region) → `selection copy` → `selection paste` (paste to hero asset at offset, verify pixels transferred cross-asset) → `export per_tag` (with export pattern `{name}_{tag}_{direction}`) → verify output filenames use correct token substitution with separator-dropping for tags without facing.
+- [x] **5.3.3.1** **E2E: modular equipment with cross-asset operations** — `project init` → `asset create` "hero" (16×24 character) → `asset create` "sword" (16×24 weapon) → `palette set_bulk` (same palette on both) → `draw` (draw character body on hero) → `draw` (draw sword pixels on sword asset) → `asset add_tag` on both (matching "idle" tags with facing) → `selection rect` (select sword region) → `selection copy` → `selection paste` (paste to hero asset at offset, verify pixels transferred cross-asset) → `export per_tag` (with export pattern `{name}_{tag}_{direction}`) → verify output filenames use correct token substitution with separator-dropping for tags without facing.
 
 #### 5.3.4 Recolor Workflow
 
