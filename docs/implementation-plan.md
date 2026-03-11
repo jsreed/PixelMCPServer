@@ -428,18 +428,18 @@ MCP Prompts are user-invoked workflow templates (triggered from the host UI, not
 
 #### 4.2.6 `export_for_godot`
 
-- [ ] **4.2.6.1** **Arguments**: `asset_name` (required — the asset to export), `godot_project_path` (optional — root path of the Godot project; defaults to project-level export path if configured).
-- [ ] **4.2.6.2** **Messages generation** — return messages array guiding the LLM to: (1) call `asset info` to determine asset type and structure, (2) select the correct export action based on asset characteristics: `godot_spriteframes` for animated sprites (has frame tags), `godot_tileset` for tilesets (has tile dimensions), `godot_static` for single-frame non-tiled assets, (3) construct the correct `path` parameter relative to `godot_project_path`, (4) execute the export, (5) verify output files were created.
+- [x] **4.2.6.1** **Arguments**: `asset_name` (required — the asset to export), `godot_project_path` (optional — root path of the Godot project; defaults to project-level export path if configured).
+- [x] **4.2.6.2** **Messages generation** — return messages array guiding the LLM to: (1) call `asset info` to determine asset type and structure, (2) select the correct export action based on asset characteristics: `godot_spriteframes` for animated sprites (has frame tags), `godot_tileset` for tilesets (has tile dimensions), `godot_static` for single-frame non-tiled assets, (3) construct the correct `path` parameter relative to `godot_project_path`, (4) execute the export, (5) verify output files were created.
 
 #### 4.2.7 Prompt Tests
 
-- [ ] **4.2.7.1** **Registration tests** — all 5 prompts registered, each has correct name, description, and argument definitions.
-- [ ] **4.2.7.2** **Argument validation tests** — required arguments enforced, optional arguments apply defaults correctly, invalid argument values rejected.
+- [x] **4.2.7.1** **Registration tests** — all 5 prompts registered, each has correct name, description, and argument definitions.
+- [x] **4.2.7.2** **Argument validation tests** — required arguments enforced, optional arguments apply defaults correctly, invalid argument values rejected.
 - [ ] **4.2.7.3** **`scaffold_character` tests** — messages reference `asset create`, `palette` tool, `asset add_layer`, `asset add_tag`; 4-dir vs 8-dir produces different facing values; custom dimensions passed through.
 - [ ] **4.2.7.4** **`scaffold_tileset` tests** — messages reference `asset create` with tile fields, `autotile_generate`, `godot_tileset` export; terrain_name defaults to asset name.
 - [ ] **4.2.7.5** **`scaffold_equipment` tests** — messages reference `asset info` for reference character, correct equipment type guidance.
 - [ ] **4.2.7.6** **`analyze_asset` tests** — messages include calls to `asset info`, `palette info`, `detect_banding`; output is a structured critique.
-- [ ] **4.2.7.7** **`export_for_godot` tests** — messages include `asset info` inspection, correct export action selection logic for each asset type.
+- [x] **4.2.7.7** **`export_for_godot` tests** — messages include `asset info` inspection, correct export action selection logic for each asset type.
 
 > **Definition of Done — Phase 4:** All resource URIs resolve and return valid image data. All prompts return well-formed message arrays with correct argument validation. Resource links appear in mutation tool responses for all 7 mutation tools. Prompt messages reference correct tool names and actions.
 
