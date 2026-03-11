@@ -517,7 +517,7 @@ Full workflow tests that exercise multiple tools in sequence, verifying the syst
 
 #### 5.3.9 Linked Cel Lifecycle
 
-- [ ] **5.3.9.1** **E2E: linked cel resolution, write-break, and undo** — `project init` → `asset create` (2 frames) → `draw` (pixels on frame 0) → create linked cel (frame 1 links to frame 0) → `asset get_cel` frame 1 (verify returns frame 0 pixel data, `is_linked: true`, `link_source` metadata) → `draw` (modify a pixel on frame 1) → `asset get_cel` frame 1 (verify link broken — `is_linked: false`, pixel data includes the modification) → `asset get_cel` frame 0 (verify source cel unchanged) → `workspace undo` → `asset get_cel` frame 1 (verify link restored — `is_linked: true`, data matches frame 0 again).
+- [x] **5.3.9.1** **E2E: linked cel resolution, write-break, and undo** — `project init` → `asset create` (2 frames) → `draw` (pixels on frame 0) → create linked cel (frame 1 links to frame 0) → `asset get_cel` frame 1 (verify returns frame 0 pixel data, `is_linked: true`, `link_source` metadata) → `draw` (modify a pixel on frame 1) → `asset get_cel` frame 1 (verify link broken — `is_linked: false`, pixel data includes the modification) → `asset get_cel` frame 0 (verify source cel unchanged) → `workspace undo` → `asset get_cel` frame 1 (verify link restored — `is_linked: true`, data matches frame 0 again).
 
 #### 5.3.10 Selection Workflow
 

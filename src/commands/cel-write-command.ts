@@ -1,6 +1,6 @@
 import { type Command } from './command.js';
 import { type AssetClass } from '../classes/asset.js';
-import { type Cel } from '../types/cel.js';
+import { type Cel, packCelKey } from '../types/cel.js';
 
 export class CelWriteCommand implements Command {
   private beforeCel: Cel | undefined;
@@ -12,8 +12,9 @@ export class CelWriteCommand implements Command {
     private frameIndex: number,
     private action: () => void,
   ) {
-    const cel = asset.getCel(layerId, frameIndex);
-    this.beforeCel = cel ? (JSON.parse(JSON.stringify(cel)) as Cel) : undefined;
+    const key = packCelKey(layerId, frameIndex);
+    const cel = asset.cels[key] as Cel | undefined; // raw cel — preserves { link: "..." } if linked
+    this.beforeCel = cel !== undefined ? (JSON.parse(JSON.stringify(cel)) as Cel) : undefined;
   }
 
   execute(): void {

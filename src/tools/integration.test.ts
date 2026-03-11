@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { z } from 'zod';
-import { WorkspaceClass } from '../classes/workspace.js';
+import { WorkspaceClass, getWorkspace } from '../classes/workspace.js';
 import { registerProjectTool } from './project.js';
 import { registerWorkspaceTool } from './workspace.js';
 import { registerAssetTool } from './asset.js';
@@ -2102,6 +2102,120 @@ describe('Minimum Viable Loop Integration', () => {
       expect(paletteRedone.total_defined).toBeGreaterThanOrEqual(2);
       const redEntry = paletteRedone.entries.find((e) => e.index === 1);
       expect(redEntry?.rgba).toEqual([255, 0, 0, 255]);
+    });
+
+    it('5.3.9.1 Linked cel lifecycle: resolution → write-break → undo restore', async () => {
+      // Setup: project + asset with 2 frames
+      unwrap(
+        await dispatch('project', { action: 'init', path: '/tmp/test_project', name: 'Test' }),
+      );
+      unwrap(
+        await dispatch('asset', {
+          action: 'create',
+          name: 'sprite',
+          width: 4,
+          height: 4,
+          palette: [
+            [0, 0, 0, 0],
+            [255, 0, 0, 255],
+            [0, 255, 0, 255],
+          ],
+        }),
+      );
+      unwrap(await dispatch('asset', { action: 'add_frame', asset_name: 'sprite' }));
+
+      // Draw pixel on layer 1, frame 0 (color 1 at 0,0) — establish source data
+      unwrap(
+        await dispatch('draw', {
+          asset_name: 'sprite',
+          layer_id: 1,
+          frame_index: 0,
+          operations: [{ action: 'pixel', x: 0, y: 0, color: 1 }],
+        }),
+      );
+
+      // Directly create a linked cel: layer 1, frame 1 → links to "1/0"
+      const asset = getWorkspace().loadedAssets.get('sprite');
+      if (!asset) throw new Error('Asset not loaded');
+      asset.setCel(1, 1, { link: '1/0' });
+
+      // get_cel frame 1: should show is_linked=true, link_source="1/0", data matches frame 0
+      let res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'sprite',
+          layer_id: 1,
+          frame_index: 1,
+        }),
+      );
+      const celFrame1Linked = JSON.parse(res.content[0].text) as {
+        is_linked: boolean;
+        link_source?: string;
+        data: number[][];
+      };
+      expect(celFrame1Linked.is_linked).toBe(true);
+      expect(celFrame1Linked.link_source).toBe('1/0');
+      expect(celFrame1Linked.data[0]?.[0]).toBe(1); // resolves through link
+
+      // Draw pixel on layer 1, frame 1 (color 2 at 1,1) — triggers link break via getMutableCel
+      unwrap(
+        await dispatch('draw', {
+          asset_name: 'sprite',
+          layer_id: 1,
+          frame_index: 1,
+          operations: [{ action: 'pixel', x: 1, y: 1, color: 2 }],
+        }),
+      );
+
+      // get_cel frame 1: link broken, both pixels present
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'sprite',
+          layer_id: 1,
+          frame_index: 1,
+        }),
+      );
+      const celFrame1Broken = JSON.parse(res.content[0].text) as {
+        is_linked: boolean;
+        data: number[][];
+      };
+      expect(celFrame1Broken.is_linked).toBe(false);
+      expect(celFrame1Broken.data[0]?.[0]).toBe(1); // copied from source
+      expect(celFrame1Broken.data[1]?.[1]).toBe(2); // new pixel
+
+      // get_cel frame 0: unchanged
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'sprite',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      const celFrame0 = JSON.parse(res.content[0].text) as { data: number[][] };
+      expect(celFrame0.data[0]?.[0]).toBe(1);
+      expect(celFrame0.data[1]?.[1]).toBe(0);
+
+      // Undo: should restore the LinkedCel
+      unwrap(await dispatch('workspace', { action: 'undo' }));
+
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'sprite',
+          layer_id: 1,
+          frame_index: 1,
+        }),
+      );
+      const celFrame1Restored = JSON.parse(res.content[0].text) as {
+        is_linked: boolean;
+        link_source?: string;
+        data: number[][];
+      };
+      expect(celFrame1Restored.is_linked).toBe(true);
+      expect(celFrame1Restored.link_source).toBe('1/0');
+      expect(celFrame1Restored.data[0]?.[0]).toBe(1); // still resolves through link
     });
   });
 });
