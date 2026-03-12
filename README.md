@@ -146,7 +146,7 @@ npm run dev      # Run directly with tsx (no build step)
 
 ### MCP Client Configuration
 
-Add to your MCP client's configuration (e.g., Claude Desktop `claude_desktop_config.json`):
+**Claude Desktop** — add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
 ```json
 {
@@ -159,9 +159,117 @@ Add to your MCP client's configuration (e.g., Claude Desktop `claude_desktop_con
 }
 ```
 
-## Project Status
+**Cursor / Cline** — same JSON format, placed in the tool's MCP config file (e.g., `.cursor/mcp.json` or Cline's MCP settings).
 
-> **Early Development** — The architecture and API are fully specified in [`docs/design.md`](docs/design.md). Implementation is tracked in [`docs/implementation-plan.md`](docs/implementation-plan.md). Currently only a `get_status` stub tool exists; the core data model and tools are being built.
+**Claude Code** — run once from any directory:
+
+```bash
+claude mcp add pixelmcpserver -- node /path/to/PixelMCPServer/dist/index.js
+```
+
+## Example Project
+
+The [`example/`](example/) directory contains a minimal sample project demonstrating the file formats:
+
+- **`example/pixelmcp.json`** — project config with conventions, defaults, and two registered assets
+- **`example/palettes/game.json`** — a shared 12-color palette file
+- **`example/assets/hero.json`** — 16×16 character sprite: 2 image/shape layers, 2 idle frames with a `ping_pong` facing-S animation tag, linked hitbox cel
+- **`example/assets/coin.json`** — 8×8 item sprite: 4-frame spin animation (`forward` loop), linked cel for the reverse-oval frame
+
+Open it with the server:
+
+```json
+{ "tool": "project", "action": "open", "path": "/path/to/PixelMCPServer/example" }
+```
+
+## Example: Creating a Sprite
+
+This walkthrough shows the minimum viable loop — init a project, create an asset, draw pixels, and export.
+
+### 1. Initialize a project
+
+```json
+{ "tool": "project", "action": "init", "path": "/my/game/art" }
+```
+
+### 2. Create an asset
+
+```json
+{
+  "tool": "asset",
+  "action": "create",
+  "name": "player",
+  "width": 16,
+  "height": 24,
+  "palette": [
+    [0, 0, 0, 0],
+    [45, 30, 20, 255],
+    [120, 85, 60, 255],
+    [200, 160, 120, 255]
+  ],
+  "layers": [
+    { "name": "body", "type": "image" },
+    { "name": "eyes", "type": "image" }
+  ],
+  "frames": [{ "duration_ms": 150 }, { "duration_ms": 150 }],
+  "tags": [{ "name": "idle", "type": "frame", "start": 0, "end": 1, "direction": "ping_pong" }]
+}
+```
+
+### 3. Draw pixels (batched — one undo step)
+
+```json
+{
+  "tool": "draw",
+  "asset_name": "player",
+  "layer_id": 0,
+  "frame_index": 0,
+  "operations": [
+    { "action": "rect", "x": 4, "y": 8, "width": 8, "height": 12, "color": 2, "filled": true },
+    { "action": "fill", "x": 5, "y": 9, "color": 3 },
+    { "action": "circle", "x": 8, "y": 4, "radius": 4, "color": 2, "filled": true }
+  ]
+}
+```
+
+### 4. Inspect pixel data
+
+```json
+{ "tool": "asset", "action": "get_cel", "asset_name": "player", "layer_id": 0, "frame_index": 0 }
+```
+
+### 5. Save
+
+```json
+{ "tool": "workspace", "action": "save", "asset_name": "player" }
+```
+
+### 6. Export to PNG
+
+```json
+{
+  "tool": "export",
+  "action": "png",
+  "asset_name": "player",
+  "output_path": "/my/game/art/exports/player.png",
+  "scale_factor": 2
+}
+```
+
+### Godot export
+
+To produce a `SpriteFrames` `.tres` ready for Godot 4.x:
+
+```json
+{
+  "tool": "export",
+  "action": "godot_spriteframes",
+  "asset_name": "player",
+  "output_dir": "/my/game/art/exports"
+}
+```
+
+This writes `player.png`, `player.png.import`, and `player.tres` — import directly into your Godot project.
 
 ## Project Structure
 
@@ -170,7 +278,7 @@ src/
 ├── index.ts              # Entry point — registers tools, starts stdio transport
 ├── errors.ts             # Shared error factory for domain errors
 ├── types/                # Interfaces & discriminated unions (no runtime logic)
-├── models/               # Stateful classes — Palette, Asset, Project, Workspace
+├── classes/              # Stateful classes — Palette, Asset, Project, Workspace
 ├── commands/             # Command pattern (undo/redo) — one class per mutation category
 ├── io/                   # File I/O — read/write asset, project, and palette JSON files
 ├── algorithms/           # Pure functions — drawing, geometry, compositing, dithering, autotile
@@ -180,7 +288,7 @@ src/
 ```
 
 - **`types/`** — pure interfaces and discriminated unions, no runtime logic. Imported by everything.
-- **`models/`** — stateful classes that enforce data model invariants. No MCP awareness.
+- **`classes/`** — stateful classes that enforce data model invariants. No MCP awareness.
 - **`commands/`** — undo/redo command classes (one per mutation category: cel write, layer, frame, tag, etc.).
 - **`io/`** — file serialization. Models handle `toJSON()`/`fromJSON()`; `io/` handles `fs` read/write.
 - **`algorithms/`** — pure functions with no model dependencies. Independently testable. Covers drawing primitives (Bresenham, midpoint circle/ellipse, flood fill), geometry (marching squares, RDP simplification), effects (gradient, dither, outline, auto-AA), compositing, bin-packing, autotile bitmask computation, and more.

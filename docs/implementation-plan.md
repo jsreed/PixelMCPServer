@@ -534,8 +534,8 @@ Full workflow tests that exercise multiple tools in sequence, verifying the syst
 
 ### 5.5 Documentation
 
-- [ ] **5.5.1** **README** — usage instructions, MCP client configuration, example tool calls
-- [ ] **5.5.2** **Example project** — a minimal `pixelmcp.json` + asset files demonstrating the format
+- [x] **5.5.1** **README** — usage instructions, MCP client configuration, example tool calls
+- [x] **5.5.2** **Example project** — a minimal `pixelmcp.json` + asset files demonstrating the format
 
 > **Definition of Done — Phase 5:** All E2E tests pass covering every major workflow from the design spec. Error audit confirms all ~30 domain errors from §2.6 return correct messages with `isError: true`. Tool surface completeness check confirms all 10 tools with all actions match the design spec. README and example project are complete.
 
