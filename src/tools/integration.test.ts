@@ -2217,5 +2217,204 @@ describe('Minimum Viable Loop Integration', () => {
       expect(celFrame1Restored.link_source).toBe('1/0');
       expect(celFrame1Restored.data[0]?.[0]).toBe(1); // still resolves through link
     });
+
+    it('5.3.10.1 E2E: selection masking and clipboard', async () => {
+      // 1. Project init + asset create (16×16)
+      unwrap(
+        await dispatch('project', { action: 'init', path: '/tmp/test_project', name: 'Test' }),
+      );
+      unwrap(await dispatch('asset', { action: 'create', name: 'sprite', width: 16, height: 16 }));
+
+      // 2. Palette set — colors at index 1 and 2
+      unwrap(
+        await dispatch('palette', {
+          action: 'set',
+          asset_name: 'sprite',
+          index: 1,
+          rgba: [255, 0, 0, 255],
+        }),
+      );
+      unwrap(
+        await dispatch('palette', {
+          action: 'set',
+          asset_name: 'sprite',
+          index: 2,
+          rgba: [0, 255, 0, 255],
+        }),
+      );
+
+      // 3. Draw fill — fill entire cel with color 1
+      unwrap(
+        await dispatch('draw', {
+          asset_name: 'sprite',
+          layer_id: 1,
+          frame_index: 0,
+          operations: [{ action: 'fill', x: 0, y: 0, color: 1 }],
+        }),
+      );
+
+      // 4. Selection rect — select 4×4 region at (2,2)
+      unwrap(
+        await dispatch('selection', {
+          action: 'rect',
+          asset_name: 'sprite',
+          layer_id: 1,
+          frame_index: 0,
+          x: 2,
+          y: 2,
+          width: 4,
+          height: 4,
+        }),
+      );
+
+      // 5. Draw fill with color 2 — only selected 4×4 region should change
+      unwrap(
+        await dispatch('draw', {
+          asset_name: 'sprite',
+          layer_id: 1,
+          frame_index: 0,
+          operations: [{ action: 'fill', x: 2, y: 2, color: 2 }],
+        }),
+      );
+
+      let res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'sprite',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      let celData = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
+
+      // Inside selection (2,2)→(5,5) should be color 2
+      expect(celData[2][2]).toBe(2);
+      expect(celData[3][4]).toBe(2);
+      expect(celData[5][5]).toBe(2);
+
+      // Outside selection should remain color 1
+      expect(celData[0][0]).toBe(1);
+      expect(celData[1][1]).toBe(1);
+      expect(celData[6][6]).toBe(1);
+      expect(celData[15][15]).toBe(1);
+
+      // 6. Selection copy — populate clipboard from selection
+      unwrap(
+        await dispatch('selection', {
+          action: 'copy',
+          asset_name: 'sprite',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+
+      // 7. Selection clear — clear selection mask
+      unwrap(await dispatch('selection', { action: 'clear' }));
+      expect(getWorkspace().selection).toBeNull();
+
+      // 8. Create second asset (16×16) + load it
+      unwrap(await dispatch('asset', { action: 'create', name: 'sprite2', width: 16, height: 16 }));
+
+      // 9. Paste to second asset at offset (offset_x:6, offset_y:6)
+      // Clipboard originalX=2, originalY=2, so paste lands at (2+6, 2+6) = (8, 8)
+      unwrap(
+        await dispatch('selection', {
+          action: 'paste',
+          target_asset_name: 'sprite2',
+          target_layer_id: 1,
+          target_frame_index: 0,
+          offset_x: 6,
+          offset_y: 6,
+        }),
+      );
+
+      // 10. get_cel on second asset — verify 4×4 region pasted at correct offset
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'sprite2',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      celData = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
+
+      // Pasted region: (8,8)→(11,11) should be color 2
+      expect(celData[8][8]).toBe(2);
+      expect(celData[9][10]).toBe(2);
+      expect(celData[11][11]).toBe(2);
+
+      // Outside pasted region should be 0 (empty)
+      expect(celData[0][0]).toBe(0);
+      expect(celData[7][7]).toBe(0);
+      expect(celData[12][12]).toBe(0);
+
+      // 11. Selection by_color on second asset — select color 2 region
+      unwrap(
+        await dispatch('selection', {
+          action: 'by_color',
+          asset_name: 'sprite2',
+          layer_id: 1,
+          frame_index: 0,
+          color: 2,
+        }),
+      );
+
+      // Verify by_color selection mask
+      const selAfterByColor = getWorkspace().selection;
+      if (!selAfterByColor) throw new Error('Expected selection after by_color');
+      expect(selAfterByColor.mask[8][8]).toBe(true);
+      expect(selAfterByColor.mask[11][11]).toBe(true);
+      expect(selAfterByColor.mask[0][0]).toBe(false);
+
+      // 12. Selection cut — cut the color 2 pixels
+      unwrap(
+        await dispatch('selection', {
+          action: 'cut',
+          asset_name: 'sprite2',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+
+      // 13. get_cel — verify cut region is now transparent (index 0)
+      res = unwrap(
+        await dispatch('asset', {
+          action: 'get_cel',
+          asset_name: 'sprite2',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+      celData = (JSON.parse(res.content[0].text) as { data: number[][] }).data;
+
+      expect(celData[8][8]).toBe(0);
+      expect(celData[9][10]).toBe(0);
+      expect(celData[11][11]).toBe(0);
+
+      // 14. Selection invert — verify selection covers everything except the cut region
+      unwrap(
+        await dispatch('selection', {
+          action: 'invert',
+          asset_name: 'sprite2',
+          layer_id: 1,
+          frame_index: 0,
+        }),
+      );
+
+      const selAfterInvert = getWorkspace().selection;
+      if (!selAfterInvert) throw new Error('Expected selection after invert');
+      expect(selAfterInvert.width).toBe(16);
+      expect(selAfterInvert.height).toBe(16);
+
+      // Previously selected (color 2) region should now be UNselected
+      expect(selAfterInvert.mask[8][8]).toBe(false);
+      expect(selAfterInvert.mask[11][11]).toBe(false);
+
+      // Previously unselected region should now be selected
+      expect(selAfterInvert.mask[0][0]).toBe(true);
+      expect(selAfterInvert.mask[7][7]).toBe(true);
+      expect(selAfterInvert.mask[12][12]).toBe(true);
+    });
   });
 });

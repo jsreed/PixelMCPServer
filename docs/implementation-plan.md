@@ -521,7 +521,7 @@ Full workflow tests that exercise multiple tools in sequence, verifying the syst
 
 #### 5.3.10 Selection Workflow
 
-- [ ] **5.3.10.1** **E2E: selection masking and clipboard** — `project init` → `asset create` (16×16) → `palette set` (set a few colors) → `draw` (fill entire cel with color 1) → `selection rect` (select 4×4 region) → `draw` (fill with color 2 — verify only selected 4×4 region changed, rest remains color 1) → `selection copy` → `selection clear` → create second asset → `workspace load_asset` → `selection paste` (to second asset at offset) → `asset get_cel` on second asset (verify 4×4 region pasted at correct offset) → `selection by_color` (select color 2 region) → `selection cut` → `asset get_cel` (verify cut region now transparent/index 0) → `selection invert` → verify selection covers everything except the cut region.
+- [x] **5.3.10.1** **E2E: selection masking and clipboard** — `project init` → `asset create` (16×16) → `palette set` (set a few colors) → `draw` (fill entire cel with color 1) → `selection rect` (select 4×4 region) → `draw` (fill with color 2 — verify only selected 4×4 region changed, rest remains color 1) → `selection copy` → `selection clear` → create second asset → `workspace load_asset` → `selection paste` (to second asset at offset) → `asset get_cel` on second asset (verify 4×4 region pasted at correct offset) → `selection by_color` (select color 2 region) → `selection cut` → `asset get_cel` (verify cut region now transparent/index 0) → `selection invert` → verify selection covers everything except the cut region.
 
 #### 5.3.11 MCP Resources Integration
 
