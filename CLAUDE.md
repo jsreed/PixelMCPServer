@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 PixelMCPServer is a **headless pixel art engine** exposed as a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server. It enables LLMs and AI agents to create, animate, and export production-ready 2D game art — sprites, tilesets, and animations — entirely through structured tool calls, with no GUI required. Think of it as a "Headless Aseprite" for AI.
 
-The project is in early development. The full architecture is defined in [`docs/design.md`](docs/design.md) and the phased build plan is in [`docs/implementation-plan.md`](docs/implementation-plan.md).
+The full architecture is defined in [`docs/design.md`](docs/design.md) and the phased build plan is in [`docs/implementation-plan.md`](docs/implementation-plan.md).
 
 ## Commands
 
@@ -41,9 +41,11 @@ src/
 │   ├── shape.ts                   #   RectShape | PolygonShape
 │   ├── asset.ts                   #   Asset interface
 │   ├── project.ts                 #   ProjectConfig, AssetRegistryEntry, Conventions, Defaults
-│   └── selection.ts               #   SelectionMask interface
+│   ├── selection.ts               #   SelectionMask interface
+│   └── gifenc.d.ts                #   Module declarations for gifenc (no @types package)
 │
 ├── classes/                       # Stateful classes (enforce invariants, no MCP awareness)
+│   ├── index.ts                   #   Barrel re-export
 │   ├── palette.ts                 #   Palette class — get/set/swap/setBulk/toJSON/fromJSON
 │   ├── asset.ts                   #   Asset class — layer/frame/cel/tag/shape CRUD, resize, dirty tracking
 │   ├── project.ts                 #   Project class — init/open/info, registry, path resolution, defaults
@@ -58,29 +60,34 @@ src/
 │   ├── tag-command.ts             #   TagCommand
 │   ├── shape-command.ts           #   ShapeCommand
 │   ├── resize-command.ts          #   ResizeCommand — captures all cel data + dimensions
+│   ├── tileset-command.ts         #   TilesetCommand — extract_tile / place_tile / autotile mutations
 │   ├── asset-delete-command.ts    #   AssetDeleteCommand — captures registry entry
 │   └── rename-command.ts          #   RenameCommand — captures old name, registry key, filename
 │
 ├── io/                            # File I/O (serialization to/from disk)
+│   ├── index.ts                   #   Barrel re-export
 │   ├── asset-io.ts                #   loadAssetFile() / saveAssetFile()
 │   ├── project-io.ts              #   loadProjectFile() / saveProjectFile()
-│   └── palette-io.ts              #   loadPaletteFile() / savePaletteFile()
+│   ├── palette-io.ts              #   loadPaletteFile() / savePaletteFile()
+│   ├── godot-import.ts            #   generateGodotImportSidecar() — writes .png.import files
+│   └── godot-resources.ts         #   Godot .tres resource generators (SpriteFrames, TileSet, Animation)
 │
 ├── algorithms/                    # Pure functions (no model deps, independently testable)
 │   ├── bresenham.ts               #   Line drawing
 │   ├── midpoint.ts                #   Circle & ellipse rasterization
 │   ├── flood-fill.ts              #   Scanline flood fill
 │   ├── marching-squares.ts        #   Contour tracing
-│   ├── ramer-douglas-peucker.ts    #   Ramer-Douglas-Peucker simplification
+│   ├── ramer-douglas-peucker.ts   #   Ramer-Douglas-Peucker simplification
 │   ├── quantize.ts                #   Color quantization (median cut)
 │   ├── banding.ts                 #   Banding detection
 │   ├── export-pattern.ts          #   Token substitution with separator-drop logic
 │   ├── bin-pack.ts                #   Rectangle packing for atlas export
 │   ├── composite.ts               #   Layer compositing — indexed→RGBA, opacity, visibility
+│   ├── upscale.ts                 #   Nearest-neighbor upscale for export scale_factor
 │   ├── isometric.ts               #   Dimetric 2:1 projection helpers
 │   ├── gradient.ts                #   Linear gradient generation
 │   ├── dither.ts                  #   Checkerboard, ordered (Bayer), error diffusion, noise
-│   ├── outline.ts                 #   Outline generation
+│   ├── outline.ts                 #   Outline generation + cleanupOrphans
 │   ├── auto-aa.ts                 #   Automatic anti-aliasing at convex corners
 │   ├── motion.ts                  #   Subpixel shift & smear frame
 │   ├── autotile.ts                #   Blob47/4side/4corner canonical slot computation & peering bits
@@ -99,12 +106,12 @@ src/
 │   └── selection.ts               #   registerSelectionTool(server)
 │
 ├── resources/                     # MCP Resource handlers (visual previews)
-│   ├── router.ts                  #   URI parser + dispatch for pixel://view/... URIs
-│   ├── asset-view.ts              #   Asset & frame composite PNG rendering
-│   ├── layer-view.ts              #   Single layer/cel PNG rendering
-│   ├── animation-view.ts          #   Tagged animation → GIF rendering
-│   ├── palette-view.ts            #   Palette swatch grid PNG
-│   └── tileset-view.ts            #   Tile grid PNG
+│   ├── index.ts                   #   registerResources(server) — templates, listing, list_changed notifications
+│   └── read.ts                    #   URI dispatch + all renderers (asset, layer, animation, palette, tileset)
+│
+├── utils/                         # Shared utilities used across tools and resources
+│   ├── render.ts                  #   buildCompositeLayers() — shared helper for resource renderers
+│   └── resource-link.ts           #   createResourceLink() — builds MCP ResourceLink content blocks
 │
 └── prompts/                       # MCP Prompt handlers (workflow templates)
     ├── scaffold-character.ts      #   scaffold_character prompt
@@ -116,10 +123,12 @@ src/
 
 **Structural principles:**
 - **`types/` vs `classes/`** — types are pure interfaces/unions with no runtime logic; classes are stateful wrappers. Both algorithms and tool handlers can import from `types/` without pulling in class dependencies.
-- **`commands/`** — undo/redo command classes live separately from models to keep the system cohesive and `models/` focused.
-- **`io/`** — file I/O is separate from models. Models have `toJSON()`/`fromJSON()` for serialization; `io/` handles the actual `fs` read/write.
+- **`commands/`** — undo/redo command classes live separately from models to keep the system cohesive and `classes/` focused.
+- **`io/`** — file I/O is separate from models. Models have `toJSON()`/`fromJSON()` for serialization; `io/` handles the actual `fs` read/write, plus Godot-specific file generators (`godot-import.ts`, `godot-resources.ts`).
 - **`algorithms/`** — flat directory of pure functions with no model dependencies. Each file is independently testable.
 - **`tools/`** — mirrors the 10-tool design spec 1:1. Each file exports a single `register*Tool(server)` function. Tool handlers are thin wrappers: validate input → delegate to model/algorithm → format MCP response.
+- **`resources/`** — consolidated into two files: `index.ts` handles registration, listing, and list_changed notifications; `read.ts` handles URI dispatch and all visual renderers.
+- **`utils/`** — shared helpers used by both `tools/` and `resources/` that don't belong in `algorithms/` (which must remain model-free).
 - **Tests colocated** — `*.test.ts` files sit next to their source (e.g., `src/algorithms/bresenham.test.ts`, `src/classes/asset.test.ts`).
 
 ### Data Model (defined in [`design.md` §2.1](docs/design.md))
@@ -135,7 +144,7 @@ The model separates on-disk project structure from the in-memory editing session
 - **Tag** — named label on a frame range (animation sequence) or layer set (organizational grouping). Frame tags carry optional `facing` for directional sprites.
 - **Palette** — up to 256 RGBA colors. All pixel data stores indices, not raw color values.
 
-### Target Tool Surface (10 polymorphic tools)
+### Tool Surface (10 polymorphic tools)
 
 Each tool uses the SDK's `registerTool()` API with a Zod `inputSchema`. An `action` enum parameter discriminates operations within each tool.
 
@@ -192,8 +201,9 @@ algorithms/     ← imports only from types/
 classes/        ← imports from types/, errors.ts, algorithms/
 commands/       ← imports from types/, classes/
 io/             ← imports from types/, classes/
-tools/          ← imports from types/, classes/, commands/, io/, algorithms/
-resources/      ← imports from types/, classes/, algorithms/
+utils/          ← imports from types/, classes/, algorithms/
+tools/          ← imports from types/, classes/, commands/, io/, algorithms/, utils/
+resources/      ← imports from types/, classes/, algorithms/, utils/
 prompts/        ← imports from types/
 ```
 
@@ -225,8 +235,7 @@ prompts/        ← imports from types/
 
 ## Implementation Plan
 
-Work follows the phased plan in [`docs/implementation-plan.md`](docs/implementation-plan.md). Before starting a task, check the plan for:
-- **Phase ordering** — later phases depend on earlier ones (e.g., tools depend on models, export depends on compositing).
+Work follows the phased plan in [`docs/implementation-plan.md`](docs/implementation-plan.md). Phases 0–5 are largely complete (only documentation tasks remain in Phase 5). Before starting any remaining tasks, check the plan for:
 - **Task status** — checked boxes `[x]` are done; unchecked `[ ]` are pending.
 - **Definition of Done** per phase — lists the acceptance criteria.
 
