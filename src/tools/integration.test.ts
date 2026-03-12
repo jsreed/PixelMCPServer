@@ -13,6 +13,7 @@ import { registerTransformTool } from './transform.js';
 import { registerEffectTool } from './effect.js';
 import { saveAssetFile } from '../io/asset-io.js';
 import { PNG } from 'pngjs';
+import { dispatchResource } from '../resources/read.js';
 
 // Mock IO
 const virtualFs = new Map<string, unknown>();
@@ -2415,6 +2416,219 @@ describe('Minimum Viable Loop Integration', () => {
       expect(selAfterInvert.mask[0][0]).toBe(true);
       expect(selAfterInvert.mask[7][7]).toBe(true);
       expect(selAfterInvert.mask[12][12]).toBe(true);
+    });
+
+    it('5.3.11.1 E2E: resource rendering', async () => {
+      // 1. Setup: project init + asset create (16×24)
+      unwrap(
+        await dispatch('project', { action: 'init', path: '/tmp/test_project', name: 'Test' }),
+      );
+      unwrap(await dispatch('asset', { action: 'create', name: 'hero', width: 16, height: 24 }));
+
+      // 2. Set palette color at index 1 (red)
+      unwrap(
+        await dispatch('palette', {
+          action: 'set',
+          asset_name: 'hero',
+          index: 1,
+          rgba: [255, 0, 0, 255],
+        }),
+      );
+
+      // 3. Draw a rect on layer 1 frame 0 so the composite is non-trivial
+      unwrap(
+        await dispatch('draw', {
+          asset_name: 'hero',
+          layer_id: 1,
+          frame_index: 0,
+          operations: [
+            { action: 'rect', x: 2, y: 2, width: 8, height: 12, color: 1, filled: true },
+          ],
+        }),
+      );
+
+      // 4. Verify pixel://view/asset/hero returns valid PNG with correct dimensions (16×24)
+      const assetResult = await dispatchResource(
+        { type: 'asset', name: 'hero' },
+        new URL('pixel://view/asset/hero'),
+      );
+      expect(assetResult.contents).toHaveLength(1);
+      const assetContent = assetResult.contents[0];
+      expect(assetContent.mimeType).toBe('image/png');
+      if ('blob' in assetContent) {
+        const png = PNG.sync.read(Buffer.from(assetContent.blob, 'base64'));
+        expect(png.width).toBe(16);
+        expect(png.height).toBe(24);
+      }
+
+      // 5. Verify pixel://view/asset/hero/layer/1/0 renders the layer in isolation
+      const layerResult = await dispatchResource(
+        { type: 'layer_frame', name: 'hero', layerId: 1, frameIndex: 0 },
+        new URL('pixel://view/asset/hero/layer/1/0'),
+      );
+      expect(layerResult.contents[0].mimeType).toBe('image/png');
+      if ('blob' in layerResult.contents[0]) {
+        const png = PNG.sync.read(Buffer.from(layerResult.contents[0].blob, 'base64'));
+        expect(png.width).toBe(16);
+        expect(png.height).toBe(24);
+      }
+
+      // 6. Add a second frame then a frame tag spanning both frames
+      unwrap(
+        await dispatch('asset', { action: 'add_frame', asset_name: 'hero', duration_ms: 100 }),
+      );
+      unwrap(
+        await dispatch('asset', {
+          action: 'add_tag',
+          asset_name: 'hero',
+          name: 'idle',
+          tag_start: 0,
+          tag_end: 1,
+          direction: 'forward',
+          tag_type: 'frame',
+        }),
+      );
+
+      // 7. Verify pixel://view/animation/hero/idle returns a valid GIF
+      const animResult = await dispatchResource(
+        { type: 'animation', name: 'hero', tag: 'idle' },
+        new URL('pixel://view/animation/hero/idle'),
+      );
+      expect(animResult.contents[0].mimeType).toBe('image/gif');
+      if ('blob' in animResult.contents[0]) {
+        expect(animResult.contents[0].blob.length).toBeGreaterThan(100);
+        // Verify it is a GIF by checking the magic bytes (GIF89a = 47 49 46 38 39 61)
+        const bytes = Buffer.from(animResult.contents[0].blob, 'base64');
+        expect(bytes[0]).toBe(0x47); // G
+        expect(bytes[1]).toBe(0x49); // I
+        expect(bytes[2]).toBe(0x46); // F
+      }
+
+      // 8. Verify pixel://view/palette/hero returns a 256×256 PNG swatch grid
+      const paletteResult = await dispatchResource(
+        { type: 'palette', name: 'hero' },
+        new URL('pixel://view/palette/hero'),
+      );
+      expect(paletteResult.contents[0].mimeType).toBe('image/png');
+      if ('blob' in paletteResult.contents[0]) {
+        const png = PNG.sync.read(Buffer.from(paletteResult.contents[0].blob, 'base64'));
+        expect(png.width).toBe(256);
+        expect(png.height).toBe(256);
+      }
+
+      // 9. Create a tileset asset with 1 tile extracted
+      unwrap(
+        await dispatch('asset', {
+          action: 'create',
+          name: 'tiles',
+          width: 8,
+          height: 8,
+          tile_width: 8,
+          tile_height: 8,
+        }),
+      );
+      unwrap(
+        await dispatch('palette', {
+          action: 'set',
+          asset_name: 'tiles',
+          index: 1,
+          rgba: [0, 128, 255, 255],
+        }),
+      );
+      unwrap(
+        await dispatch('draw', {
+          asset_name: 'tiles',
+          layer_id: 1,
+          frame_index: 0,
+          operations: [{ action: 'rect', x: 0, y: 0, width: 8, height: 8, color: 1, filled: true }],
+        }),
+      );
+      unwrap(
+        await dispatch('tileset', {
+          action: 'extract_tile',
+          asset_name: 'tiles',
+          layer_id: 1,
+          x: 0,
+          y: 0,
+        }),
+      );
+
+      // 10. Verify pixel://view/tileset/tiles returns a valid PNG tile grid
+      // 1 tile of 8×8 → 1 col, 1 row → outWidth=8, outHeight=8 (no gaps for single col/row)
+      const tilesetResult = await dispatchResource(
+        { type: 'tileset', name: 'tiles' },
+        new URL('pixel://view/tileset/tiles'),
+      );
+      expect(tilesetResult.contents[0].mimeType).toBe('image/png');
+      if ('blob' in tilesetResult.contents[0]) {
+        const png = PNG.sync.read(Buffer.from(tilesetResult.contents[0].blob, 'base64'));
+        expect(png.width).toBe(8);
+        expect(png.height).toBe(8);
+      }
+    });
+
+    it('5.3.11.2 E2E: resource links in mutation responses', async () => {
+      // Setup: project init + asset create
+      unwrap(
+        await dispatch('project', { action: 'init', path: '/tmp/test_project', name: 'Test' }),
+      );
+      unwrap(await dispatch('asset', { action: 'create', name: 'hero', width: 16, height: 16 }));
+
+      // 1. draw operation → response includes pixel://view/asset/.../layer/... URI
+      const drawRes = unwrap(
+        await dispatch('draw', {
+          asset_name: 'hero',
+          layer_id: 1,
+          frame_index: 0,
+          operations: [{ action: 'pixel', x: 0, y: 0, color: 1 }],
+        }),
+      );
+      const drawLinks = (drawRes.content as Array<{ type: string; uri?: string }>).filter(
+        (c) => c.type === 'resource_link',
+      );
+      expect(drawLinks.length).toBeGreaterThan(0);
+      expect(drawLinks[0]?.uri).toContain('pixel://view/asset/hero/layer/1/0');
+
+      // 2. palette set → response includes pixel://view/palette/hero URI
+      const paletteRes = unwrap(
+        await dispatch('palette', {
+          action: 'set',
+          asset_name: 'hero',
+          index: 1,
+          rgba: [255, 0, 0, 255],
+        }),
+      );
+      const paletteLinks = (paletteRes.content as Array<{ type: string; uri?: string }>).filter(
+        (c) => c.type === 'resource_link',
+      );
+      expect(paletteLinks.length).toBeGreaterThan(0);
+      expect(paletteLinks[0]?.uri).toContain('pixel://view/palette/hero');
+
+      // 3. tileset extract_tile → response includes pixel://view/tileset/tiles URI
+      unwrap(
+        await dispatch('asset', {
+          action: 'create',
+          name: 'tiles',
+          width: 8,
+          height: 8,
+          tile_width: 8,
+          tile_height: 8,
+        }),
+      );
+      const tileRes = unwrap(
+        await dispatch('tileset', {
+          action: 'extract_tile',
+          asset_name: 'tiles',
+          layer_id: 1,
+          x: 0,
+          y: 0,
+        }),
+      );
+      const tileLinks = (tileRes.content as Array<{ type: string; uri?: string }>).filter(
+        (c) => c.type === 'resource_link',
+      );
+      expect(tileLinks.length).toBeGreaterThan(0);
+      expect(tileLinks[0]?.uri).toContain('pixel://view/tileset/tiles');
     });
   });
 });

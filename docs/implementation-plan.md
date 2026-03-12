@@ -525,8 +525,8 @@ Full workflow tests that exercise multiple tools in sequence, verifying the syst
 
 #### 5.3.11 MCP Resources Integration
 
-- [ ] **5.3.11.1** **E2E: resource rendering** — `project init` → `asset create` (with palette and drawn pixels) → verify `pixel://view/asset/{name}` returns valid PNG data with correct dimensions → `draw` on specific layer/frame → verify `pixel://view/asset/{name}/layer/{id}/{frame}` renders that layer in isolation → `asset add_tag` (frame tag) → verify `pixel://view/animation/{name}/{tag}` returns valid GIF → verify `pixel://view/palette/{name}` returns a PNG → create tileset asset → verify `pixel://view/tileset/{name}` returns a PNG grid.
-- [ ] **5.3.11.2** **E2E: resource links in mutation responses** — perform a `draw` operation → verify response includes `pixel://view/` URI → perform a `palette set` → verify response includes palette resource URI → perform `tileset extract_tile` → verify response includes tileset resource URI.
+- [x] **5.3.11.1** **E2E: resource rendering** — `project init` → `asset create` (with palette and drawn pixels) → verify `pixel://view/asset/{name}` returns valid PNG data with correct dimensions → `draw` on specific layer/frame → verify `pixel://view/asset/{name}/layer/{id}/{frame}` renders that layer in isolation → `asset add_tag` (frame tag) → verify `pixel://view/animation/{name}/{tag}` returns valid GIF → verify `pixel://view/palette/{name}` returns a PNG → create tileset asset → verify `pixel://view/tileset/{name}` returns a PNG grid.
+- [x] **5.3.11.2** **E2E: resource links in mutation responses** — perform a `draw` operation → verify response includes `pixel://view/` URI → perform a `palette set` → verify response includes palette resource URI → perform `tileset extract_tile` → verify response includes tileset resource URI.
 
 ### 5.4 CLAUDE.md Update
 
