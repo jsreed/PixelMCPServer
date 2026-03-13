@@ -19,6 +19,8 @@ export class TilesetCommand implements Command {
       height: snapshot.height,
       tile_count: snapshot.tile_count,
     };
+    if (snapshot.tile_width !== undefined) this.beforePatch.tile_width = snapshot.tile_width;
+    if (snapshot.tile_height !== undefined) this.beforePatch.tile_height = snapshot.tile_height;
     if (snapshot.tile_physics !== undefined) this.beforePatch.tile_physics = snapshot.tile_physics;
     if (snapshot.tile_terrain !== undefined) this.beforePatch.tile_terrain = snapshot.tile_terrain;
   }
@@ -35,6 +37,12 @@ export class TilesetCommand implements Command {
         height: snapshot.height,
         tile_count: snapshot.tile_count,
       };
+      if (snapshot.tile_width !== undefined) this.afterPatch.tile_width = snapshot.tile_width;
+      else this.afterPatch.tile_width = undefined;
+
+      if (snapshot.tile_height !== undefined) this.afterPatch.tile_height = snapshot.tile_height;
+      else this.afterPatch.tile_height = undefined;
+
       if (snapshot.tile_physics !== undefined) this.afterPatch.tile_physics = snapshot.tile_physics;
       else this.afterPatch.tile_physics = undefined; // Force restore to undefined
 
@@ -46,6 +54,8 @@ export class TilesetCommand implements Command {
   undo(): void {
     // We need to ensure that properties missing in the snapshot are cleared on undo as well
     const patch = { ...this.beforePatch };
+    if (!('tile_width' in patch)) patch.tile_width = undefined;
+    if (!('tile_height' in patch)) patch.tile_height = undefined;
     if (!('tile_physics' in patch)) patch.tile_physics = undefined;
     if (!('tile_terrain' in patch)) patch.tile_terrain = undefined;
     this.asset._restoreDataPatch(patch);

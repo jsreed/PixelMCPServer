@@ -3,34 +3,7 @@ import {
   buildScaffoldCharacterText,
   registerScaffoldCharacterPrompt,
 } from './scaffold-character.js';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-
-// Capture the prompt callback from the server registration
-type PromptArgs = Record<string, unknown>;
-interface PromptMessage {
-  role: string;
-  content: { type: string; text: string };
-}
-interface PromptResult {
-  messages: PromptMessage[];
-}
-type PromptCallback = (args: PromptArgs) => PromptResult;
-
-function capturePromptCallback(registerFn: (server: McpServer) => void): {
-  name: string;
-  cb: PromptCallback;
-} {
-  let capturedName = '';
-  let capturedCb!: PromptCallback;
-  const mockServer = {
-    registerPrompt(name: string, _config: unknown, callback: PromptCallback) {
-      capturedName = name;
-      capturedCb = callback;
-    },
-  };
-  registerFn(mockServer as unknown as McpServer);
-  return { name: capturedName, cb: capturedCb };
-}
+import { capturePromptCallback } from './test-helpers.js';
 
 describe('scaffold_character prompt', () => {
   describe('registration', () => {

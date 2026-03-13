@@ -175,45 +175,41 @@ export function generateGodotTileSet(
   const tileH = (asset.tile_height ?? 16) * scaleFactor;
 
   let tres = `[gd_resource type="TileSet" load_steps=3 format=3]\n\n`;
-  tres += `[ext_resource type="Texture2D" path="res://${stripPngPath(atlasPngPath)}" id="1_tex"]\n\n`;
+  tres += `[ext_resource type="Texture2D" path="res://${atlasPngPath}" id="1_tex"]\n\n`;
 
   tres += `[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_1"]\n`;
   tres += `texture = ExtResource("1_tex")\n`;
   tres += `texture_region_size = Vector2i(${String(tileW)}, ${String(tileH)})\n`;
 
-  const cols = Math.ceil(Math.sqrt(asset.tile_count ?? 1));
-
+  // Tiles are stored in a horizontal strip on the asset canvas (slot N at x=N*tileW, y=0).
+  // The exported PNG preserves that layout, so all tiles are at row=0, col=slot_index.
   if (asset.tile_physics || asset.tile_terrain) {
     if (asset.tile_physics) {
       for (const tileStr of Object.keys(asset.tile_physics.tiles)) {
-        const idx = parseInt(tileStr, 10);
-        const col = idx % cols;
-        const row = Math.floor(idx / cols);
+        const col = parseInt(tileStr, 10);
         const poly = asset.tile_physics.tiles[tileStr].polygon;
         if (poly && poly.length > 0) {
-          tres += `${String(col)}:${String(row)}/0 = 0\n`;
+          tres += `${String(col)}:0/0 = 0\n`;
           const points = poly
             .map(
               (pt: [number, number]) =>
                 `${String(pt[0] * scaleFactor)}, ${String(pt[1] * scaleFactor)}`,
             )
             .join(', ');
-          tres += `${String(col)}:${String(row)}/0/physics_layer_0/polygon_0/points = PackedVector2Array(${points})\n`;
+          tres += `${String(col)}:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(${points})\n`;
         }
       }
     }
     if (asset.tile_terrain) {
       const terrain = asset.tile_terrain;
       for (const tileStr of Object.keys(terrain.peering_bits)) {
-        const idx = parseInt(tileStr, 10);
-        const col = idx % cols;
-        const row = Math.floor(idx / cols);
+        const col = parseInt(tileStr, 10);
         const bits = terrain.peering_bits[tileStr];
-        tres += `${String(col)}:${String(row)}/0 = 0\n`;
-        tres += `${String(col)}:${String(row)}/0/terrain_set = 0\n`;
-        tres += `${String(col)}:${String(row)}/0/terrain = 0\n`;
+        tres += `${String(col)}:0/0 = 0\n`;
+        tres += `${String(col)}:0/0/terrain_set = 0\n`;
+        tres += `${String(col)}:0/0/terrain = 0\n`;
         for (const [side, bitVal] of Object.entries(bits)) {
-          tres += `${String(col)}:${String(row)}/0/terrains_peering_bit/${side} = ${String(bitVal)}\n`;
+          tres += `${String(col)}:0/0/terrains_peering_bit/${side} = ${String(bitVal)}\n`;
         }
       }
     }
@@ -237,8 +233,4 @@ export function generateGodotTileSet(
   tres += `sources/0 = SubResource("TileSetAtlasSource_1")\n`;
 
   return tres;
-}
-
-function stripPngPath(path: string): string {
-  return path;
 }

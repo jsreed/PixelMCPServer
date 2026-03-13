@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { buildPaletteStep } from './palette-step.js';
 
 export function buildScaffoldTilesetText(args: {
   name: string;
@@ -12,18 +13,11 @@ export function buildScaffoldTilesetText(args: {
   const canvasW = tileSize * 8;
   const canvasH = tileSize * 6;
 
-  // Palette setup instructions
-  let paletteStep: string;
-  if (!args.palette) {
-    paletteStep = `  - No palette was specified. Call \`palette info\` on the asset to check the current palette.
-    If the project has a default palette configured, it was applied automatically.
-    Otherwise, use \`palette set_bulk\` to add at least: index 0 = transparent [0,0,0,0],
-    an outline color, and a terrain color ramp.`;
-  } else if (args.palette.includes('/') || args.palette.endsWith('.json')) {
-    paletteStep = `  - Load the palette file: call \`palette load\` with \`path="${args.palette}"\` on asset \`"${args.name}"\`.`;
-  } else {
-    paletteStep = `  - Fetch the Lospec palette: call \`palette fetch_lospec\` with \`slug="${args.palette}"\` on asset \`"${args.name}"\`.`;
-  }
+  const paletteStep = buildPaletteStep(
+    args.name,
+    args.palette,
+    'an outline color, and a terrain color ramp.',
+  );
 
   return `Scaffold a blob47 autotile tileset asset named "${args.name}" (${String(tileSize)}px tiles, ${String(canvasW)}×${String(canvasH)} canvas).
 

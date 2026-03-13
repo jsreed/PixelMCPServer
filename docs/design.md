@@ -583,7 +583,7 @@ Example assignments: slot `0` = isolated tile, slot `255` = interior (all neighb
 - asset_name (string, optional — defaults to first loaded asset)
 - path (string — output file path)
 - scale_factor (integer, optional — e.g., 4 for 4x upscale)
-- pad (boolean, optional — add padding between atlas cells)
+- pad (integer, optional — pixel padding between atlas cells, default 0)
 - extrude (boolean, optional — extrude edge pixels for atlas bleeding prevention)
 - tags (array of strings, optional — for `per_tag`: filter which frame tags to export; defaults to all frame tags)
 
@@ -960,7 +960,97 @@ Arguments:
 - `godot_project_path` (optional) — root path of the Godot project; defaults to project-level export path if configured
 
 
-### 2.5 Custom Files
+### 2.5 MCP App
+
+The MCP App is an interactive pixel art editor that renders **inline in the conversation** using the [MCP Apps extension](https://modelcontextprotocol.io/extensions/apps/overview). When `open_editor` is called (by the AI or user), the host (Claude web, Claude Desktop, VS Code Copilot, etc.) fetches the UI resource and renders it in a sandboxed iframe alongside the chat. The user can interact with the editor while the AI continues to make tool calls — both sides share the same MCP tool surface with no additional API or authentication.
+
+#### How It Works
+
+The MCP App extension adds two patterns on top of standard MCP:
+
+1. **Tool with UI metadata** — `open_editor` declares `_meta: { ui: { resourceUri: "ui://pixel-editor/app.html" } }` in its registration. The host preloads the HTML resource before the tool is even called, enabling instant rendering.
+2. **HTML resource** — `ui://pixel-editor/app.html` is a standard MCP resource that returns a self-contained HTML bundle (compiled by Vite with `vite-plugin-singlefile`). The host renders it in a sandboxed iframe.
+
+Communication between the app and host is via `postMessage` (not direct network calls). The host proxies tool calls from the iframe to the MCP server over the existing stdio transport — no HTTP endpoint required.
+
+```
+User ←→ Claude (host)
+              ├── stdio ←→ PixelMCPServer (all existing tools + open_editor)
+              └── postMessage ←→ MCP App iframe
+                                    └── calls tools through host proxy
+```
+
+#### New Server-Side Surface
+
+Two new additions to the server, registered alongside the existing 10 tools:
+
+**`open_editor` tool**
+
+Opens the editor for a specific asset. Returns the full asset state (palette, layers, frames, tags, cels for frame 0) as JSON, and declares the UI resource URI in `_meta.ui`.
+
+- `asset_name` (string, optional — defaults to first loaded asset)
+
+The tool result JSON contains: `{ asset_name, width, height, palette, layers, frames, tags, cels }` — everything the UI needs to perform an initial render without any additional round trips.
+
+**`get_asset_state` tool**
+
+Fetches current asset state for a specific frame. Called by the UI after any edit (user-initiated or AI-initiated) to sync the canvas.
+
+- `asset_name` (string)
+- `frame_index` (integer, optional — defaults to 0)
+
+Returns: `{ cels, frame_index }` (cel pixel data for that frame across all image layers).
+
+**`ui://pixel-editor/app.html` resource**
+
+Served by a resource handler that reads `dist/app/app.html` (the Vite-compiled UI bundle) and returns it with MIME type `text/html+mcp-app`. Registered via `registerAppResource` from `@modelcontextprotocol/ext-apps/server`.
+
+#### UI Capabilities
+
+The app is built with Preact (minimal bundle size) and communicates with the host via the `App` class from `@modelcontextprotocol/ext-apps`.
+
+| Panel / Tool | Behavior |
+|---|---|
+| **Canvas** | Composited view of all visible image layers for the current frame. Indexed color → RGBA via palette. Checkerboard background for transparent (index 0) pixels. Zoom 1×–16× (nearest-neighbor, no smoothing). Pan via middle-click or space+drag. |
+| **Pencil** | Click/drag to paint pixels with the active color. Strokes are committed as a single `draw write_pixels` call on mouse-up (one undo step per stroke). |
+| **Eraser** | Same as pencil but paints with index 0 (transparent). |
+| **Eyedropper** | Click a canvas pixel to set the active palette color. No server call. |
+| **Fill** | Click → calls `draw fill` at that coordinate. |
+| **Palette panel** | Color swatches for all palette entries. Click to set active color. Hover shows `[index] #hex`. |
+| **Layer panel** | Layer list with visibility toggles. Click eye → calls `asset` tool to toggle `visible`. Click row → sets active layer for pencil/fill. |
+| **Frame timeline** | Frame strip with current frame highlighted. Prev/Next buttons, frame counter "3 / 8 (120ms)". Tag spans shown as colored labels above strip. |
+| **Play / Pause** | `requestAnimationFrame` loop advancing frames based on `duration_ms`. Loop toggle. |
+| **Rect selection** | Drag to select a rectangle → calls `selection rect` to set the server-side mask. Marching ants overlay drawn on canvas. |
+| **Select All / Clear** | Calls `selection all` / `selection clear`. |
+| **"Reference in AI"** | Extracts a dominant-color histogram from the selected region using local canvas pixel data, then calls `app.sendContextUpdate({ type: "pixel_selection", asset, region: {x,y,w,h}, dominant_colors })` so the AI knows exactly what region the user is pointing at in subsequent messages. |
+| **Undo / Redo** | Buttons call `workspace undo` / `workspace redo`, then `get_asset_state` to refresh. |
+| **Auto-refresh** | `app.ontoolresult` fires whenever the AI calls a tool (draw, transform, etc.). On receipt, the UI calls `get_asset_state` to sync the canvas with AI-made changes. |
+
+#### State Sync Model
+
+The UI maintains a local copy of the asset state: `{ assetName, width, height, palette, layers, frames, tags, cels, activeLayerId, activeColorIndex, currentFrame, isPlaying, selection }`.
+
+- **Initial state** — populated from `open_editor` tool result via `app.ontoolresult`.
+- **User edits** — pencil strokes apply optimistically to local canvas; committed to server on mouse-up; UI then calls `get_asset_state` to confirm.
+- **AI edits** — `app.ontoolresult` fires; UI calls `get_asset_state` to pull fresh state.
+- **Frame navigation** — switching frames calls `get_asset_state` with the new `frame_index`.
+
+This pull-on-demand model keeps state management simple at the cost of one round-trip per edit — acceptable for pixel art at typical sprite sizes (≤256×256 pixels).
+
+#### Build Pipeline
+
+The UI (`src/app/`) is compiled separately from the server (`src/`) using Vite with `vite-plugin-singlefile`, which inlines all CSS and JS into a single `dist/app/app.html` file. This self-contained HTML is what the resource handler serves.
+
+```
+npm run build:app   # Vite → dist/app/app.html (UI bundle)
+npm run build       # tsc → dist/ (server)
+npm run start       # node dist/index.js (stdio transport, default)
+npm run start -- --http   # + Express on :3001 (for basic-host dev testing)
+```
+
+---
+
+### 2.6 Custom Files
 
 #### 1. The Root Project File (`pixelmcp.json`)
 
@@ -1174,7 +1264,7 @@ Each Asset is stored as a self-contained JSON file. Pixel data uses the **row in
 **Why JSON for images?** Saving pixel art hierarchies this way (instead of as raw PNGs) is highly intentional for an AI agent. The JSON format is human-readable (allowing the LLM to inspect or debug specific layers/pixels), diff-friendly (working well with Git for game development workflows), and parsable (meaning generic tools can read the asset data without a specialized decoder). When actual images are needed for the game, the server runs an export pipeline to bake the JSON out into standard .png spritesheets or .gif animations.
 
 
-### 2.6 Error Response Catalog
+### 2.7 Error Response Catalog
 
 Domain errors are returned with `{ isError: true, content: [{ type: "text", text: "..." }] }`. The LLM should read the message and self-correct (e.g., call `workspace load_asset` before retrying a draw operation). Protocol-level errors (unknown tool name, schema validation failure) are handled automatically by the SDK and are not listed here.
 

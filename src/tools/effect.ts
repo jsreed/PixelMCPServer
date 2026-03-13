@@ -25,37 +25,37 @@ const regionParams = {
 const gradientOp = z.object({
   action: z.literal('gradient'),
   ...regionParams,
-  color1: z.number().int().min(0).max(255),
-  color2: z.number().int().min(0).max(255),
+  color1: z.number().int().describe('Palette index (0-255)'),
+  color2: z.number().int().describe('Palette index (0-255)'),
   direction: z.enum(['vertical', 'horizontal', 'diagonal_down', 'diagonal_up']).optional(),
 });
 
 const checkerboardOp = z.object({
   action: z.literal('checkerboard'),
   ...regionParams,
-  color1: z.number().int().min(0).max(255),
-  color2: z.number().int().min(0).max(255),
+  color1: z.number().int().describe('Palette index (0-255)'),
+  color2: z.number().int().describe('Palette index (0-255)'),
 });
 
 const noiseOp = z.object({
   action: z.literal('noise'),
   ...regionParams,
-  color1: z.number().int().min(0).max(255),
-  color2: z.number().int().min(0).max(255),
+  color1: z.number().int().describe('Palette index (0-255)'),
+  color2: z.number().int().describe('Palette index (0-255)'),
 });
 
 const orderedDitherOp = z.object({
   action: z.literal('ordered_dither'),
   ...regionParams,
-  color1: z.number().int().min(0).max(255),
-  color2: z.number().int().min(0).max(255),
+  color1: z.number().int().describe('Palette index (0-255)'),
+  color2: z.number().int().describe('Palette index (0-255)'),
 });
 
 const errorDiffusionOp = z.object({
   action: z.literal('error_diffusion'),
   ...regionParams,
-  color1: z.number().int().min(0).max(255),
-  color2: z.number().int().min(0).max(255),
+  color1: z.number().int().describe('Palette index (0-255)'),
+  color2: z.number().int().describe('Palette index (0-255)'),
 });
 
 const autoAaOp = z.object({
@@ -64,7 +64,7 @@ const autoAaOp = z.object({
 
 const outlineOp = z.object({
   action: z.literal('outline'),
-  color: z.number().int().min(0).max(255),
+  color: z.number().int().describe('Palette index (0-255)'),
 });
 
 const cleanupOrphansOp = z.object({
@@ -197,6 +197,19 @@ export function registerEffectTool(server: McpServer): void {
 
       if (!Array.isArray(args.operations) || args.operations.length === 0) {
         return errors.invalidArgument('operations array is required and must not be empty.');
+      }
+
+      // Pre-validate color parameters before beginning mutation bundle
+      for (const op of args.operations) {
+        if ('color1' in op) {
+          if (op.color1 < 0 || op.color1 > 255) return errors.colorOutOfRange(op.color1);
+        }
+        if ('color2' in op) {
+          if (op.color2 < 0 || op.color2 > 255) return errors.colorOutOfRange(op.color2);
+        }
+        if ('color' in op) {
+          if (op.color < 0 || op.color > 255) return errors.colorOutOfRange(op.color);
+        }
       }
 
       try {

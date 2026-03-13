@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { buildPaletteStep } from './palette-step.js';
 
 const FOUR_DIR_FACINGS = ['S', 'N', 'E', 'W'] as const;
 const EIGHT_DIR_FACINGS = ['S', 'SW', 'W', 'NW', 'N', 'NE', 'E', 'SE'] as const;
@@ -16,18 +17,11 @@ export function buildScaffoldCharacterText(args: {
   const h = args.height ?? 24;
   const facings = dirCount === '8' ? EIGHT_DIR_FACINGS : FOUR_DIR_FACINGS;
 
-  // Palette setup instructions
-  let paletteStep: string;
-  if (!args.palette) {
-    paletteStep = `  - No palette was specified. Call \`palette info\` on the asset to check the current palette.
-    If the project has a default palette configured, it was applied automatically.
-    Otherwise, use \`palette set_bulk\` to add at least: index 0 = transparent [0,0,0,0],
-    a skin tone, outline color, shadow, highlight, and eye/accent color.`;
-  } else if (args.palette.includes('/') || args.palette.endsWith('.json')) {
-    paletteStep = `  - Load the palette file: call \`palette load\` with \`path="${args.palette}"\` on asset \`"${args.name}"\`.`;
-  } else {
-    paletteStep = `  - Fetch the Lospec palette: call \`palette fetch_lospec\` with \`slug="${args.palette}"\` on asset \`"${args.name}"\`.`;
-  }
+  const paletteStep = buildPaletteStep(
+    args.name,
+    args.palette,
+    'a skin tone, outline color, shadow, highlight, and eye/accent color.',
+  );
 
   // Frame and tag layout
   // Layout: idle frame per direction + walk frames (4) per direction

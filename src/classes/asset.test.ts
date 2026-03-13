@@ -506,22 +506,235 @@ describe('AssetClass', () => {
         cels: {},
       });
 
-      // Remove frame 2 (overlaps both tags)
+      // Remove frame 2 (falls within both tag ranges)
       asset.removeFrame(2);
 
       const idleTag = asset.tags.find((t) => t.name === 'Idle') as FrameTag;
       const walkTag = asset.tags.find((t) => t.name === 'Walk') as FrameTag;
 
-      // Idle [0,2]: frame 2 removed → end shrinks to 1
+      // Idle [0,2]: end >= removed index → end shifts to 1. Result: [0,1]
       expect(idleTag.start).toBe(0);
       expect(idleTag.end).toBe(1);
 
-      // Walk [2,4]: frame 2 removed → start stays 2, end 3 → then shifted -1 → [1,2]
-      // Actually the removeFrame logic: both start and end are >= removed index
-      // so they both shift by -1: [2,4] → shrink end → [2,3] → shift → [1,2]
-      // Let's verify the actual behavior
-      expect(walkTag).toBeDefined();
-      expect(walkTag.start).toBeLessThanOrEqual(walkTag.end);
+      // Walk [2,4]: start (2) not > index (2) → start stays 2;
+      // end (4) >= index (2) → end shifts to 3. Result: [2,3]
+      expect(walkTag.start).toBe(2);
+      expect(walkTag.end).toBe(3);
+    });
+  });
+
+  // ─── Gap 1: addTag / removeTag with facing disambiguation ────────
+
+  describe('addTag and removeTag', () => {
+    it('addTag adds a frame tag with facing', () => {
+      const asset = new AssetClass(mockAssetData);
+      asset.addTag({
+        type: 'frame',
+        name: 'Run',
+        start: 0,
+        end: 1,
+        direction: 'forward',
+        facing: 'S',
+      });
+
+      const tag = asset.tags.find((t) => t.name === 'Run') as FrameTag;
+      expect(tag).toBeDefined();
+      expect(tag.facing).toBe('S');
+    });
+
+    it('addTag throws on duplicate name + facing', () => {
+      const asset = new AssetClass(mockAssetData);
+      asset.addTag({
+        type: 'frame',
+        name: 'Idle',
+        start: 0,
+        end: 1,
+        direction: 'forward',
+        facing: 'N',
+      });
+
+      expect(() => {
+        asset.addTag({
+          type: 'frame',
+          name: 'Idle',
+          start: 0,
+          end: 1,
+          direction: 'forward',
+          facing: 'N',
+        });
+      }).toThrow();
+    });
+
+    it('removeTag without facing removes all tags with that name', () => {
+      const asset = new AssetClass(mockAssetData);
+      asset.addTag({
+        type: 'frame',
+        name: 'Run',
+        start: 0,
+        end: 1,
+        direction: 'forward',
+        facing: 'N',
+      });
+      asset.addTag({
+        type: 'frame',
+        name: 'Run',
+        start: 0,
+        end: 1,
+        direction: 'forward',
+        facing: 'S',
+      });
+
+      asset.removeTag('Run');
+
+      expect(asset.tags.find((t) => t.name === 'Run')).toBeUndefined();
+    });
+
+    it('removeTag with facing removes only the matching facing', () => {
+      const asset = new AssetClass(mockAssetData);
+      asset.addTag({
+        type: 'frame',
+        name: 'Run',
+        start: 0,
+        end: 1,
+        direction: 'forward',
+        facing: 'N',
+      });
+      asset.addTag({
+        type: 'frame',
+        name: 'Run',
+        start: 0,
+        end: 1,
+        direction: 'forward',
+        facing: 'S',
+      });
+
+      asset.removeTag('Run', 'N');
+
+      // 'S' facing survives; 'N' facing is removed
+      const remaining = asset.tags.filter((t) => t.name === 'Run') as FrameTag[];
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0]?.facing).toBe('S');
+    });
+  });
+
+  // ─── Gap 2: Link-break-on-write semantics ────────────────────────
+
+  describe('link-break-on-write', () => {
+    it('setCel on a linked cel deletes the link and writes independent data', () => {
+      const sourceData: number[][] = [
+        [10, 11],
+        [12, 13],
+      ];
+      const data: Asset = {
+        ...mockAssetData,
+        cels: {
+          [packCelKey(1, 0)]: { x: 0, y: 0, data: sourceData } as ImageCel,
+          [packCelKey(1, 1)]: { link: '1/0' } as LinkedCel,
+        },
+      };
+      const asset = new AssetClass(data);
+
+      // Write new data to the linked cel
+      const newData: number[][] = [
+        [99, 98],
+        [97, 96],
+      ];
+      asset.setCel(1, 1, { x: 0, y: 0, data: newData } as ImageCel);
+
+      // Frame 1 now has independent data
+      const cel1 = asset.getCel(1, 1) as ImageCel;
+      expect(cel1.data).toEqual(newData);
+
+      // Frame 0 source is unchanged
+      const cel0 = asset.getCel(1, 0) as ImageCel;
+      expect(cel0.data).toEqual(sourceData);
+    });
+
+    it('getMutableCel on a linked cel returns an independent copy; mutating does not affect source', () => {
+      const sourceData: number[][] = [
+        [1, 2],
+        [3, 4],
+      ];
+      const data: Asset = {
+        ...mockAssetData,
+        cels: {
+          [packCelKey(1, 0)]: { x: 0, y: 0, data: sourceData } as ImageCel,
+          [packCelKey(1, 1)]: { link: '1/0' } as LinkedCel,
+        },
+      };
+      const asset = new AssetClass(data);
+
+      // getMutableCel breaks the link and returns independent copy
+      const mutable = asset.getMutableCel(1, 1) as ImageCel;
+      expect(mutable).toBeDefined();
+      expect(mutable.data).toEqual(sourceData);
+
+      // Mutate the returned copy
+      mutable.data[0][0] = 99;
+
+      // Frame 0 source is unchanged
+      const cel0 = asset.getCel(1, 0) as ImageCel;
+      expect(cel0.data[0][0]).toBe(1);
+    });
+  });
+
+  // ─── Gap 3: toJSON / fromJSON roundtrip fidelity ─────────────────
+
+  describe('toJSON / fromJSON roundtrip', () => {
+    it('roundtrip preserves all fields', () => {
+      const asset = new AssetClass(mockAssetData);
+      const shapeLayerId = asset.addLayer({
+        name: 'Hitbox',
+        type: 'shape',
+        opacity: 255,
+        visible: true,
+        role: 'hitbox',
+      });
+      asset.addTag({
+        type: 'frame',
+        name: 'Walk',
+        start: 0,
+        end: 1,
+        direction: 'forward',
+        facing: 'S',
+      });
+      asset.setCel(1, 0, {
+        x: 0,
+        y: 0,
+        data: [
+          [5, 6],
+          [7, 8],
+        ],
+      } as ImageCel);
+      asset.addShape(shapeLayerId, 0, {
+        type: 'rect',
+        name: 'body',
+        x: 2,
+        y: 2,
+        width: 10,
+        height: 14,
+      });
+
+      const json = asset.toJSON();
+      const restored = AssetClass.fromJSON(json);
+
+      expect(restored.name).toBe(asset.name);
+      expect(restored.width).toBe(asset.width);
+      expect(restored.height).toBe(asset.height);
+      expect(restored.perspective).toBe(asset.perspective);
+      expect(restored.layers.length).toBe(asset.layers.length);
+      expect(restored.frames.length).toBe(asset.frames.length);
+      expect(restored.tags.length).toBe(asset.tags.length);
+
+      const cel = restored.getCel(1, 0) as ImageCel;
+      expect(cel.data).toEqual([
+        [5, 6],
+        [7, 8],
+      ]);
+
+      const shapes = restored.getShapes(shapeLayerId, 0);
+      expect(shapes).toHaveLength(1);
+      expect(shapes[0]?.name).toBe('body');
     });
   });
 });

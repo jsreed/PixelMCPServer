@@ -89,16 +89,21 @@ async function handleLoadAsset(
     return errors.noProjectLoaded();
   }
 
+  // Resolve the asset path before loading so we can report it in file-not-found errors.
+  // This also catches registry misses before attempting I/O.
+  let resolvedPath: string;
+  try {
+    resolvedPath = workspace.project.resolveAssetPath(assetName, variant);
+  } catch {
+    return errors.assetNotInRegistry(assetName);
+  }
+
   try {
     await workspace.loadAsset(assetName, variant);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    // Check for known domain error patterns
-    if (msg.includes('not found in project registry')) {
-      return errors.assetNotInRegistry(assetName);
-    }
     if (msg.includes('not found') || msg.includes('ENOENT')) {
-      return errors.assetFileNotFound(assetName);
+      return errors.assetFileNotFound(resolvedPath);
     }
     return errors.domainError(msg);
   }

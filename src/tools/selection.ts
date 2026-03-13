@@ -113,9 +113,8 @@ export function registerSelectionTool(server: McpServer): void {
         const targetAsset = args.target_asset_name ?? firstLoadedAssetName(workspace.loadedAssets);
         if (!targetAsset) return errors.invalidArgument('No asset loaded to paste into.');
 
-        const assetOrError = requireAsset(workspace, targetAsset);
-        if (isError(assetOrError)) return assetOrError;
-        const asset = assetOrError;
+        const asset = workspace.loadedAssets.get(targetAsset);
+        if (!asset) return errors.targetAssetNotLoaded(targetAsset);
 
         const layerId = args.target_layer_id ?? 0;
         const frameIndex = args.target_frame_index ?? 0;

@@ -186,7 +186,7 @@ describe('godot-resources', () => {
       const res = generateGodotTileSet(asset, 'atlas.png', 2); // scale 2
 
       expect(res).toContain('tile_size = Vector2i(16, 16)');
-      // col = 1, row = 0 (1 % 2 = 1, 1 / 2 = 0)
+      // Tiles are in a horizontal strip: col=slot_index, row=0 always
       expect(res).toContain(
         '1:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(0, 0, 32, 0, 32, 32, 0, 32)',
       );
@@ -196,6 +196,55 @@ describe('godot-resources', () => {
       // terrain peering bits
       expect(res).toContain('1:0/0/terrains_peering_bit/bottom = 0');
       expect(res).toContain('1:0/0/terrains_peering_bit/right = 0');
+    });
+
+    test('uses col=slot_index row=0 for high tile indices (horizontal strip layout)', () => {
+      // blob47 uses bitmask values as slot indices — some are >= tile_count.
+      // With the old sqrt(tile_count) formula, tile 255 on a 47-tile set would have
+      // wrapped to a non-zero row. With the correct formula it must always be row 0.
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 47,
+        tile_physics: {
+          physics_layers: [{ collision_layer: 1, collision_mask: 1 }],
+          tiles: {
+            '255': {
+              polygon: [
+                [0, 0],
+                [16, 0],
+                [16, 16],
+                [0, 16],
+              ],
+            },
+          },
+        },
+        tile_terrain: {
+          pattern: 'blob47',
+          terrain_name: 'terrain',
+          peering_bits: {
+            '255': {
+              top: 0,
+              top_right: 0,
+              right: 0,
+              bottom_right: 0,
+              bottom: 0,
+              bottom_left: 0,
+              left: 0,
+              top_left: 0,
+            },
+          },
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      // Tile 255 must be at col=255, row=0 — not wrapped into a square grid
+      expect(res).toContain('255:0/0 = 0');
+      expect(res).toContain('255:0/0/physics_layer_0/polygon_0/points');
+      expect(res).toContain('255:0/0/terrain_set = 0');
+      expect(res).toContain('255:0/0/terrains_peering_bit/top = 0');
+      // Must NOT appear as a non-zero row
+      expect(res).not.toMatch(/255:\d+\/0\/0/); // not 255:1/0, 255:2/0, etc.
     });
   });
 });

@@ -1,20 +1,13 @@
 import { type Command } from './command.js';
-import { type ProjectClass } from '../classes/project.js';
-import { type AssetRegistryEntry } from '../types/project.js';
 
 export class RenameCommand implements Command {
-  private registryEntry: AssetRegistryEntry;
-
   constructor(
-    private project: ProjectClass,
-    private oldName: string,
-    private newName: string,
+    _project: unknown,
+    _oldName: string,
+    _newName: string,
     private action: () => void,
     private undoAction: () => void,
-  ) {
-    const info = project.info();
-    this.registryEntry = JSON.parse(JSON.stringify(info.assets[oldName])) as AssetRegistryEntry;
-  }
+  ) {}
 
   execute(): void {
     this.action();

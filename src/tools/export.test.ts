@@ -245,9 +245,11 @@ describe('Export Tool', () => {
 
     expect(result.content[0].text).toContain('Exported 2 tag sequences');
 
-    // Pattern uses "{name}_{tag}_{direction}.png" -> test_asset_idle_S.png
+    // Pattern uses "{name}_{tag}_{direction}.png" with separator-drop for missing direction:
+    // idle tag has facing='S' => test_asset_idle_S.png
+    // ping tag has no facing  => direction token empty => separator dropped => test_asset_ping.png
     const pngPath1 = path.join(outDir, 'test_asset_idle_S.png');
-    const pngPath2 = path.join(outDir, 'test_asset_ping_ping_pong.png');
+    const pngPath2 = path.join(outDir, 'test_asset_ping.png');
     expect(fs.existsSync(pngPath1)).toBe(true);
     expect(fs.existsSync(pngPath2)).toBe(true);
 

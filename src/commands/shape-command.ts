@@ -1,6 +1,6 @@
 import { type Command } from './command.js';
 import { type AssetClass } from '../classes/asset.js';
-import { type Cel } from '../types/cel.js';
+import { type Cel, packCelKey } from '../types/cel.js';
 
 export class ShapeCommand implements Command {
   private beforeCel: Cel | undefined;
@@ -12,8 +12,11 @@ export class ShapeCommand implements Command {
     private frameIndex: number,
     private action: () => void,
   ) {
-    const cel = asset.getCel(layerId, frameIndex);
-    this.beforeCel = cel ? (JSON.parse(JSON.stringify(cel)) as Cel) : undefined;
+    // Use raw cel access (not getCel) to preserve LinkedCel references.
+    // getMutableCel breaks links on write; undo must restore the original link.
+    const key = packCelKey(layerId, frameIndex);
+    const cel = asset.cels[key] as Cel | undefined;
+    this.beforeCel = cel !== undefined ? (JSON.parse(JSON.stringify(cel)) as Cel) : undefined;
   }
 
   execute(): void {
@@ -21,8 +24,10 @@ export class ShapeCommand implements Command {
       this.restore(this.afterCel);
     } else {
       this.action();
-      const cel = this.asset.getCel(this.layerId, this.frameIndex);
-      this.afterCel = cel ? (JSON.parse(JSON.stringify(cel)) as Cel) : undefined;
+      // After the action, any link is already broken — raw and resolved are equivalent here.
+      const key = packCelKey(this.layerId, this.frameIndex);
+      const cel = this.asset.cels[key] as Cel | undefined;
+      this.afterCel = cel !== undefined ? (JSON.parse(JSON.stringify(cel)) as Cel) : undefined;
     }
   }
 

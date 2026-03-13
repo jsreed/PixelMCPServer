@@ -1,35 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildAnalyzeAssetText, registerAnalyzeAssetPrompt } from './analyze-asset.js';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-
-// ─── Test helpers ─────────────────────────────────────────────────────────────
-
-/** Captures the prompt name and callback from a mock MCP server registration. */
-type PromptArgs = Record<string, unknown>;
-interface PromptMessage {
-  role: string;
-  content: { type: string; text: string };
-}
-interface PromptResult {
-  messages: PromptMessage[];
-}
-type PromptCallback = (args: PromptArgs) => PromptResult;
-
-function capturePromptCallback(registerFn: (server: McpServer) => void): {
-  name: string;
-  cb: PromptCallback;
-} {
-  let capturedName = '';
-  let capturedCb!: PromptCallback;
-  const mockServer = {
-    registerPrompt(name: string, _config: unknown, callback: PromptCallback) {
-      capturedName = name;
-      capturedCb = callback;
-    },
-  };
-  registerFn(mockServer as unknown as McpServer);
-  return { name: capturedName, cb: capturedCb };
-}
+import { capturePromptCallback } from './test-helpers.js';
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 

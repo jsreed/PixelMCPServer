@@ -1102,8 +1102,8 @@ describe('Minimum Viable Loop Integration', () => {
       // -----------------------------------------------------------------------
       // 9. export per_tag on sword
       //    Default pattern: '{name}_{tag}_{direction}.png'
-      //    Sword's "idle" tag has no facing → direction falls back to 'forward'
-      //    Expected filename: sword_idle_forward.png
+      //    Sword's "idle" tag has no facing → direction token empty → separator dropped
+      //    Expected filename: sword_idle.png
       // -----------------------------------------------------------------------
       res = unwrap(
         await dispatch('export', {
@@ -1115,24 +1115,21 @@ describe('Minimum Viable Loop Integration', () => {
       );
 
       // The default export pattern is '{name}_{tag}_{direction}.png'
-      // Sword idle tag has no facing → direction = 'forward' → sword_idle_forward.png
+      // Sword idle tag has no facing → direction token empty → separator dropped → sword_idle.png
       const exportResult = JSON.parse(res.content[0].text) as { files: string[] };
       expect(exportResult.files.length).toBeGreaterThanOrEqual(1);
 
       const swordIdleFile = exportResult.files[0];
-      // Token substitution: {name}=sword, {tag}=idle, {direction}=forward
+      // Token substitution: {name}=sword, {tag}=idle, {direction}='' → separator dropped
       expect(swordIdleFile).toContain('sword');
       expect(swordIdleFile).toContain('idle');
-      expect(swordIdleFile).toContain('forward'); // direction token populated (no facing)
       // Verify no doubled separators — the file should be stored without malformed names
       expect(virtualFs.has(swordIdleFile)).toBe(true);
 
       // -----------------------------------------------------------------------
       // 10. export per_tag on hero to verify facing value substitutes as direction token
-      //    Hero has two "idle" tags: one with no facing (→ 'forward') and one with
-      //    facing='S' (→ 'S'). Export both and verify the facing value appears in
-      //    the filename when the tag carries a facing, demonstrating correct
-      //    separator-dropping: the tag with facing='S' uses 'S' (not 'forward').
+      //    Hero has two "idle" tags: one with no facing (direction token dropped) and
+      //    one with facing='S' (direction token = 'S').
       // -----------------------------------------------------------------------
       res = unwrap(
         await dispatch('export', {
@@ -1154,8 +1151,8 @@ describe('Minimum Viable Loop Integration', () => {
       }
       // One file should use the facing value 'S' as its direction token
       expect(heroExportResult.files.some((f) => f.includes('_S'))).toBe(true);
-      // The other should use 'forward' (direction fallback when no facing)
-      expect(heroExportResult.files.some((f) => f.includes('forward'))).toBe(true);
+      // The other (no facing) has the direction separator dropped → ends in 'idle.png'
+      expect(heroExportResult.files.some((f) => f.endsWith('idle.png'))).toBe(true);
 
       // -----------------------------------------------------------------------
       // 11. Verify both assets were structurally valid after all operations

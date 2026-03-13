@@ -96,10 +96,8 @@ export function registerTilesetTool(server: McpServer): void {
 
           const cmd = new TilesetCommand(asset, () => {
             // Apply dimensions if they were provided and not already on asset
-            if (asset.tile_width === undefined)
-              asset['_restoreDataPatch']({ ...asset.toJSON(), tile_width: tw });
-            if (asset.tile_height === undefined)
-              asset['_restoreDataPatch']({ ...asset.toJSON(), tile_height: th });
+            if (asset.tile_width === undefined) asset.tile_width = tw;
+            if (asset.tile_height === undefined) asset.tile_height = th;
 
             const count = asset.tile_count ?? 0;
             const slotIndex = count;
@@ -294,6 +292,7 @@ export function registerTilesetTool(server: McpServer): void {
 
         if (args.action === 'autotile_generate') {
           if (!args.pattern) return errors.autotilePatternRequired();
+          if (!asset.tile_width || !asset.tile_height) return errors.notATileset(assetName);
 
           const expected = getCanonicalSlots(args.pattern);
           const count = asset.tile_count ?? 0;
@@ -355,7 +354,7 @@ export function registerTilesetTool(server: McpServer): void {
           };
         }
 
-        {
+        if (args.action === 'set_tile_physics') {
           if (args.tile_index === undefined)
             return errors.invalidArgument('set_tile_physics requires tile_index');
 

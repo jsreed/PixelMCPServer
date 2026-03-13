@@ -102,7 +102,7 @@ function handleInfo(asset: Asset) {
   const palette = asset.palette.toJSON();
   const usageCounts = asset.paletteUsageCounts();
 
-  // Build a compact representation: only entries that have non-transparent colors or usage
+  // Build a compact representation: entries with non-transparent colors or actual pixel usage
   const entries: Array<{ index: number; rgba: [number, number, number, number]; usage: number }> =
     [];
   for (let i = 0; i < 256; i++) {

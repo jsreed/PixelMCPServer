@@ -76,8 +76,18 @@ export class AssetClass {
     return this._data.tile_width;
   }
 
+  set tile_width(value: number | undefined) {
+    this._data.tile_width = value;
+    this.markDirty();
+  }
+
   get tile_height(): number | undefined {
     return this._data.tile_height;
+  }
+
+  set tile_height(value: number | undefined) {
+    this._data.tile_height = value;
+    this.markDirty();
   }
 
   get tile_count(): number | undefined {
@@ -825,6 +835,8 @@ export class AssetClass {
     if (patch.cels) this._data.cels = JSON.parse(JSON.stringify(patch.cels)) as Record<string, Cel>;
     if (patch.width !== undefined) this._data.width = patch.width;
     if (patch.height !== undefined) this._data.height = patch.height;
+    if ('tile_width' in patch) this._data.tile_width = patch.tile_width;
+    if ('tile_height' in patch) this._data.tile_height = patch.tile_height;
     if ('tile_count' in patch) this._data.tile_count = patch.tile_count;
     if ('tile_physics' in patch)
       this._data.tile_physics = patch.tile_physics

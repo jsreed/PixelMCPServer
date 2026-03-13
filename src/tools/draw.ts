@@ -14,7 +14,7 @@ import { createResourceLink } from '../utils/resource-link.js';
 // ---------------------------------------------------------------------------
 
 const baseOp = {
-  color: z.number().int().min(0).max(255).describe('Palette index (0-255)'),
+  color: z.number().int().describe('Palette index (0-255)'),
 };
 
 const pixelOp = z.object({
@@ -91,9 +91,9 @@ const isoCubeOp = z.object({
   col: z.number().int(),
   row: z.number().int(),
   elevation: z.number().int().optional().default(0),
-  top_color: z.number().int().min(0).max(255),
-  left_color: z.number().int().min(0).max(255),
-  right_color: z.number().int().min(0).max(255),
+  top_color: z.number().int().describe('Palette index (0-255)'),
+  left_color: z.number().int().describe('Palette index (0-255)'),
+  right_color: z.number().int().describe('Palette index (0-255)'),
 });
 
 const isoWallOp = z.object({
@@ -179,6 +179,16 @@ export function registerDrawTool(server: McpServer): void {
 
       // Pre-validate all operations before beginning mutation bundle
       for (const op of args.operations) {
+        // Named color parameters must be domain-error-validated (not Zod schema errors)
+        if (op.action === 'iso_cube') {
+          if (op.top_color < 0 || op.top_color > 255) return errors.colorOutOfRange(op.top_color);
+          if (op.left_color < 0 || op.left_color > 255)
+            return errors.colorOutOfRange(op.left_color);
+          if (op.right_color < 0 || op.right_color > 255)
+            return errors.colorOutOfRange(op.right_color);
+        } else if ('color' in op) {
+          if (op.color < 0 || op.color > 255) return errors.colorOutOfRange(op.color);
+        }
         if (op.action === 'write_pixels') {
           const dh = op.data.length;
           const dw = dh > 0 ? op.data[0].length : 0;

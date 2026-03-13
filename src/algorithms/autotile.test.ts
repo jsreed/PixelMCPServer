@@ -16,6 +16,8 @@ describe('Autotile Algorithms', () => {
       // Check an invalid one (e.g. diagonal without orthogonals)
       // NE (2) but no N (1) or E (4)
       expect(slots).not.toContain(2);
+      // All corners set (NE+SE+SW+NW=170) but no orthogonals — invalid
+      expect(slots).not.toContain(170);
     });
 
     it('should generate 16 slots for 4side', () => {
@@ -96,6 +98,17 @@ describe('Autotile Algorithms', () => {
       });
     });
 
+    it('should correctly assign bits for 4side N-only tile (slot 1)', () => {
+      // N=1: only top is connected
+      const bits = assignPeeringBits(1, '4side');
+      expect(bits).toEqual({
+        top: 0,
+        right: -1,
+        bottom: -1,
+        left: -1,
+      });
+    });
+
     it('should correctly assign bits for 4corner interior tile', () => {
       const bits = assignPeeringBits(170, '4corner');
       expect(bits).toEqual({
@@ -103,6 +116,17 @@ describe('Autotile Algorithms', () => {
         bottom_right: 0,
         bottom_left: 0,
         top_left: 0,
+      });
+    });
+
+    it('should correctly assign bits for 4corner NE-only tile (slot 2)', () => {
+      // NE=2: only top_right is connected
+      const bits = assignPeeringBits(2, '4corner');
+      expect(bits).toEqual({
+        top_right: 0,
+        bottom_right: -1,
+        bottom_left: -1,
+        top_left: -1,
       });
     });
   });
