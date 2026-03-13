@@ -50,6 +50,7 @@ The model is structured hierarchically, separating the on-disk project structure
 * **Region**: A positioned rectangular chunk of pixel data (palette indices) on a layer.
 * **Palette**: A collection of up to 256 RGBA colors. All pixel data in a Cel stores a **color index (0-255)** rather than raw color values, enabling instant global color swapping.
 * **Tag**: A named label applied to a range of frames or a set of layers. Frame tags define animation sequences (e.g., "idle" = frames 0-3, "walk" = frames 4-11) with playback properties including direction (`forward`, `reverse`, `ping_pong`) and an optional `facing` property (one of N, NE, E, SE, S, SW, W, NW) that records the screen-facing direction for directional character sprites. Layer tags group related layers for organizational purposes (e.g., "armor", "base_body").
+* **NineSlice**: Optional metadata on an Asset defining nine-slice scaling margins (`top`, `right`, `bottom`, `left` in pixels). When set, the asset is treated as a scalable UI element — the four corners are fixed, edges repeat/stretch, and the center tiles. Used by the `godot_ui_frame` export to produce a Godot `StyleBoxTexture` resource.
 
 #### Data Model Lifecycle
 
@@ -167,7 +168,7 @@ If the target cel is a linked cel, the link is broken on the first operation in 
 **Purpose:** Querying and modifying the structural hierarchy (layers, frames, tags) and properties of a loaded Asset.
 
 **Arguments:**
-- action (enum: `info`, `get_cel`, `get_cels`, `detect_banding`, `generate_collision_polygon`, `create`, `resize`, `rename`, `duplicate`, `create_recolor`, `delete`, `add_layer`, `add_group`, `remove_layer`, `reorder_layer`, `add_frame`, `remove_frame`, `set_frame_duration`, `add_tag`, `remove_tag`, `add_shape`, `update_shape`, `remove_shape`, `get_shapes`)
+- action (enum: `info`, `get_cel`, `get_cels`, `detect_banding`, `generate_collision_polygon`, `create`, `resize`, `rename`, `duplicate`, `create_recolor`, `delete`, `add_layer`, `add_group`, `remove_layer`, `reorder_layer`, `add_frame`, `remove_frame`, `set_frame_duration`, `add_tag`, `remove_tag`, `add_shape`, `update_shape`, `remove_shape`, `get_shapes`, `set_nine_slice`)
 - asset_name (string, optional — identifies target asset)
 - name (string, optional — for rename, duplicate, new asset/layer/group/tag name)
 - delete_file (boolean, optional — for `delete`: also remove the asset's `.json` file from disk; defaults to false, which only removes the registry entry)
@@ -203,6 +204,7 @@ If the target cel is a linked cel, the link is broken on the first operation in 
 - palette_file (string, optional — for `create_recolor`: path to a palette `.json` file, relative to `pixelmcp.json`)
 - palette_slug (string, optional — for `create_recolor`: Lospec palette slug, e.g. `"endesga-32"`)
 - palette_entries (array of {index, rgba}, optional — for `create_recolor`: inline palette overrides)
+- nine_slice_top, nine_slice_right, nine_slice_bottom, nine_slice_left (integers ≥ 0, optional — pixel margins for `set_nine_slice`; also accepted on `create` for convenience)
 
 **Behavior:**
 - `info` — returns full structural metadata for the asset: dimensions, perspective, layer tree (IDs, names, types, visibility, opacity, tags), frame list (indices, durations), all tags, and palette summary (color count, entries). This is the LLM's primary way to discover and inspect asset structure.
@@ -229,6 +231,7 @@ If the target cel is a linked cel, the link is broken on the first operation in 
 - `update_shape` — replaces the geometry of an existing named shape in a shape layer cel.
 - `remove_shape` — deletes a named shape from a shape layer cel.
 - `get_shapes` — returns all shapes in a shape layer cel as an array of `{name, type, ...geometry}` objects.
+- `set_nine_slice` — sets nine-slice scaling margins on the asset. Requires at least one of `nine_slice_top`, `nine_slice_right`, `nine_slice_bottom`, `nine_slice_left` (unspecified margins default to 0). Validates that `top + bottom < height` and `left + right < width` — returns an error if margins exceed asset dimensions. Sets `asset.nine_slice = { top, right, bottom, left }`. Also accepted on `create` for convenience. Wrapped in a Command for undo/redo.
 
 **Example — scaffolding a full asset in one call:**
 ```json
@@ -579,7 +582,7 @@ Example assignments: slot `0` = isolated tile, slot `255` = interior (all neighb
 **Purpose:** The gateway out of the engine — produces standard game-ready file formats.
 
 **Arguments:**
-- action (enum: `png`, `gif`, `spritesheet_strip`, `atlas`, `per_tag`, `godot_spriteframes`, `godot_tileset`, `godot_static`)
+- action (enum: `png`, `gif`, `spritesheet_strip`, `atlas`, `per_tag`, `godot_spriteframes`, `godot_tileset`, `godot_static`, `godot_ui_frame`, `godot_atlas`)
 - asset_name (string, optional — defaults to first loaded asset)
 - path (string — output file path)
 - scale_factor (integer, optional — e.g., 4 for 4x upscale)
@@ -608,7 +611,19 @@ Example assignments: slot `0` = isolated tile, slot `255` = interior (all neighb
   2. `{name}.png.import` — import sidecar with lossless compression and disabled mipmaps.
   Does not produce a `.tres` resource. For animated assets, use `godot_spriteframes` instead.
 
-  > **UI icon sheets:** For packed UI icon atlases (items, abilities, status effects), use `atlas` to pack multiple loaded icon assets into a single texture, then reference sub-regions from Godot code. For animated UI elements (spinning effects, animated buttons), use `godot_spriteframes`.
+  > **UI icon sheets:** For packed UI icon atlases (items, abilities, status effects), use `godot_atlas` to pack multiple loaded icon assets into a single texture with named `AtlasTexture` sub-resources. For animated UI elements (spinning effects, animated buttons), use `godot_spriteframes`.
+
+- `godot_ui_frame` — exports a nine-slice UI panel as a Godot 4.x `StyleBoxTexture` package:
+  1. `{name}.png` — composited frame 0 at `scale_factor`.
+  2. `{name}.png.import` — import sidecar with lossless compression and disabled mipmaps.
+  3. `{name}.tres` — Godot `StyleBoxTexture` text resource with `texture_margin_left`, `texture_margin_top`, `texture_margin_right`, `texture_margin_bottom` set from the asset's `nine_slice` margins (scaled by `scale_factor`).
+  Requires the asset to have `nine_slice` margins set (via `asset set_nine_slice`). Returns an error if `nine_slice` is not set.
+
+- `godot_atlas` — exports a packed texture atlas with named Godot `AtlasTexture` sub-resources:
+  1. `{name}.png` — packed atlas image at `scale_factor`, using the same bin-packing logic as the `atlas` action.
+  2. `{name}.png.import` — import sidecar with lossless compression and disabled mipmaps.
+  3. `{name}.tres` — Godot resource file containing one `ext_resource` for the atlas texture and one `AtlasTexture` `sub_resource` per packed asset, each with a `region = Rect2(x, y, w, h)` pointing to its location in the atlas. Sub-resources are named by asset name, making them directly referenceable from Godot code.
+  Returns message + file list + region metadata.
 
 **Example — exporting all directional animation strips using the project export_pattern:**
 ```json
@@ -953,11 +968,33 @@ Arguments:
 ---
 
 **`export_for_godot`**
-Prompt the LLM to determine the correct export action for a loaded asset (spriteframes vs. tileset vs. static) based on its type and structure, then execute the export to the appropriate project path.
+Prompt the LLM to determine the correct export action for a loaded asset (spriteframes vs. tileset vs. static vs. ui_frame vs. atlas) based on its type and structure, then execute the export to the appropriate project path.
 
 Arguments:
 - `asset_name` (required) — the asset to export
 - `godot_project_path` (optional) — root path of the Godot project; defaults to project-level export path if configured
+
+---
+
+**`scaffold_ui_icons`**
+Guide the LLM through creating a set of UI icons: asset creation per icon, palette selection, drawing at a consistent canvas size, and exporting all icons as a packed atlas with named Godot `AtlasTexture` sub-resources.
+
+Arguments:
+- `name` (required) — base name for the icon set
+- `icon_size` (optional) — icon canvas size in pixels (square); defaults to 16
+- `count` (optional) — expected number of icons to create
+- `palette` (optional) — Lospec slug or palette file path; defaults to project default
+
+---
+
+**`scaffold_ui_frame`**
+Guide the LLM through creating a nine-slice UI frame panel: asset creation, palette setup, explaining the 9-slice concept (fixed corners, repeating edges, tiling center), drawing the frame (corners first, then edges, then center fill), setting nine-slice margins, and exporting as a Godot `StyleBoxTexture`.
+
+Arguments:
+- `name` (required) — asset name
+- `width` (optional) — canvas width in pixels; defaults to 48
+- `height` (optional) — canvas height in pixels; defaults to 48
+- `palette` (optional) — Lospec slug or palette file path; defaults to project default
 
 
 ### 2.5 MCP App
@@ -1112,7 +1149,7 @@ This file represents the Project configuration for your entire game or creative 
 
   Tokens with no value for a given tag are silently dropped along with their nearest adjacent separator character (`_`, `-`, `.`). For example, `{name}_{tag}_{direction}.png` applied to a tag with no `facing` produces `iron_sword_idle.png`, not `iron_sword_idle_.png`. Only include tokens relevant to your asset structure.
 - **`defaults`** — applied when creating new assets without explicit overrides. `palette` may be a Lospec slug (`"endesga-32"`) or a relative path to a local palette `.json` file (e.g., `"palettes/fishing_village.json"`). Detection: if the value contains `/` or ends with `.json`, it is treated as a file path resolved relative to `pixelmcp.json`; otherwise it is treated as a Lospec slug fetched from the API.
-- **`assets`** — the asset registry. Each entry maps a logical name to either a single `path` or a `variants` map of fit-category name → path. `type` is a free string — the server does not enforce an enum; use whatever classification fits the project (e.g., `character`, `weapon`, `armor`, `tileset`, `prop`, `effect`, `ui`). The `project add_file` action appends entries here. `workspace load_asset` resolves names through this registry; pass an optional `variant` parameter to select a specific fit (e.g., `"slim"`), otherwise the first defined variant is used.
+- **`assets`** — the asset registry. Each entry maps a logical name to either a single `path` or a `variants` map of fit-category name → path. `type` is a free string — the server does not enforce an enum; use whatever classification fits the project (e.g., `character`, `weapon`, `armor`, `tileset`, `prop`, `effect`, `icon`, `ui_frame`, `cursor`, `hud`). **UI asset conventions:** use `icon` for individual icons or icon sets (export with `godot_atlas`), `ui_frame` for nine-slice panels and buttons (export with `godot_ui_frame`), `cursor` for mouse cursors, and `hud` for HUD elements. **Multi-state UI controls** (buttons with normal/hover/pressed/disabled states): use frame tags named `normal`, `hover`, `pressed`, `disabled` — the standard frame tag system handles state variants the same way it handles animation sequences. The `project add_file` action appends entries here. `workspace load_asset` resolves names through this registry; pass an optional `variant` parameter to select a specific fit (e.g., `"slim"`), otherwise the first defined variant is used.
 
   **`recolor_of` (string, optional)** — records that this asset is a palette-swap variant of another registered asset. Purely informational — the server does not enforce or resolve this field at runtime. The referenced asset does not need to be loaded or even exist. Automatically set by `asset create_recolor`; can also be added manually to any registry entry. Useful for LLM context (avoiding redundant pixel work on known recolors), batch operations (propagating structural changes across all recolors of a base), and human readability.
 
@@ -1259,6 +1296,11 @@ Each Asset is stored as a self-contained JSON file. Pixel data uses the **row in
   }
   ```
   Keys in `peering_bits` are slot indices (as strings). Each entry maps the 8 neighbor directions to a terrain ID (`0`+) or `-1` (no connection). The direction names (`top`, `top_right`, etc.) correspond to Godot's `CellNeighbor` constants and are written directly into the `.tres` as `terrain_peering_bits/<neighbor_int>` values.
+- **UI frame assets** may include a top-level `nine_slice` object defining nine-slice scaling margins. This is populated by the `asset set_nine_slice` action (or on `create`) and consumed by the `export godot_ui_frame` action. Example structure:
+  ```json
+  "nine_slice": { "top": 4, "right": 4, "bottom": 4, "left": 4 }
+  ```
+  Margins are in pixels relative to the asset's native resolution (before any `scale_factor` upscaling). All four values must be non-negative and `top + bottom` must be less than `height`, `left + right` less than `width`.
 - **Tags** include both frame tags (animation sequences with `start`, `end`, `direction`, and optional `facing`) and layer tags (organizational groups with `layers` array of IDs). `facing` is only meaningful on frame tags for directional sprites and maps to the `{direction}` token in `export_pattern`.
 
 **Why JSON for images?** Saving pixel art hierarchies this way (instead of as raw PNGs) is highly intentional for an AI agent. The JSON format is human-readable (allowing the LLM to inspect or debug specific layers/pixels), diff-friendly (working well with Git for game development workflows), and parsable (meaning generic tools can read the asset data without a specialized decoder). When actual images are needed for the game, the server runs an export pipeline to bake the JSON out into standard .png spritesheets or .gif animations.
@@ -1286,6 +1328,7 @@ Domain errors are returned with `{ isError: true, content: [{ type: "text", text
 | asset | `generate_collision_polygon` — no shape layer found | `"No target shape layer specified and no hitbox shape layer found in asset '{name}'."` |
 | asset | `add_shape` / `update_shape` — `layer_id` not a shape layer | `"Layer {id} is not a shape layer."` |
 | asset | `create_recolor` — no palette source provided | `"At least one palette source (palette_file, palette_slug, or palette_entries) is required for create_recolor."` |
+| asset | `set_nine_slice` — margins exceed dimensions | `"Nine-slice margins exceed asset dimensions (top + bottom must be < height, left + right must be < width)."` |
 | draw | any operation — `color` out of range | `"Color index {color} is out of range (0–255)."` |
 | draw | `write_pixels` — data dimensions mismatch | `"write_pixels data dimensions ({dw}×{dh}) do not match declared width×height ({w}×{h})."` |
 | effect | any operation — `color1` / `color2` out of range | `"Color index {color} is out of range (0–255)."` |
@@ -1300,6 +1343,7 @@ Domain errors are returned with `{ isError: true, content: [{ type: "text", text
 | tileset | `set_tile_physics` — tile index not found | `"Tile index {index} does not exist in tileset '{name}'."` |
 | export | any action, asset not loaded | `"Asset '{name}' is not loaded in the workspace."` |
 | export | any action — output path not writable | `"Cannot write to path: {path}"` |
+| export | `godot_ui_frame` — no nine_slice set | `"Asset '{name}' has no nine_slice margins set. Call asset set_nine_slice first."` |
 | selection | `paste` — clipboard empty | `"Clipboard is empty. Copy or cut a selection first."` |
 | selection | `paste` — `target_asset_name` not loaded | `"Target asset '{name}' is not loaded in the workspace."` |
 

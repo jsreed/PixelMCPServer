@@ -541,11 +541,74 @@ Full workflow tests that exercise multiple tools in sequence, verifying the syst
 
 ---
 
-## Phase 6: MCP App
+## Phase 6: UI Art Assets
+
+First-class support for **UI art assets** — icons, UI frames/panels, buttons, and similar. Adds nine-slice metadata for scalable UI panels, Godot `StyleBoxTexture` export, atlas export with named Godot `AtlasTexture` sub-resources, and scaffolding prompts for common UI art workflows.
+
+**Depends on:** Phases 1–5 (full tool surface, working exports)
+
+---
+
+### 6.1 Nine-Slice Types & Class
+
+- [ ] **6.1.1** **`NineSlice` interface** (`src/types/asset.ts`) — `{ top: number; right: number; bottom: number; left: number }` defining pixel margins for 9-slice scaling
+- [ ] **6.1.2** **Optional `nine_slice` field on `Asset`** (`src/types/asset.ts`) — `nine_slice?: NineSlice`, following the `tile_physics`/`tile_terrain` pattern
+- [ ] **6.1.3** **`AssetClass` getter/setter** (`src/classes/asset.ts`) — getter/setter for `nine_slice` with `markDirty()` in the setter; handle in `_restoreDataPatch()` using the `'nine_slice' in patch` pattern
+
+---
+
+### 6.2 Nine-Slice Command
+
+- [ ] **6.2.1** **`NineSliceCommand`** (`src/commands/nine-slice-command.ts`) — follows the `TilesetCommand` pattern: captures `nine_slice` before-state in constructor, applies mutation, captures after-state. Uses `_restoreDataPatch()` for undo/redo.
+
+---
+
+### 6.3 Asset Tool: `set_nine_slice` Action
+
+- [ ] **6.3.1** **Add `set_nine_slice` to asset tool** (`src/tools/asset.ts`) — add to the action enum in the Zod schema; add optional params `nine_slice_top`, `nine_slice_right`, `nine_slice_bottom`, `nine_slice_left` (all `z.number().int().min(0).optional()`)
+- [ ] **6.3.2** **Accept `nine_slice` on `asset create`** — same way `tile_width`/`tile_height` are set on create, for convenience
+- [ ] **6.3.3** **Handler logic** — validate at least one margin is provided, validate margins don't exceed asset dimensions (top+bottom >= height or left+right >= width → error), wrap in `NineSliceCommand`, set `asset.nine_slice`
+
+---
+
+### 6.4 Godot Resource Generation
+
+- [ ] **6.4.1** **`generateGodotStyleBoxTexture()`** (`src/io/godot-resources.ts`) — produces a Godot 4.x `StyleBoxTexture` `.tres` with `texture_margin_*` properties from nine-slice margins and scale factor
+- [ ] **6.4.2** **`generateGodotAtlasTextures()`** (`src/io/godot-resources.ts`) — produces a single `.tres` with named `AtlasTexture` sub-resources, each pointing to a region within a packed atlas texture
+
+---
+
+### 6.5 Export Actions
+
+- [ ] **6.5.1** **`godot_ui_frame` export action** (`src/tools/export.ts`) — requires loaded asset with `nine_slice` set; composites frame 0, upscales, writes `{name}.png` + `.png.import` sidecar + `{name}.tres` (`StyleBoxTexture`). Returns message + file list.
+- [ ] **6.5.2** **`godot_atlas` export action** (`src/tools/export.ts`) — uses same atlas packing logic as existing `atlas` action (refactor shared helper); writes `{name}.png` + `.png.import` sidecar + `{name}.tres` (named `AtlasTexture` sub-resources). Returns message + file list + regions.
+
+---
+
+### 6.6 MCP Prompts
+
+- [ ] **6.6.1** **`scaffold_ui_icons` prompt** (`src/prompts/scaffold-ui-icons.ts`) — follows `scaffold_tileset` pattern. Arguments: `name` (required), `icon_size` (optional, default 16), `count` (optional), `palette` (optional). Guides: create asset, set palette, draw icon, tips for consistency, export as `godot_atlas`.
+- [ ] **6.6.2** **`scaffold_ui_frame` prompt** (`src/prompts/scaffold-ui-frame.ts`) — Arguments: `name` (required), `width` (optional, default 48), `height` (optional, default 48), `palette` (optional). Guides: create asset, set palette, explain 9-slice concept, draw frame (corners → edges → center fill), set nine_slice margins, preview, export as `godot_ui_frame`.
+- [ ] **6.6.3** **Register prompts** (`src/index.ts`) — import and call `registerScaffoldUiIconsPrompt()` and `registerScaffoldUiFramePrompt()`
+
+---
+
+### 6.7 Testing
+
+- [ ] **6.7.1** **Unit tests** — nine_slice getter/setter, toJSON/fromJSON roundtrip, dirty tracking (`src/classes/asset.test.ts`); NineSliceCommand execute/undo/redo (`src/commands/nine-slice-command.test.ts`); `generateGodotStyleBoxTexture()` and `generateGodotAtlasTextures()` output format (`src/io/godot-resources.test.ts`)
+- [ ] **6.7.2** **Tool tests** — `set_nine_slice` action: valid set, margins-exceed-dimensions error, undo/redo; `create` with nine_slice params (`src/tools/asset.test.ts`); `godot_ui_frame` (produces PNG + import + .tres, error when no nine_slice set) and `godot_atlas` (produces PNG + import + .tres with named sub-resources) export actions (`src/tools/export.test.ts`)
+- [ ] **6.7.3** **Prompt tests** — `scaffold_ui_icons` and `scaffold_ui_frame` registration, argument validation, messages reference correct tool actions
+- [ ] **6.7.4** **E2E tests** — UI frame workflow: `project init` → `asset create` → `palette set_bulk` → `draw` → `asset set_nine_slice` → `workspace save` → `export godot_ui_frame` → verify `.tres` contains correct `StyleBoxTexture` margins. Icon atlas workflow: create 3 icon assets → draw on each → `export godot_atlas` → verify `.tres` contains 3 named `AtlasTexture` sub-resources with correct regions.
+
+> **Definition of Done — Phase 6:** Nine-slice metadata round-trips through save/load. `set_nine_slice` validates margins and supports undo/redo. `godot_ui_frame` produces a valid Godot `StyleBoxTexture` `.tres`. `godot_atlas` produces a valid Godot `AtlasTexture` `.tres` with named sub-resources. Both scaffolding prompts guide the user through complete workflows. All 6.7 tests pass.
+
+---
+
+## Phase 7: MCP App
 
 An interactive pixel art editor that renders **inline in the conversation** using the [MCP Apps extension](https://modelcontextprotocol.io/extensions/apps/overview). When the AI (or user) calls the `open_editor` tool, a sandboxed iframe appears in the chat containing a live pixel art editor. The user can paint pixels, navigate frames, make selections to reference in conversation, and step through animations — all without leaving the chat. The AI can continue making tool calls while the user interacts with the editor.
 
-**Depends on:** Phases 1–5 (full tool surface, working resources)
+**Depends on:** Phases 1–6 (full tool surface, working resources, UI art assets)
 
 **SDK/infra deps:** `@modelcontextprotocol/ext-apps`, `vite`, `vite-plugin-singlefile`, `preact`
 
@@ -553,97 +616,97 @@ An interactive pixel art editor that renders **inline in the conversation** usin
 
 ---
 
-### 6.1 Infrastructure
+### 7.1 Infrastructure
 
-- [ ] **6.1.1** **Install UI deps** — `@modelcontextprotocol/ext-apps`, `vite`, `vite-plugin-singlefile`, `preact`; install as dev deps or separate workspace package to avoid bloating the server bundle
-- [ ] **6.1.2** **Vite config** — `vite.config.app.ts` targeting `src/app/app.html`, `viteSingleFile` plugin, outputs `dist/app/app.html`
-- [ ] **6.1.3** **Build scripts** — add `build:app` (`vite build --config vite.config.app.ts`) and `dev:app` (vite dev server with HMR) to `package.json`; `build` script stays tsc-only
-- [ ] **6.1.4** **Optional HTTP transport** — if `--http` flag present, start Express + `StreamableHTTPServerTransport` on port 3001 alongside (or instead of) stdio; useful for `basic-host` dev testing
+- [ ] **7.1.1** **Install UI deps** — `@modelcontextprotocol/ext-apps`, `vite`, `vite-plugin-singlefile`, `preact`; install as dev deps or separate workspace package to avoid bloating the server bundle
+- [ ] **7.1.2** **Vite config** — `vite.config.app.ts` targeting `src/app/app.html`, `viteSingleFile` plugin, outputs `dist/app/app.html`
+- [ ] **7.1.3** **Build scripts** — add `build:app` (`vite build --config vite.config.app.ts`) and `dev:app` (vite dev server with HMR) to `package.json`; `build` script stays tsc-only
+- [ ] **7.1.4** **Optional HTTP transport** — if `--http` flag present, start Express + `StreamableHTTPServerTransport` on port 3001 alongside (or instead of) stdio; useful for `basic-host` dev testing
 
 ---
 
-### 6.2 Server-side: Editor Tool & Resource
+### 7.2 Server-side: Editor Tool & Resource
 
-- [ ] **6.2.1** **`src/tools/editor.ts`** — `registerEditorTool(server)`:
+- [ ] **7.2.1** **`src/tools/editor.ts`** — `registerEditorTool(server)`:
   - `open_editor({ asset_name })` — loads asset if not loaded, returns full asset state JSON (palette, layers, frame list, tags, cels for frame 0), declares `_meta: { ui: { resourceUri: "ui://pixel-editor/app.html" } }`
   - `get_asset_state({ asset_name, frame_index? })` — returns cels + metadata for the given frame; called by the UI to refresh after any edit or AI tool call
-- [ ] **6.2.2** **`src/resources/editor.ts`** — resource handler for `ui://pixel-editor/app.html`; reads `dist/app/app.html` and returns it with MIME type `text/html+mcp-app` via `registerAppResource`
-- [ ] **6.2.3** **Wire into `src/index.ts`** — call `registerEditorTool` and `registerEditorResource`
+- [ ] **7.2.2** **`src/resources/editor.ts`** — resource handler for `ui://pixel-editor/app.html`; reads `dist/app/app.html` and returns it with MIME type `text/html+mcp-app` via `registerAppResource`
+- [ ] **7.2.3** **Wire into `src/index.ts`** — call `registerEditorTool` and `registerEditorResource`
 
 ---
 
-### 6.3 UI: Canvas Renderer (`src/app/canvas.ts`)
+### 7.3 UI: Canvas Renderer (`src/app/canvas.ts`)
 
-- [ ] **6.3.1** **`CanvasRenderer` class** — wraps a `<canvas>` element; `render(cels, layers, palette, selection?)` composites all visible image layers for the current frame into `ImageData` using indexed→RGBA conversion (respects layer opacity, visibility order); draws to canvas
-- [ ] **6.3.2** **Transparency background** — checkerboard pattern drawn behind any pixel with index 0 (transparent)
-- [ ] **6.3.3** **Zoom** — CSS canvas scaling with `imageSmoothingEnabled = false` (nearest-neighbor); scroll-wheel to zoom 1×–16×; zoom anchored to cursor position
-- [ ] **6.3.4** **Pan** — middle-click or space+drag to pan; canvas offset tracked as `{ dx, dy }` state
-- [ ] **6.3.5** **`getPixelAt(clientX, clientY)`** — maps screen coordinates back to canvas pixel `{ x, y, colorIndex }` accounting for zoom and pan; used by pencil, eyedropper, and selection tools
-
----
-
-### 6.4 UI: Palette Panel (`src/app/palette.ts`)
-
-- [ ] **6.4.1** **Color swatch grid** — renders all non-null palette entries as colored squares (skip index 0 or render as checkerboard for transparent)
-- [ ] **6.4.2** **Active color selection** — click a swatch → set `activeColorIndex`; selected swatch gets a highlight border
-- [ ] **6.4.3** **Hover tooltip** — shows `[${index}] #${hexRGBA}` on mouse-over
+- [ ] **7.3.1** **`CanvasRenderer` class** — wraps a `<canvas>` element; `render(cels, layers, palette, selection?)` composites all visible image layers for the current frame into `ImageData` using indexed→RGBA conversion (respects layer opacity, visibility order); draws to canvas
+- [ ] **7.3.2** **Transparency background** — checkerboard pattern drawn behind any pixel with index 0 (transparent)
+- [ ] **7.3.3** **Zoom** — CSS canvas scaling with `imageSmoothingEnabled = false` (nearest-neighbor); scroll-wheel to zoom 1×–16×; zoom anchored to cursor position
+- [ ] **7.3.4** **Pan** — middle-click or space+drag to pan; canvas offset tracked as `{ dx, dy }` state
+- [ ] **7.3.5** **`getPixelAt(clientX, clientY)`** — maps screen coordinates back to canvas pixel `{ x, y, colorIndex }` accounting for zoom and pan; used by pencil, eyedropper, and selection tools
 
 ---
 
-### 6.5 UI: Layer Panel (`src/app/layers.ts`)
+### 7.4 UI: Palette Panel (`src/app/palette.ts`)
 
-- [ ] **6.5.1** **Layer list** — renders all layers top-to-bottom with name, type icon (image/tilemap/shape/group), and eye toggle icon
-- [ ] **6.5.2** **Visibility toggle** — click eye → optimistic local toggle + call `asset` tool to set `visible`; re-render canvas on confirmation
-- [ ] **6.5.3** **Active layer** — click row → set `activeLayerId`; highlighted in panel; pencil/fill tools target this layer
-
----
-
-### 6.6 UI: Frame Timeline (`src/app/timeline.ts`)
-
-- [ ] **6.6.1** **Frame strip** — small squares for each frame; current frame highlighted; click to jump to frame → call `get_asset_state` to reload cels
-- [ ] **6.6.2** **Prev / Next buttons** — step one frame at a time; wraps at ends
-- [ ] **6.6.3** **Frame counter** — "frame 3 / 8 (120ms)" label
-- [ ] **6.6.4** **Tag spans** — colored labels above the strip showing tag name and frame range for each frame tag
-- [ ] **6.6.5** **Play / Pause** — `requestAnimationFrame` loop; advances frame when elapsed time ≥ current frame's `duration_ms`; respects loop toggle
-- [ ] **6.6.6** **Loop toggle** — loops back to frame 0, or stops at last frame
+- [ ] **7.4.1** **Color swatch grid** — renders all non-null palette entries as colored squares (skip index 0 or render as checkerboard for transparent)
+- [ ] **7.4.2** **Active color selection** — click a swatch → set `activeColorIndex`; selected swatch gets a highlight border
+- [ ] **7.4.3** **Hover tooltip** — shows `[${index}] #${hexRGBA}` on mouse-over
 
 ---
 
-### 6.7 UI: Drawing Toolbar (`src/app/toolbar.ts`)
+### 7.5 UI: Layer Panel (`src/app/layers.ts`)
 
-- [ ] **6.7.1** **Pencil tool** — `mousedown` → `mousemove` → `mouseup` on canvas; accumulates `{x, y}` stroke pixels optimistically into local canvas; on `mouseup` commits as a single `draw write_pixels` batch call (efficient, produces one undo step)
-- [ ] **6.7.2** **Eraser tool** — same as pencil but uses `activeColorIndex = 0`
-- [ ] **6.7.3** **Eyedropper tool** — click canvas → `getPixelAt()` → set `activeColorIndex`; no server call needed
-- [ ] **6.7.4** **Fill tool** — click canvas → `getPixelAt()` → call `draw fill` with that `{x, y}` and `activeColorIndex` → call `get_asset_state` to refresh
-- [ ] **6.7.5** **Undo / Redo buttons** — call `workspace undo` / `workspace redo` → call `get_asset_state` to refresh canvas
+- [ ] **7.5.1** **Layer list** — renders all layers top-to-bottom with name, type icon (image/tilemap/shape/group), and eye toggle icon
+- [ ] **7.5.2** **Visibility toggle** — click eye → optimistic local toggle + call `asset` tool to set `visible`; re-render canvas on confirmation
+- [ ] **7.5.3** **Active layer** — click row → set `activeLayerId`; highlighted in panel; pencil/fill tools target this layer
 
 ---
 
-### 6.8 UI: Selection & Context Bridge (`src/app/selection.ts`)
+### 7.6 UI: Frame Timeline (`src/app/timeline.ts`)
 
-- [ ] **6.8.1** **Rect selection tool** — drag on canvas → draw dashed rectangle overlay; on `mouseup` call `selection rect { asset_name, layer_id, frame_index, x, y, width, height }` to set server-side mask; render marching ants (CSS `stroke-dashoffset` animation) on canvas overlay
-- [ ] **6.8.2** **Select All / Clear** — buttons calling `selection all` / `selection clear`; clear also removes marching ants overlay
-- [ ] **6.8.3** **"Reference in AI" button** — extracts dominant color histogram from the selected region using local canvas pixel data; calls `app.sendContextUpdate({ type: "pixel_selection", asset: name, region: { x, y, w, h }, dominant_colors: [...] })` so the AI knows exactly what region the user is pointing at in subsequent messages
-
----
-
-### 6.9 UI: App Shell & State (`src/app/app.ts`)
-
-- [ ] **6.9.1** **`App` from `@modelcontextprotocol/ext-apps`** — `app.connect()` on init; `app.ontoolresult` receives initial asset state from `open_editor` and triggers first render
-- [ ] **6.9.2** **Top-level state** — `{ assetName, width, height, palette, layers, frames, tags, cels, activeLayerId, activeColorIndex, currentFrame, isPlaying, selection }`
-- [ ] **6.9.3** **Status bar** — shows active tool, active layer name, active palette color swatch + index, last AI operation
-- [ ] **6.9.4** **Auto-refresh on AI edits** — `ontoolresult` also fires when the AI calls tools (draw, transform, etc.); on receipt, call `get_asset_state` to sync canvas with any AI-made changes
+- [ ] **7.6.1** **Frame strip** — small squares for each frame; current frame highlighted; click to jump to frame → call `get_asset_state` to reload cels
+- [ ] **7.6.2** **Prev / Next buttons** — step one frame at a time; wraps at ends
+- [ ] **7.6.3** **Frame counter** — "frame 3 / 8 (120ms)" label
+- [ ] **7.6.4** **Tag spans** — colored labels above the strip showing tag name and frame range for each frame tag
+- [ ] **7.6.5** **Play / Pause** — `requestAnimationFrame` loop; advances frame when elapsed time ≥ current frame's `duration_ms`; respects loop toggle
+- [ ] **7.6.6** **Loop toggle** — loops back to frame 0, or stops at last frame
 
 ---
 
-### 6.10 Testing
+### 7.7 UI: Drawing Toolbar (`src/app/toolbar.ts`)
 
-- [ ] **6.10.1** **`CanvasRenderer` unit tests** — render known pixel data + palette → assert correct RGBA output for specific pixels; assert transparent background (index 0 → alpha 0 in composited output)
-- [ ] **6.10.2** **`open_editor` tool tests** — call with a loaded test asset; verify response contains `palette`, `layers`, `frames`, `cels`, and `_meta.ui.resourceUri`
-- [ ] **6.10.3** **Editor resource handler tests** — verify `ui://pixel-editor/app.html` returns content with correct MIME type; verify HTML content is non-empty after build
-- [ ] **6.10.4** **Manual smoke test** — build UI (`npm run build:app`), start server with `--http`, point `basic-host` at `http://localhost:3001/mcp`, call `open_editor`, verify canvas renders and pencil tool commits pixels via draw tool
+- [ ] **7.7.1** **Pencil tool** — `mousedown` → `mousemove` → `mouseup` on canvas; accumulates `{x, y}` stroke pixels optimistically into local canvas; on `mouseup` commits as a single `draw write_pixels` batch call (efficient, produces one undo step)
+- [ ] **7.7.2** **Eraser tool** — same as pencil but uses `activeColorIndex = 0`
+- [ ] **7.7.3** **Eyedropper tool** — click canvas → `getPixelAt()` → set `activeColorIndex`; no server call needed
+- [ ] **7.7.4** **Fill tool** — click canvas → `getPixelAt()` → call `draw fill` with that `{x, y}` and `activeColorIndex` → call `get_asset_state` to refresh
+- [ ] **7.7.5** **Undo / Redo buttons** — call `workspace undo` / `workspace redo` → call `get_asset_state` to refresh canvas
 
-> **Definition of Done — Phase 6:** `open_editor` renders an interactive canvas inline in Claude. User can paint pixels, step through animation frames, drag a selection rectangle and hit "Reference in AI" to update conversation context with the selected region. Undo/redo works. Canvas auto-refreshes when the AI makes tool calls. All 6.10 tests pass.
+---
+
+### 7.8 UI: Selection & Context Bridge (`src/app/selection.ts`)
+
+- [ ] **7.8.1** **Rect selection tool** — drag on canvas → draw dashed rectangle overlay; on `mouseup` call `selection rect { asset_name, layer_id, frame_index, x, y, width, height }` to set server-side mask; render marching ants (CSS `stroke-dashoffset` animation) on canvas overlay
+- [ ] **7.8.2** **Select All / Clear** — buttons calling `selection all` / `selection clear`; clear also removes marching ants overlay
+- [ ] **7.8.3** **"Reference in AI" button** — extracts dominant color histogram from the selected region using local canvas pixel data; calls `app.sendContextUpdate({ type: "pixel_selection", asset: name, region: { x, y, w, h }, dominant_colors: [...] })` so the AI knows exactly what region the user is pointing at in subsequent messages
+
+---
+
+### 7.9 UI: App Shell & State (`src/app/app.ts`)
+
+- [ ] **7.9.1** **`App` from `@modelcontextprotocol/ext-apps`** — `app.connect()` on init; `app.ontoolresult` receives initial asset state from `open_editor` and triggers first render
+- [ ] **7.9.2** **Top-level state** — `{ assetName, width, height, palette, layers, frames, tags, cels, activeLayerId, activeColorIndex, currentFrame, isPlaying, selection }`
+- [ ] **7.9.3** **Status bar** — shows active tool, active layer name, active palette color swatch + index, last AI operation
+- [ ] **7.9.4** **Auto-refresh on AI edits** — `ontoolresult` also fires when the AI calls tools (draw, transform, etc.); on receipt, call `get_asset_state` to sync canvas with any AI-made changes
+
+---
+
+### 7.10 Testing
+
+- [ ] **7.10.1** **`CanvasRenderer` unit tests** — render known pixel data + palette → assert correct RGBA output for specific pixels; assert transparent background (index 0 → alpha 0 in composited output)
+- [ ] **7.10.2** **`open_editor` tool tests** — call with a loaded test asset; verify response contains `palette`, `layers`, `frames`, `cels`, and `_meta.ui.resourceUri`
+- [ ] **7.10.3** **Editor resource handler tests** — verify `ui://pixel-editor/app.html` returns content with correct MIME type; verify HTML content is non-empty after build
+- [ ] **7.10.4** **Manual smoke test** — build UI (`npm run build:app`), start server with `--http`, point `basic-host` at `http://localhost:3001/mcp`, call `open_editor`, verify canvas renders and pencil tool commits pixels via draw tool
+
+> **Definition of Done — Phase 7:** `open_editor` renders an interactive canvas inline in Claude. User can paint pixels, step through animation frames, drag a selection rectangle and hit "Reference in AI" to update conversation context with the selected region. Undo/redo works. Canvas auto-refreshes when the AI makes tool calls. All 7.10 tests pass.
 
 ---
 
@@ -730,17 +793,26 @@ Phase 5 (Integration & Polish — depends on everything)
   ├── 5.4 CLAUDE.md update
   └── 5.5 Documentation (README + example project)
 
-Phase 6 (MCP App — depends on Phases 1-5)
-  ├── 6.1 Infrastructure (Vite + ext-apps SDK + optional HTTP transport)
-  ├── 6.2 Server-side tool + resource (open_editor, get_asset_state, ui:// resource)
-  ├── 6.3 UI: CanvasRenderer (indexed→RGBA composite, zoom, pan)
-  ├── 6.4 UI: PalettePanel (swatch grid, active color)
-  ├── 6.5 UI: LayerPanel (layer list, visibility toggle, active layer)
-  ├── 6.6 UI: FrameTimeline (scrubber, play/pause, tag spans)
-  ├── 6.7 UI: DrawingToolbar (pencil, eraser, eyedropper, fill, undo/redo)
-  ├── 6.8 UI: Selection + context bridge (rect select, marching ants, "Reference in AI")
-  ├── 6.9 UI: App shell + state (App.connect, ontoolresult, auto-refresh)
-  └── 6.10 Testing (CanvasRenderer unit tests + tool tests + smoke test)
+Phase 6 (UI Art Assets — depends on Phases 1-5)
+  ├── 6.1 Nine-Slice types & class (NineSlice interface, Asset optional field, getter/setter)
+  ├── 6.2 NineSliceCommand (undo/redo for nine_slice mutations)
+  ├── 6.3 Asset tool: set_nine_slice (action + validation + create convenience)
+  ├── 6.4 Godot resource generation (StyleBoxTexture, AtlasTextures)
+  ├── 6.5 Export actions (godot_ui_frame, godot_atlas)
+  ├── 6.6 MCP Prompts (scaffold_ui_icons, scaffold_ui_frame)
+  └── 6.7 Testing (unit + tool + prompt + E2E)
+
+Phase 7 (MCP App — depends on Phases 1-6)
+  ├── 7.1 Infrastructure (Vite + ext-apps SDK + optional HTTP transport)
+  ├── 7.2 Server-side tool + resource (open_editor, get_asset_state, ui:// resource)
+  ├── 7.3 UI: CanvasRenderer (indexed→RGBA composite, zoom, pan)
+  ├── 7.4 UI: PalettePanel (swatch grid, active color)
+  ├── 7.5 UI: LayerPanel (layer list, visibility toggle, active layer)
+  ├── 7.6 UI: FrameTimeline (scrubber, play/pause, tag spans)
+  ├── 7.7 UI: DrawingToolbar (pencil, eraser, eyedropper, fill, undo/redo)
+  ├── 7.8 UI: Selection + context bridge (rect select, marching ants, "Reference in AI")
+  ├── 7.9 UI: App shell + state (App.connect, ontoolresult, auto-refresh)
+  └── 7.10 Testing (CanvasRenderer unit tests + tool tests + smoke test)
 ```
 
 ## Implementation Rules
