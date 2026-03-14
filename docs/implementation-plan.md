@@ -573,8 +573,8 @@ First-class support for **UI art assets** — icons, UI frames/panels, buttons, 
 
 ### 6.4 Godot Resource Generation
 
-- [ ] **6.4.1** **`generateGodotStyleBoxTexture()`** (`src/io/godot-resources.ts`) — produces a Godot 4.x `StyleBoxTexture` `.tres` with `texture_margin_*` properties from nine-slice margins and scale factor
-- [ ] **6.4.2** **`generateGodotAtlasTextures()`** (`src/io/godot-resources.ts`) — produces a single `.tres` with named `AtlasTexture` sub-resources, each pointing to a region within a packed atlas texture
+- [x] **6.4.1** **`generateGodotStyleBoxTexture()`** (`src/io/godot-resources.ts`) — produces a Godot 4.x `StyleBoxTexture` `.tres` with `texture_margin_*` properties from nine-slice margins and scale factor
+- [x] **6.4.2** **`generateGodotAtlasTextures()`** (`src/io/godot-resources.ts`) — produces a single `.tres` with named `AtlasTexture` sub-resources, each pointing to a region within a packed atlas texture
 
 ---
 

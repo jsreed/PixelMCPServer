@@ -1,4 +1,6 @@
 import { type AssetClass } from '../classes/asset.js';
+import { type NineSlice } from '../types/asset.js';
+import { type PackPlacement } from '../algorithms/bin-pack.js';
 
 function gcd(a: number, b: number): number {
   return b === 0 ? a : gcd(b, a % b);
@@ -89,6 +91,72 @@ export function generateGodotSpriteFrames(
 
   tres += animations.join(', ') + `]\n`;
   return tres;
+}
+
+/**
+ * Produces a Godot 4.x `StyleBoxTexture` `.tres` resource for a nine-slice UI panel.
+ *
+ * @param pngPath  `res://`-relative path to the panel texture PNG.
+ * @param nineSlice  Nine-slice margins in source pixels.
+ * @param scaleFactor  Export scale factor (margins are multiplied accordingly).
+ */
+export function generateGodotStyleBoxTexture(
+  pngPath: string,
+  nineSlice: NineSlice,
+  scaleFactor: number = 1,
+): string {
+  const l = (nineSlice.left * scaleFactor).toFixed(1);
+  const t = (nineSlice.top * scaleFactor).toFixed(1);
+  const r = (nineSlice.right * scaleFactor).toFixed(1);
+  const b = (nineSlice.bottom * scaleFactor).toFixed(1);
+
+  let tres = `[gd_resource type="StyleBoxTexture" load_steps=2 format=3]\n\n`;
+  tres += `[ext_resource type="Texture2D" path="res://${pngPath}" id="1_tex"]\n\n`;
+  tres += `[resource]\n`;
+  tres += `texture = ExtResource("1_tex")\n`;
+  tres += `texture_margin_left = ${l}\n`;
+  tres += `texture_margin_top = ${t}\n`;
+  tres += `texture_margin_right = ${r}\n`;
+  tres += `texture_margin_bottom = ${b}\n`;
+  return tres;
+}
+
+/**
+ * Produces a Godot 4.x `.tres` resource containing named `AtlasTexture` sub-resources,
+ * one per placement in a packed atlas.  The main resource is a generic `Resource` whose
+ * properties are keyed by sanitized asset name so they can be accessed in GDScript via
+ * `load("res://atlas.tres").get("icon_button")`.
+ *
+ * @param atlasPngPath  `res://`-relative path to the packed atlas PNG.
+ * @param placements  Bin-pack placements (already in scaled output pixel coordinates).
+ */
+export function generateGodotAtlasTextures(
+  atlasPngPath: string,
+  placements: PackPlacement[],
+): string {
+  const loadSteps = placements.length + 2; // 1 ext_resource + N AtlasTexture + 1 resource
+
+  let tres = `[gd_resource type="Resource" load_steps=${String(loadSteps)} format=3]\n\n`;
+  tres += `[ext_resource type="Texture2D" path="res://${atlasPngPath}" id="1_tex"]\n\n`;
+
+  for (const p of placements) {
+    const safeId = sanitizeGodotId(p.id);
+    tres += `[sub_resource type="AtlasTexture" id="AtlasTexture_${safeId}"]\n`;
+    tres += `atlas = ExtResource("1_tex")\n`;
+    tres += `region = Rect2(${String(p.x)}, ${String(p.y)}, ${String(p.width)}, ${String(p.height)})\n\n`;
+  }
+
+  tres += `[resource]\n`;
+  for (const p of placements) {
+    const safeId = sanitizeGodotId(p.id);
+    tres += `${safeId} = SubResource("AtlasTexture_${safeId}")\n`;
+  }
+
+  return tres;
+}
+
+function sanitizeGodotId(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_]/g, '_');
 }
 
 export function generateGodotShapesAnimation(asset: AssetClass, scaleFactor: number = 1): string {
