@@ -627,10 +627,10 @@ An interactive pixel art editor that renders **inline in the conversation** usin
 
 ### 7.2 Server-side: Editor Tool & Resource
 
-- [ ] **7.2.1** **`src/tools/editor.ts`** — `registerEditorTool(server)`:
-  - `open_editor({ asset_name })` — loads asset if not loaded, returns full asset state JSON (palette, layers, frame list, tags, cels for frame 0), declares `_meta: { ui: { resourceUri: "ui://pixel-editor/app.html" } }`
-  - `get_asset_state({ asset_name, frame_index? })` — returns cels + metadata for the given frame; called by the UI to refresh after any edit or AI tool call
-- [ ] **7.2.2** **`src/resources/editor.ts`** — resource handler for `ui://pixel-editor/app.html`; reads `dist/app/app.html` and returns it with MIME type `text/html+mcp-app` via `registerAppResource`
+- [ ] **7.2.1** **`src/tools/editor.ts`** — uses `registerAppTool()` from `@modelcontextprotocol/ext-apps/server` (not `server.registerTool()`):
+  - `open_editor({ asset_name })` — loads asset if not loaded; returns `structuredContent` with full asset state (palette, layers, frame list, tags, cels for frame 0) for the UI, and a brief text summary in `content` for the LLM; declares `_meta: { ui: { resourceUri: "ui://pixel-editor/app.html" } }`
+  - `get_asset_state({ asset_name, frame_index? })` — returns cels + metadata for the given frame in `structuredContent`; declared with `visibility: ["app"]` so it only appears to the UI, not the LLM; called by the UI to refresh after any edit or AI tool call
+- [ ] **7.2.2** **`src/resources/editor.ts`** — uses `registerAppResource()` from `@modelcontextprotocol/ext-apps/server` to register `ui://pixel-editor/app.html`; reads `dist/app/app.html` and returns it (the SDK handles the MIME type)
 - [ ] **7.2.3** **Wire into `src/index.ts`** — call `registerEditorTool` and `registerEditorResource`
 
 ---
@@ -686,13 +686,13 @@ An interactive pixel art editor that renders **inline in the conversation** usin
 
 - [ ] **7.8.1** **Rect selection tool** — drag on canvas → draw dashed rectangle overlay; on `mouseup` call `selection rect { asset_name, layer_id, frame_index, x, y, width, height }` to set server-side mask; render marching ants (CSS `stroke-dashoffset` animation) on canvas overlay
 - [ ] **7.8.2** **Select All / Clear** — buttons calling `selection all` / `selection clear`; clear also removes marching ants overlay
-- [ ] **7.8.3** **"Reference in AI" button** — extracts dominant color histogram from the selected region using local canvas pixel data; calls `app.sendContextUpdate({ type: "pixel_selection", asset: name, region: { x, y, w, h }, dominant_colors: [...] })` so the AI knows exactly what region the user is pointing at in subsequent messages
+- [ ] **7.8.3** **"Reference in AI" button** — extracts dominant color histogram from the selected region using local canvas pixel data; calls `app.updateModelContext({ content: [{ type: "text", text: "..." }] })` with a YAML-frontmatter block containing `{ type: "pixel_selection", asset, region: { x, y, w, h }, dominant_colors }` so the AI knows exactly what region the user is pointing at in subsequent messages
 
 ---
 
 ### 7.9 UI: App Shell & State (`src/app/app.ts`)
 
-- [ ] **7.9.1** **`App` from `@modelcontextprotocol/ext-apps`** — `app.connect()` on init; `app.ontoolresult` receives initial asset state from `open_editor` and triggers first render
+- [ ] **7.9.1** **`App` from `@modelcontextprotocol/ext-apps`** — register all handlers (`ontoolresult`, `onhostcontextchanged`, `onteardown`) **before** calling `app.connect()` to avoid missing the initial tool result; `app.ontoolresult` receives initial asset state from `open_editor` via `structuredContent` and triggers first render
 - [ ] **7.9.2** **Top-level state** — `{ assetName, width, height, palette, layers, frames, tags, cels, activeLayerId, activeColorIndex, currentFrame, isPlaying, selection }`
 - [ ] **7.9.3** **Status bar** — shows active tool, active layer name, active palette color swatch + index, last AI operation
 - [ ] **7.9.4** **Auto-refresh on AI edits** — `ontoolresult` also fires when the AI calls tools (draw, transform, etc.); on receipt, call `get_asset_state` to sync canvas with any AI-made changes
@@ -701,10 +701,10 @@ An interactive pixel art editor that renders **inline in the conversation** usin
 
 ### 7.10 Testing
 
-- [ ] **7.10.1** **`CanvasRenderer` unit tests** — render known pixel data + palette → assert correct RGBA output for specific pixels; assert transparent background (index 0 → alpha 0 in composited output)
-- [ ] **7.10.2** **`open_editor` tool tests** — call with a loaded test asset; verify response contains `palette`, `layers`, `frames`, `cels`, and `_meta.ui.resourceUri`
-- [ ] **7.10.3** **Editor resource handler tests** — verify `ui://pixel-editor/app.html` returns content with correct MIME type; verify HTML content is non-empty after build
-- [ ] **7.10.4** **Manual smoke test** — build UI (`npm run build:app`), start server with `--http`, point `basic-host` at `http://localhost:3001/mcp`, call `open_editor`, verify canvas renders and pencil tool commits pixels via draw tool
+- [ ] **7.10.1** **Compositing unit tests** — test `compositeFrame()` directly (no DOM required): render known pixel data + palette → assert correct RGBA output for specific pixels; assert transparent pixels (index 0 → alpha 0 in composited output). `CanvasRenderer` itself wraps a `<canvas>` element requiring a DOM environment (`jsdom` or `happy-dom`) — defer browser-dependent rendering tests to the manual smoke test
+- [ ] **7.10.2** **`open_editor` tool tests** — call with a loaded test asset; verify response `structuredContent` contains `palette`, `layers`, `frames`, `cels`; verify `content` contains a text summary for the LLM; verify the tool is registered with `_meta.ui.resourceUri` pointing to `"ui://pixel-editor/app.html"`
+- [ ] **7.10.3** **Editor resource handler tests** — verify `ui://pixel-editor/app.html` returns content with correct MIME type; verify HTML content is non-empty after build; test should skip gracefully if `dist/app/app.html` has not been built yet
+- [ ] **7.10.4** **Manual smoke test** — build UI (`npm run build:app`), start server with `--http`, open with `npx @mcpjam/inspector@latest` or `basic-host` at `http://localhost:3001/mcp`, call `open_editor`, verify canvas renders and pencil tool commits pixels via draw tool
 
 > **Definition of Done — Phase 7:** `open_editor` renders an interactive canvas inline in Claude. User can paint pixels, step through animation frames, drag a selection rectangle and hit "Reference in AI" to update conversation context with the selected region. Undo/redo works. Canvas auto-refreshes when the AI makes tool calls. All 7.10 tests pass.
 
