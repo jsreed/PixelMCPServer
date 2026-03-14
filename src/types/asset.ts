@@ -79,6 +79,19 @@ export interface TileTerrain {
   peering_bits: Record<string, TilePeeringBits>;
 }
 
+// --- Nine-slice metadata types ---
+
+/**
+ * Nine-slice scaling margins for a UI panel asset.
+ * All values are in pixels and define the inset from each edge.
+ */
+export interface NineSlice {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 /**
  * Core type for a complete Asset document.
  * Represents a single art file loaded in the workspace.
@@ -116,4 +129,9 @@ export interface Asset {
   tile_physics?: TilePhysics;
   /** Autotile terrain bitmask metadata */
   tile_terrain?: TileTerrain;
+
+  // --- Optional Fields (UI Art) ---
+
+  /** Nine-slice scaling margins for UI panel export */
+  nine_slice?: NineSlice;
 }

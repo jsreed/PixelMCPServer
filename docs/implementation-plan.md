@@ -551,9 +551,9 @@ First-class support for **UI art assets** — icons, UI frames/panels, buttons, 
 
 ### 6.1 Nine-Slice Types & Class
 
-- [ ] **6.1.1** **`NineSlice` interface** (`src/types/asset.ts`) — `{ top: number; right: number; bottom: number; left: number }` defining pixel margins for 9-slice scaling
-- [ ] **6.1.2** **Optional `nine_slice` field on `Asset`** (`src/types/asset.ts`) — `nine_slice?: NineSlice`, following the `tile_physics`/`tile_terrain` pattern
-- [ ] **6.1.3** **`AssetClass` getter/setter** (`src/classes/asset.ts`) — getter/setter for `nine_slice` with `markDirty()` in the setter; handle in `_restoreDataPatch()` using the `'nine_slice' in patch` pattern
+- [x] **6.1.1** **`NineSlice` interface** (`src/types/asset.ts`) — `{ top: number; right: number; bottom: number; left: number }` defining pixel margins for 9-slice scaling
+- [x] **6.1.2** **Optional `nine_slice` field on `Asset`** (`src/types/asset.ts`) — `nine_slice?: NineSlice`, following the `tile_physics`/`tile_terrain` pattern
+- [x] **6.1.3** **`AssetClass` getter/setter** (`src/classes/asset.ts`) — getter/setter for `nine_slice` with `markDirty()` in the setter; handle in `_restoreDataPatch()` using the `'nine_slice' in patch` pattern
 
 ---
 

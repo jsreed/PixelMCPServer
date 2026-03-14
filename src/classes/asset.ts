@@ -4,6 +4,7 @@ import {
   type Anchor,
   type TilePhysics,
   type TileTerrain,
+  type NineSlice,
 } from '../types/asset.js';
 import { PaletteClass } from './palette.js';
 import * as errors from '../errors.js';
@@ -114,6 +115,15 @@ export class AssetClass {
 
   set tile_terrain(value: TileTerrain | undefined) {
     this._data.tile_terrain = value;
+    this.markDirty();
+  }
+
+  get nine_slice(): NineSlice | undefined {
+    return this._data.nine_slice;
+  }
+
+  set nine_slice(value: NineSlice | undefined) {
+    this._data.nine_slice = value;
     this.markDirty();
   }
 
@@ -845,6 +855,10 @@ export class AssetClass {
     if ('tile_terrain' in patch)
       this._data.tile_terrain = patch.tile_terrain
         ? (JSON.parse(JSON.stringify(patch.tile_terrain)) as TileTerrain)
+        : undefined;
+    if ('nine_slice' in patch)
+      this._data.nine_slice = patch.nine_slice
+        ? (JSON.parse(JSON.stringify(patch.nine_slice)) as NineSlice)
         : undefined;
     this.markDirty();
   }
