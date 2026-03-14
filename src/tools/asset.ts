@@ -9,6 +9,7 @@ import { ShapeCommand } from '../commands/shape-command.js';
 import { ResizeCommand } from '../commands/resize-command.js';
 import { RenameCommand } from '../commands/rename-command.js';
 import { AssetDeleteCommand } from '../commands/asset-delete-command.js';
+import { NineSliceCommand } from '../commands/nine-slice-command.js';
 import { saveAssetFile } from '../io/asset-io.js';
 import { loadPaletteFile } from '../io/palette-io.js';
 import { marchingSquares, simplifyOrthogonal } from '../algorithms/marching-squares.js';
@@ -18,7 +19,7 @@ import * as errors from '../errors.js';
 import { createResourceLink } from '../utils/resource-link.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import { type Asset, type Perspective, type Anchor } from '../types/asset.js';
+import { type Asset, type Perspective, type Anchor, type NineSlice } from '../types/asset.js';
 import { type Color } from '../types/palette.js';
 import { type Frame } from '../types/frame.js';
 import { type Tag, type Facing } from '../types/tag.js';
@@ -56,6 +57,7 @@ const assetInputSchema = {
       'update_shape',
       'remove_shape',
       'get_shapes',
+      'set_nine_slice',
     ])
     .describe('Asset action to perform'),
   asset_name: z.string().optional().describe('Target asset name'),
@@ -114,6 +116,25 @@ const assetInputSchema = {
     .describe('Drawing convention (flat, top_down, isometric, etc.)'),
   tile_width: z.number().int().optional().describe('Tile/iso cell width'),
   tile_height: z.number().int().optional().describe('Tile/iso cell height'),
+  nine_slice_top: z.number().int().min(0).optional().describe('Nine-slice top margin in pixels'),
+  nine_slice_right: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe('Nine-slice right margin in pixels'),
+  nine_slice_bottom: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe('Nine-slice bottom margin in pixels'),
+  nine_slice_left: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe('Nine-slice left margin in pixels'),
   palette: z.array(z.array(z.number().int())).optional().describe('Initial palette for create'),
   layers: z
     .array(z.object({ name: z.string(), type: z.enum(['image', 'tilemap', 'shape']) }))
@@ -260,6 +281,8 @@ export function registerAssetTool(server: McpServer): void {
           );
         case 'generate_collision_polygon':
           return handleGenerateCollisionPolygon(workspace, args);
+        case 'set_nine_slice':
+          return handleSetNineSlice(workspace, args);
 
         default:
           return errors.invalidArgument(`Unknown asset action: ${String(args.action)}`);
@@ -503,6 +526,18 @@ async function handleCreate(workspace: Workspace, args: Record<string, unknown>)
 
   if (args.tile_width) assetData.tile_width = args.tile_width as number;
   if (args.tile_height) assetData.tile_height = args.tile_height as number;
+  const nsTop = args.nine_slice_top as number | undefined;
+  const nsRight = args.nine_slice_right as number | undefined;
+  const nsBottom = args.nine_slice_bottom as number | undefined;
+  const nsLeft = args.nine_slice_left as number | undefined;
+  if (nsTop !== undefined || nsRight !== undefined || nsBottom !== undefined || nsLeft !== undefined) {
+    assetData.nine_slice = {
+      top: nsTop ?? 0,
+      right: nsRight ?? 0,
+      bottom: nsBottom ?? 0,
+      left: nsLeft ?? 0,
+    };
+  }
 
   // Apply initial palette
   const paletteArgs = args.palette as number[][] | undefined;
@@ -1247,5 +1282,54 @@ function handleGenerateCollisionPolygon(workspace: Workspace, args: Record<strin
     message: `Collision polygon '${shapeName}' generated.`,
     vertices: tuplePoints.length,
     target_layer_id: targetLayerId,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// set_nine_slice
+// ---------------------------------------------------------------------------
+
+function handleSetNineSlice(workspace: Workspace, args: Record<string, unknown>) {
+  const asset = requireAsset(workspace, args.asset_name as string | undefined);
+  if (isError(asset)) return asset;
+
+  const top = args.nine_slice_top as number | undefined;
+  const right = args.nine_slice_right as number | undefined;
+  const bottom = args.nine_slice_bottom as number | undefined;
+  const left = args.nine_slice_left as number | undefined;
+
+  if (top === undefined && right === undefined && bottom === undefined && left === undefined) {
+    return errors.invalidArgument(
+      'set_nine_slice requires at least one margin param (nine_slice_top, nine_slice_right, nine_slice_bottom, nine_slice_left).',
+    );
+  }
+
+  // Merge with existing nine_slice, defaulting unspecified margins to 0
+  const existing = asset.nine_slice;
+  const newTop = top ?? existing?.top ?? 0;
+  const newRight = right ?? existing?.right ?? 0;
+  const newBottom = bottom ?? existing?.bottom ?? 0;
+  const newLeft = left ?? existing?.left ?? 0;
+
+  if (newTop + newBottom >= asset.height) {
+    return errors.invalidArgument(
+      `nine_slice top+bottom (${String(newTop)}+${String(newBottom)}=${String(newTop + newBottom)}) must be less than asset height (${String(asset.height)}).`,
+    );
+  }
+  if (newLeft + newRight >= asset.width) {
+    return errors.invalidArgument(
+      `nine_slice left+right (${String(newLeft)}+${String(newRight)}=${String(newLeft + newRight)}) must be less than asset width (${String(asset.width)}).`,
+    );
+  }
+
+  const nineSlice: NineSlice = { top: newTop, right: newRight, bottom: newBottom, left: newLeft };
+  const cmd = new NineSliceCommand(asset, () => {
+    asset.nine_slice = nineSlice;
+  });
+  workspace.pushCommand(cmd);
+
+  return ok({
+    message: `Nine-slice set on '${asset.name}'.`,
+    nine_slice: nineSlice,
   });
 }

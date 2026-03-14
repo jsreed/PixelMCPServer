@@ -565,9 +565,9 @@ First-class support for **UI art assets** — icons, UI frames/panels, buttons, 
 
 ### 6.3 Asset Tool: `set_nine_slice` Action
 
-- [ ] **6.3.1** **Add `set_nine_slice` to asset tool** (`src/tools/asset.ts`) — add to the action enum in the Zod schema; add optional params `nine_slice_top`, `nine_slice_right`, `nine_slice_bottom`, `nine_slice_left` (all `z.number().int().min(0).optional()`)
-- [ ] **6.3.2** **Accept `nine_slice` on `asset create`** — same way `tile_width`/`tile_height` are set on create, for convenience
-- [ ] **6.3.3** **Handler logic** — validate at least one margin is provided, validate margins don't exceed asset dimensions (top+bottom >= height or left+right >= width → error), wrap in `NineSliceCommand`, set `asset.nine_slice`
+- [x] **6.3.1** **Add `set_nine_slice` to asset tool** (`src/tools/asset.ts`) — add to the action enum in the Zod schema; add optional params `nine_slice_top`, `nine_slice_right`, `nine_slice_bottom`, `nine_slice_left` (all `z.number().int().min(0).optional()`)
+- [x] **6.3.2** **Accept `nine_slice` on `asset create`** — same way `tile_width`/`tile_height` are set on create, for convenience
+- [x] **6.3.3** **Handler logic** — validate at least one margin is provided, validate margins don't exceed asset dimensions (top+bottom >= height or left+right >= width → error), wrap in `NineSliceCommand`, set `asset.nine_slice`
 
 ---
 
