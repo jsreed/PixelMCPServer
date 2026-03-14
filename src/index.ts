@@ -19,6 +19,8 @@ import { registerScaffoldTilesetPrompt } from './prompts/scaffold-tileset.js';
 import { registerScaffoldEquipmentPrompt } from './prompts/scaffold-equipment.js';
 import { registerAnalyzeAssetPrompt } from './prompts/analyze-asset.js';
 import { registerExportForGodotPrompt } from './prompts/export-for-godot.js';
+import { registerScaffoldUiIconsPrompt } from './prompts/scaffold-ui-icons.js';
+import { registerScaffoldUiFramePrompt } from './prompts/scaffold-ui-frame.js';
 
 // Create the MCP server instance
 const server = new McpServer({
@@ -45,6 +47,8 @@ registerScaffoldTilesetPrompt(server);
 registerScaffoldEquipmentPrompt(server);
 registerAnalyzeAssetPrompt(server);
 registerExportForGodotPrompt(server);
+registerScaffoldUiIconsPrompt(server);
+registerScaffoldUiFramePrompt(server);
 
 async function main() {
   const transport = new StdioServerTransport();

@@ -354,44 +354,43 @@ export function registerTilesetTool(server: McpServer): void {
           };
         }
 
-        if (args.action === 'set_tile_physics') {
-          if (args.tile_index === undefined)
-            return errors.invalidArgument('set_tile_physics requires tile_index');
+        // args.action === 'set_tile_physics' (narrowed by discriminated union)
+        if (args.tile_index === undefined)
+          return errors.invalidArgument('set_tile_physics requires tile_index');
 
-          const count = asset.tile_count ?? 0;
-          if (args.tile_index < 0 || args.tile_index >= count) {
-            return errors.tileIndexNotFound(args.tile_index, assetName);
+        const count = asset.tile_count ?? 0;
+        if (args.tile_index < 0 || args.tile_index >= count) {
+          return errors.tileIndexNotFound(args.tile_index, assetName);
+        }
+
+        const cmd = new TilesetCommand(asset, () => {
+          let physics = asset.tile_physics;
+          if (!physics) {
+            physics = { physics_layers: [{ collision_layer: 1, collision_mask: 1 }], tiles: {} };
+            asset.tile_physics = physics;
+          }
+          if (!((args.tile_index ?? 0).toString() in physics.tiles)) {
+            physics.tiles[(args.tile_index ?? 0).toString()] = {};
+          }
+          const entry = physics.tiles[(args.tile_index ?? 0).toString()];
+
+          if (args.physics_polygon) {
+            if (args.physics_polygon.length === 0) delete entry.polygon;
+            else entry.polygon = args.physics_polygon;
           }
 
-          const cmd = new TilesetCommand(asset, () => {
-            let physics = asset.tile_physics;
-            if (!physics) {
-              physics = { physics_layers: [{ collision_layer: 1, collision_mask: 1 }], tiles: {} };
-              asset.tile_physics = physics;
-            }
-            if (!((args.tile_index ?? 0).toString() in physics.tiles)) {
-              physics.tiles[(args.tile_index ?? 0).toString()] = {};
-            }
-            const entry = physics.tiles[(args.tile_index ?? 0).toString()];
+          if (args.navigation_polygon) {
+            if (args.navigation_polygon.length === 0) delete entry.navigation_polygon;
+            else entry.navigation_polygon = args.navigation_polygon;
+          }
 
-            if (args.physics_polygon) {
-              if (args.physics_polygon.length === 0) delete entry.polygon;
-              else entry.polygon = args.physics_polygon;
-            }
+          asset.tile_physics = Object.assign({}, physics); // trigger dirty
+        });
+        workspace.pushCommand(cmd);
 
-            if (args.navigation_polygon) {
-              if (args.navigation_polygon.length === 0) delete entry.navigation_polygon;
-              else entry.navigation_polygon = args.navigation_polygon;
-            }
-
-            asset.tile_physics = Object.assign({}, physics); // trigger dirty
-          });
-          workspace.pushCommand(cmd);
-
-          return {
-            content: [{ type: 'text', text: JSON.stringify({ message: 'Tile physics updated.' }) }],
-          };
-        }
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ message: 'Tile physics updated.' }) }],
+        };
       } catch (e: unknown) {
         return errors.domainError(e instanceof Error ? e.message : String(e));
       }

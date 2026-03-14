@@ -587,9 +587,9 @@ First-class support for **UI art assets** — icons, UI frames/panels, buttons, 
 
 ### 6.6 MCP Prompts
 
-- [ ] **6.6.1** **`scaffold_ui_icons` prompt** (`src/prompts/scaffold-ui-icons.ts`) — follows `scaffold_tileset` pattern. Arguments: `name` (required), `icon_size` (optional, default 16), `count` (optional), `palette` (optional). Guides: create asset, set palette, draw icon, tips for consistency, export as `godot_atlas`.
-- [ ] **6.6.2** **`scaffold_ui_frame` prompt** (`src/prompts/scaffold-ui-frame.ts`) — Arguments: `name` (required), `width` (optional, default 48), `height` (optional, default 48), `palette` (optional). Guides: create asset, set palette, explain 9-slice concept, draw frame (corners → edges → center fill), set nine_slice margins, preview, export as `godot_ui_frame`.
-- [ ] **6.6.3** **Register prompts** (`src/index.ts`) — import and call `registerScaffoldUiIconsPrompt()` and `registerScaffoldUiFramePrompt()`
+- [x] **6.6.1** **`scaffold_ui_icons` prompt** (`src/prompts/scaffold-ui-icons.ts`) — follows `scaffold_tileset` pattern. Arguments: `name` (required), `icon_size` (optional, default 16), `count` (optional), `palette` (optional). Guides: create asset, set palette, draw icon, tips for consistency, export as `godot_atlas`.
+- [x] **6.6.2** **`scaffold_ui_frame` prompt** (`src/prompts/scaffold-ui-frame.ts`) — Arguments: `name` (required), `width` (optional, default 48), `height` (optional, default 48), `palette` (optional). Guides: create asset, set palette, explain 9-slice concept, draw frame (corners → edges → center fill), set nine_slice margins, preview, export as `godot_ui_frame`.
+- [x] **6.6.3** **Register prompts** (`src/index.ts`) — import and call `registerScaffoldUiIconsPrompt()` and `registerScaffoldUiFramePrompt()`
 
 ---
 
@@ -597,7 +597,7 @@ First-class support for **UI art assets** — icons, UI frames/panels, buttons, 
 
 - [ ] **6.7.1** **Unit tests** — nine_slice getter/setter, toJSON/fromJSON roundtrip, dirty tracking (`src/classes/asset.test.ts`); NineSliceCommand execute/undo/redo (`src/commands/nine-slice-command.test.ts`); `generateGodotStyleBoxTexture()` and `generateGodotAtlasTextures()` output format (`src/io/godot-resources.test.ts`)
 - [ ] **6.7.2** **Tool tests** — `set_nine_slice` action: valid set, margins-exceed-dimensions error, undo/redo; `create` with nine_slice params (`src/tools/asset.test.ts`); `godot_ui_frame` (produces PNG + import + .tres, error when no nine_slice set) and `godot_atlas` (produces PNG + import + .tres with named sub-resources) export actions (`src/tools/export.test.ts`)
-- [ ] **6.7.3** **Prompt tests** — `scaffold_ui_icons` and `scaffold_ui_frame` registration, argument validation, messages reference correct tool actions
+- [x] **6.7.3** **Prompt tests** — `scaffold_ui_icons` and `scaffold_ui_frame` registration, argument validation, messages reference correct tool actions
 - [ ] **6.7.4** **E2E tests** — UI frame workflow: `project init` → `asset create` → `palette set_bulk` → `draw` → `asset set_nine_slice` → `workspace save` → `export godot_ui_frame` → verify `.tres` contains correct `StyleBoxTexture` margins. Icon atlas workflow: create 3 icon assets → draw on each → `export godot_atlas` → verify `.tres` contains 3 named `AtlasTexture` sub-resources with correct regions.
 
 > **Definition of Done — Phase 6:** Nine-slice metadata round-trips through save/load. `set_nine_slice` validates margins and supports undo/redo. `godot_ui_frame` produces a valid Godot `StyleBoxTexture` `.tres`. `godot_atlas` produces a valid Godot `AtlasTexture` `.tres` with named sub-resources. Both scaffolding prompts guide the user through complete workflows. All 6.7 tests pass.
