@@ -417,7 +417,8 @@ describe('Export Tool', () => {
 
   it('exports godot_ui_frame with PNG + import + tres', async () => {
     // Set nine_slice on the test asset
-    const asset = workspace.loadedAssets.get('test_asset')!;
+    const asset = workspace.loadedAssets.get('test_asset');
+    if (!asset) throw new Error('test_asset not loaded');
     asset.nine_slice = { top: 1, right: 1, bottom: 1, left: 1 };
 
     const outPrefix = path.join(TEST_DIR, 'ui_frame');
@@ -450,7 +451,8 @@ describe('Export Tool', () => {
 
   it('godot_ui_frame errors when no nine_slice set', async () => {
     // test_asset has no nine_slice by default
-    const asset = workspace.loadedAssets.get('test_asset')!;
+    const asset = workspace.loadedAssets.get('test_asset');
+    if (!asset) throw new Error('test_asset not loaded');
     asset.nine_slice = undefined;
 
     const outPrefix = path.join(TEST_DIR, 'ui_frame_no_ns');
@@ -504,7 +506,8 @@ describe('Export Tool', () => {
   describe('E2E', () => {
     it('UI frame workflow: create → set nine_slice → export → verify tres', async () => {
       // Set nine_slice on test_asset
-      const asset = workspace.loadedAssets.get('test_asset')!;
+      const asset = workspace.loadedAssets.get('test_asset');
+      if (!asset) throw new Error('test_asset not loaded');
       asset.nine_slice = { top: 1, right: 1, bottom: 1, left: 1 };
 
       // Export godot_ui_frame
@@ -576,8 +579,8 @@ describe('Export Tool', () => {
 
       // Should contain AtlasTexture sub-resources for the loaded assets
       // The atlas packs all loaded assets, so at least 3 (our icons) + test_asset
-      const atlasTextureMatches = tresData.match(/type="AtlasTexture"/g);
-      expect(atlasTextureMatches!.length).toBeGreaterThanOrEqual(3);
+      const atlasTextureMatches = tresData.match(/type="AtlasTexture"/g) ?? [];
+      expect(atlasTextureMatches.length).toBeGreaterThanOrEqual(3);
 
       // Verify icon names appear (sanitized)
       expect(tresData).toContain('icon_sword');
