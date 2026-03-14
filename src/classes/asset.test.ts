@@ -678,6 +678,43 @@ describe('AssetClass', () => {
     });
   });
 
+  // ─── Nine-slice support ─────────────────────────────────────────
+
+  describe('nine_slice', () => {
+    it('getter returns undefined by default', () => {
+      const asset = new AssetClass(mockAssetData);
+      expect(asset.nine_slice).toBeUndefined();
+    });
+
+    it('setter sets value and marks dirty', () => {
+      const asset = new AssetClass(mockAssetData);
+      asset.nine_slice = { top: 4, right: 4, bottom: 4, left: 4 };
+      expect(asset.nine_slice).toEqual({ top: 4, right: 4, bottom: 4, left: 4 });
+      expect(asset.isDirty).toBe(true);
+    });
+
+    it('toJSON includes nine_slice when set', () => {
+      const asset = new AssetClass(mockAssetData);
+      asset.nine_slice = { top: 2, right: 3, bottom: 4, left: 5 };
+      const json = asset.toJSON();
+      expect(json.nine_slice).toEqual({ top: 2, right: 3, bottom: 4, left: 5 });
+    });
+
+    it('toJSON omits nine_slice when undefined', () => {
+      const asset = new AssetClass(mockAssetData);
+      const json = asset.toJSON();
+      expect(json.nine_slice).toBeUndefined();
+    });
+
+    it('fromJSON round-trip preserves nine_slice', () => {
+      const asset = new AssetClass(mockAssetData);
+      asset.nine_slice = { top: 6, right: 7, bottom: 8, left: 9 };
+      const json = asset.toJSON();
+      const restored = AssetClass.fromJSON(json);
+      expect(restored.nine_slice).toEqual({ top: 6, right: 7, bottom: 8, left: 9 });
+    });
+  });
+
   // ─── Gap 3: toJSON / fromJSON roundtrip fidelity ─────────────────
 
   describe('toJSON / fromJSON roundtrip', () => {

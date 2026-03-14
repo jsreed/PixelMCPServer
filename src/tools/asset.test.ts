@@ -544,6 +544,123 @@ describe('asset tool', () => {
     expect(data.banding.length).toBeGreaterThan(0);
   });
 
+  // ─── set_nine_slice ─────────────────────────────────────────────
+
+  describe('set_nine_slice', () => {
+    it('sets nine_slice on asset', async () => {
+      const r = await handler({
+        action: 'set_nine_slice',
+        asset_name: 'sprite',
+        nine_slice_top: 2,
+        nine_slice_right: 2,
+        nine_slice_bottom: 2,
+        nine_slice_left: 2,
+      });
+      expect(r.isError).toBeUndefined();
+      const data = JSON.parse(r.content[0].text) as { nine_slice: object };
+      expect(data.nine_slice).toEqual({ top: 2, right: 2, bottom: 2, left: 2 });
+      expect(getAsset('sprite').nine_slice).toEqual({ top: 2, right: 2, bottom: 2, left: 2 });
+    });
+
+    it('merges with existing nine_slice', async () => {
+      await handler({
+        action: 'set_nine_slice',
+        asset_name: 'sprite',
+        nine_slice_top: 1,
+        nine_slice_right: 2,
+        nine_slice_bottom: 1,
+        nine_slice_left: 2,
+      });
+      const r = await handler({
+        action: 'set_nine_slice',
+        asset_name: 'sprite',
+        nine_slice_top: 3,
+      });
+      expect(r.isError).toBeUndefined();
+      const data = JSON.parse(r.content[0].text) as {
+        nine_slice: { top: number; right: number; bottom: number; left: number };
+      };
+      expect(data.nine_slice.top).toBe(3);
+      expect(data.nine_slice.right).toBe(2);
+      expect(data.nine_slice.bottom).toBe(1);
+      expect(data.nine_slice.left).toBe(2);
+    });
+
+    it('errors when no margin params provided', async () => {
+      const r = await handler({
+        action: 'set_nine_slice',
+        asset_name: 'sprite',
+      });
+      expect(r.isError).toBe(true);
+    });
+
+    it('errors when top+bottom >= height', async () => {
+      const r = await handler({
+        action: 'set_nine_slice',
+        asset_name: 'sprite',
+        nine_slice_top: 4,
+        nine_slice_bottom: 4,
+      });
+      expect(r.isError).toBe(true);
+    });
+
+    it('errors when left+right >= width', async () => {
+      const r = await handler({
+        action: 'set_nine_slice',
+        asset_name: 'sprite',
+        nine_slice_left: 5,
+        nine_slice_right: 4,
+      });
+      expect(r.isError).toBe(true);
+    });
+
+    it('undo/redo via workspace', async () => {
+      await handler({
+        action: 'set_nine_slice',
+        asset_name: 'sprite',
+        nine_slice_top: 2,
+        nine_slice_right: 2,
+        nine_slice_bottom: 2,
+        nine_slice_left: 2,
+      });
+      expect(getAsset('sprite').nine_slice).toBeDefined();
+      workspace.undo();
+      expect(getAsset('sprite').nine_slice).toBeUndefined();
+      workspace.redo();
+      expect(getAsset('sprite').nine_slice).toEqual({ top: 2, right: 2, bottom: 2, left: 2 });
+    });
+  });
+
+  // ─── create with nine_slice ───────────────────────────────────────
+
+  it('create with nine_slice params sets nine_slice on asset', async () => {
+    const r = await handler({
+      action: 'create',
+      name: 'ns_sprite',
+      width: 16,
+      height: 16,
+      nine_slice_top: 4,
+      nine_slice_right: 4,
+      nine_slice_bottom: 4,
+      nine_slice_left: 4,
+    });
+    expect(r.isError).toBeUndefined();
+    const asset = workspace.loadedAssets.get('ns_sprite');
+    expect(asset?.nine_slice).toEqual({ top: 4, right: 4, bottom: 4, left: 4 });
+  });
+
+  it('create without nine_slice params has undefined nine_slice', async () => {
+    const r = await handler({
+      action: 'create',
+      name: 'plain_sprite',
+      width: 16,
+      height: 16,
+    });
+    expect(r.isError).toBeUndefined();
+    const asset = workspace.loadedAssets.get('plain_sprite');
+    expect(asset?.nine_slice).toBeUndefined();
+  });
+
   // ─── generate_collision_polygon ───────────────────────────────────
 
   it('generate_collision_polygon traces a solid 2x2 rectangle', async () => {

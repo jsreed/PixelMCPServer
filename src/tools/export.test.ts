@@ -412,4 +412,177 @@ describe('Export Tool', () => {
     expect(fs.existsSync(pngPath)).toBe(true);
     expect(fs.existsSync(importPath)).toBe(true);
   });
+
+  // ─── godot_ui_frame export ─────────────────────────────────────
+
+  it('exports godot_ui_frame with PNG + import + tres', async () => {
+    // Set nine_slice on the test asset
+    const asset = workspace.loadedAssets.get('test_asset')!;
+    asset.nine_slice = { top: 1, right: 1, bottom: 1, left: 1 };
+
+    const outPrefix = path.join(TEST_DIR, 'ui_frame');
+    const result = await exportHandler(
+      {
+        action: 'godot_ui_frame',
+        asset_name: 'test_asset',
+        path: outPrefix,
+        scale_factor: 1,
+      },
+      {} as unknown,
+    );
+
+    expect(result.content[0].text).toContain('Exported Godot UI frame');
+
+    const parsed = JSON.parse(result.content[0].text) as { files: string[] };
+    expect(parsed.files).toHaveLength(3);
+
+    const pngPath = path.join(TEST_DIR, 'ui_frame.png');
+    const importPath = pngPath + '.import';
+    const tresPath = path.join(TEST_DIR, 'ui_frame.tres');
+
+    expect(fs.existsSync(pngPath)).toBe(true);
+    expect(fs.existsSync(importPath)).toBe(true);
+    expect(fs.existsSync(tresPath)).toBe(true);
+
+    const tresData = fs.readFileSync(tresPath, 'utf8');
+    expect(tresData).toContain('type="StyleBoxTexture"');
+  });
+
+  it('godot_ui_frame errors when no nine_slice set', async () => {
+    // test_asset has no nine_slice by default
+    const asset = workspace.loadedAssets.get('test_asset')!;
+    asset.nine_slice = undefined;
+
+    const outPrefix = path.join(TEST_DIR, 'ui_frame_no_ns');
+    const result = await exportHandler(
+      {
+        action: 'godot_ui_frame',
+        asset_name: 'test_asset',
+        path: outPrefix,
+        scale_factor: 1,
+      },
+      {} as unknown,
+    );
+
+    const parsed = result.content[0].text;
+    expect(parsed).toContain('no nine_slice');
+  });
+
+  // ─── godot_atlas export ────────────────────────────────────────
+
+  it('exports godot_atlas with PNG + import + tres', async () => {
+    const outPrefix = path.join(TEST_DIR, 'godot_atlas');
+    const result = await exportHandler(
+      {
+        action: 'godot_atlas',
+        path: outPrefix,
+        scale_factor: 1,
+      },
+      {} as unknown,
+    );
+
+    expect(result.content[0].text).toContain('Exported Godot atlas');
+
+    const parsed = JSON.parse(result.content[0].text) as { files: string[] };
+    expect(parsed.files).toHaveLength(3);
+
+    const pngPath = path.join(TEST_DIR, 'godot_atlas.png');
+    const importPath = pngPath + '.import';
+    const tresPath = path.join(TEST_DIR, 'godot_atlas.tres');
+
+    expect(fs.existsSync(pngPath)).toBe(true);
+    expect(fs.existsSync(importPath)).toBe(true);
+    expect(fs.existsSync(tresPath)).toBe(true);
+
+    const tresData = fs.readFileSync(tresPath, 'utf8');
+    expect(tresData).toContain('type="AtlasTexture"');
+    expect(tresData).toContain('test_asset');
+  });
+
+  // ─── E2E Tests ─────────────────────────────────────────────────
+
+  describe('E2E', () => {
+    it('UI frame workflow: create → set nine_slice → export → verify tres', async () => {
+      // Set nine_slice on test_asset
+      const asset = workspace.loadedAssets.get('test_asset')!;
+      asset.nine_slice = { top: 1, right: 1, bottom: 1, left: 1 };
+
+      // Export godot_ui_frame
+      const outPrefix = path.join(TEST_DIR, 'e2e_ui_frame');
+      await exportHandler(
+        {
+          action: 'godot_ui_frame',
+          asset_name: 'test_asset',
+          path: outPrefix,
+          scale_factor: 2,
+        },
+        {} as unknown,
+      );
+
+      // Verify .tres content has correct scaled margins
+      const tresPath = path.join(TEST_DIR, 'e2e_ui_frame.tres');
+      const tresData = fs.readFileSync(tresPath, 'utf8');
+      expect(tresData).toContain('type="StyleBoxTexture"');
+      expect(tresData).toContain('texture_margin_top = 2.0');    // 1 * 2
+      expect(tresData).toContain('texture_margin_right = 2.0');
+      expect(tresData).toContain('texture_margin_bottom = 2.0');
+      expect(tresData).toContain('texture_margin_left = 2.0');
+    });
+
+    it('Icon atlas workflow: create 3 assets → export godot_atlas → verify tres', async () => {
+      // Create 3 small icon assets and load them
+      for (const name of ['icon_sword', 'icon_shield', 'icon_potion']) {
+        const iconAsset = AssetClass.fromJSON({
+          name,
+          width: 4,
+          height: 4,
+          perspective: 'flat' as const,
+          palette: Array.from({ length: 256 }, (_, i) => [i === 1 ? 255 : 0, 0, 0, i === 0 ? 0 : 255]),
+          layers: [{ id: 1, name: 'layer1', type: 'image' as const, visible: true, opacity: 255 }],
+          frames: [{ index: 0, duration_ms: 100 }],
+          tags: [],
+          cels: {
+            '1/0': {
+              x: 0,
+              y: 0,
+              data: [
+                [1, 1, 0, 0],
+                [1, 1, 0, 0],
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+              ],
+            },
+          },
+        } as unknown as import('../types/asset.js').Asset);
+        workspace.loadedAssets.set(name, iconAsset);
+      }
+
+      // Export godot_atlas
+      const outPrefix = path.join(TEST_DIR, 'e2e_atlas');
+      const result = await exportHandler(
+        {
+          action: 'godot_atlas',
+          path: outPrefix,
+          scale_factor: 1,
+        },
+        {} as unknown,
+      );
+
+      expect(result.content[0].text).toContain('Exported Godot atlas');
+
+      // Verify .tres has sub-resources for all assets
+      const tresPath = path.join(TEST_DIR, 'e2e_atlas.tres');
+      const tresData = fs.readFileSync(tresPath, 'utf8');
+
+      // Should contain AtlasTexture sub-resources for the loaded assets
+      // The atlas packs all loaded assets, so at least 3 (our icons) + test_asset
+      const atlasTextureMatches = tresData.match(/type="AtlasTexture"/g);
+      expect(atlasTextureMatches!.length).toBeGreaterThanOrEqual(3);
+
+      // Verify icon names appear (sanitized)
+      expect(tresData).toContain('icon_sword');
+      expect(tresData).toContain('icon_shield');
+      expect(tresData).toContain('icon_potion');
+    });
+  });
 });

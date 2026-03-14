@@ -4,8 +4,11 @@ import {
   generateGodotSpriteFrames,
   generateGodotShapesAnimation,
   generateGodotTileSet,
+  generateGodotStyleBoxTexture,
+  generateGodotAtlasTextures,
 } from './godot-resources.js';
 import { type Asset } from '../types/asset.js';
+import { type PackPlacement } from '../algorithms/bin-pack.js';
 
 function createDummyAsset(data: Partial<Asset> = {}): AssetClass {
   return new AssetClass({
@@ -131,6 +134,90 @@ describe('godot-resources', () => {
 
       // key times
       expect(res).toContain('"times": PackedFloat32Array(0.000, 0.200)');
+    });
+  });
+
+  describe('generateGodotStyleBoxTexture', () => {
+    test('generates StyleBoxTexture with correct margins', () => {
+      const res = generateGodotStyleBoxTexture(
+        'panels/dialog.png',
+        { top: 4, right: 6, bottom: 8, left: 10 },
+      );
+      expect(res).toContain('[gd_resource type="StyleBoxTexture" load_steps=2 format=3]');
+      expect(res).toContain('path="res://panels/dialog.png"');
+      expect(res).toContain('texture_margin_left = 10.0');
+      expect(res).toContain('texture_margin_top = 4.0');
+      expect(res).toContain('texture_margin_right = 6.0');
+      expect(res).toContain('texture_margin_bottom = 8.0');
+    });
+
+    test('scales margins by scaleFactor', () => {
+      const res = generateGodotStyleBoxTexture(
+        'panel.png',
+        { top: 4, right: 4, bottom: 4, left: 4 },
+        3,
+      );
+      expect(res).toContain('texture_margin_left = 12.0');
+      expect(res).toContain('texture_margin_top = 12.0');
+      expect(res).toContain('texture_margin_right = 12.0');
+      expect(res).toContain('texture_margin_bottom = 12.0');
+    });
+
+    test('formats margins with one decimal place', () => {
+      const res = generateGodotStyleBoxTexture(
+        'panel.png',
+        { top: 8, right: 8, bottom: 8, left: 8 },
+      );
+      expect(res).toContain('texture_margin_left = 8.0');
+      expect(res).toContain('texture_margin_top = 8.0');
+      // Should NOT have "8" without decimal
+      expect(res).not.toMatch(/texture_margin_left = 8\n/);
+    });
+  });
+
+  describe('generateGodotAtlasTextures', () => {
+    test('generates Resource with AtlasTexture sub-resources', () => {
+      const placements: PackPlacement[] = [
+        { id: 'icon_sword', x: 0, y: 0, width: 16, height: 16 },
+        { id: 'icon_shield', x: 16, y: 0, width: 16, height: 16 },
+      ];
+      const res = generateGodotAtlasTextures('atlas.png', placements);
+
+      expect(res).toContain('[gd_resource type="Resource"');
+      expect(res).toContain('type="AtlasTexture" id="AtlasTexture_icon_sword"');
+      expect(res).toContain('type="AtlasTexture" id="AtlasTexture_icon_shield"');
+      expect(res).toContain('region = Rect2(0, 0, 16, 16)');
+      expect(res).toContain('region = Rect2(16, 0, 16, 16)');
+    });
+
+    test('sanitizes IDs (hyphens to underscores)', () => {
+      const placements: PackPlacement[] = [
+        { id: 'my-icon', x: 0, y: 0, width: 8, height: 8 },
+      ];
+      const res = generateGodotAtlasTextures('atlas.png', placements);
+      expect(res).toContain('AtlasTexture_my_icon');
+      expect(res).not.toContain('my-icon');
+    });
+
+    test('calculates load_steps correctly', () => {
+      const placements: PackPlacement[] = [
+        { id: 'a', x: 0, y: 0, width: 8, height: 8 },
+        { id: 'b', x: 8, y: 0, width: 8, height: 8 },
+        { id: 'c', x: 0, y: 8, width: 8, height: 8 },
+      ];
+      // N=3 placements → load_steps = 3 + 2 = 5
+      const res = generateGodotAtlasTextures('atlas.png', placements);
+      expect(res).toContain('load_steps=5');
+    });
+
+    test('assigns atlas ExtResource to all sub-resources', () => {
+      const placements: PackPlacement[] = [
+        { id: 'a', x: 0, y: 0, width: 8, height: 8 },
+        { id: 'b', x: 8, y: 0, width: 8, height: 8 },
+      ];
+      const res = generateGodotAtlasTextures('atlas.png', placements);
+      const matches = res.match(/atlas = ExtResource\("1_tex"\)/g);
+      expect(matches).toHaveLength(2);
     });
   });
 
