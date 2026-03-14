@@ -559,7 +559,7 @@ First-class support for **UI art assets** — icons, UI frames/panels, buttons, 
 
 ### 6.2 Nine-Slice Command
 
-- [ ] **6.2.1** **`NineSliceCommand`** (`src/commands/nine-slice-command.ts`) — follows the `TilesetCommand` pattern: captures `nine_slice` before-state in constructor, applies mutation, captures after-state. Uses `_restoreDataPatch()` for undo/redo.
+- [x] **6.2.1** **`NineSliceCommand`** (`src/commands/nine-slice-command.ts`) — follows the `TilesetCommand` pattern: captures `nine_slice` before-state in constructor, applies mutation, captures after-state. Uses `_restoreDataPatch()` for undo/redo.
 
 ---
 
