@@ -618,10 +618,10 @@ An interactive pixel art editor that renders **inline in the conversation** usin
 
 ### 7.1 Infrastructure
 
-- [ ] **7.1.1** **Install UI deps** — `@modelcontextprotocol/ext-apps`, `vite`, `vite-plugin-singlefile`, `preact`; install as dev deps or separate workspace package to avoid bloating the server bundle
-- [ ] **7.1.2** **Vite config** — `vite.config.app.ts` targeting `src/app/app.html`, `viteSingleFile` plugin, outputs `dist/app/app.html`
-- [ ] **7.1.3** **Build scripts** — add `build:app` (`vite build --config vite.config.app.ts`) and `dev:app` (vite dev server with HMR) to `package.json`; `build` script stays tsc-only
-- [ ] **7.1.4** **Optional HTTP transport** — if `--http` flag present, start Express + `StreamableHTTPServerTransport` on port 3001 alongside (or instead of) stdio; useful for `basic-host` dev testing
+- [x] **7.1.1** **Install UI deps** — `@modelcontextprotocol/ext-apps`, `vite`, `vite-plugin-singlefile`, `preact`; install as dev deps or separate workspace package to avoid bloating the server bundle
+- [x] **7.1.2** **Vite config** — `vite.config.app.ts` targeting `src/app/app.html`, `viteSingleFile` plugin, outputs `dist/app/app.html`
+- [x] **7.1.3** **Build scripts** — add `build:app` (`vite build --config vite.config.app.ts`) and `dev:app` (vite dev server with HMR) to `package.json`; `build` script stays tsc-only
+- [x] **7.1.4** **Optional HTTP transport** — if `--http` flag present, start Express + `StreamableHTTPServerTransport` on port 3001 alongside (or instead of) stdio; useful for `basic-host` dev testing
 
 ---
 
