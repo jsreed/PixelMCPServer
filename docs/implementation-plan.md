@@ -580,8 +580,8 @@ First-class support for **UI art assets** — icons, UI frames/panels, buttons, 
 
 ### 6.5 Export Actions
 
-- [ ] **6.5.1** **`godot_ui_frame` export action** (`src/tools/export.ts`) — requires loaded asset with `nine_slice` set; composites frame 0, upscales, writes `{name}.png` + `.png.import` sidecar + `{name}.tres` (`StyleBoxTexture`). Returns message + file list.
-- [ ] **6.5.2** **`godot_atlas` export action** (`src/tools/export.ts`) — uses same atlas packing logic as existing `atlas` action (refactor shared helper); writes `{name}.png` + `.png.import` sidecar + `{name}.tres` (named `AtlasTexture` sub-resources). Returns message + file list + regions.
+- [x] **6.5.1** **`godot_ui_frame` export action** (`src/tools/export.ts`) — requires loaded asset with `nine_slice` set; composites frame 0, upscales, writes `{name}.png` + `.png.import` sidecar + `{name}.tres` (`StyleBoxTexture`). Returns message + file list.
+- [x] **6.5.2** **`godot_atlas` export action** (`src/tools/export.ts`) — uses same atlas packing logic as existing `atlas` action (refactor shared helper); writes `{name}.png` + `.png.import` sidecar + `{name}.tres` (named `AtlasTexture` sub-resources). Returns message + file list + regions.
 
 ---
 

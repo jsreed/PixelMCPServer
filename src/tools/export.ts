@@ -31,6 +31,8 @@ const exportInputZodSchema = z.object({
       'godot_spriteframes',
       'godot_tileset',
       'godot_static',
+      'godot_ui_frame',
+      'godot_atlas',
     ])
     .describe('Export action to perform'),
   asset_name: z.string().optional().describe('Target asset name (required except for atlas)'),
@@ -79,6 +81,16 @@ export function registerExportTool(server: McpServer): void {
           );
         }
 
+        if (args.action === 'godot_atlas') {
+          return await handleGodotAtlasExport(
+            workspace,
+            outPath,
+            scaleFactor,
+            args.pad ?? 0,
+            args.extrude === true,
+          );
+        }
+
         const assetName = args.asset_name;
         if (assetName === undefined) {
           return errors.invalidArgument('asset_name is required for this export action');
@@ -105,6 +117,8 @@ export function registerExportTool(server: McpServer): void {
             return await handleGodotTilesetExport(workspace, assetName, outPath, scaleFactor);
           case 'godot_static':
             return await handleGodotStaticExport(workspace, assetName, outPath, scaleFactor);
+          case 'godot_ui_frame':
+            return await handleGodotUiFrameExport(workspace, assetName, outPath, scaleFactor);
           default:
             return errors.invalidArgument(`Unknown export action: ${String(args.action)}`);
         }
@@ -249,13 +263,23 @@ async function handleStripExport(
   return ok({ message: `Exported spritesheet strip to '${outPath}'.` });
 }
 
-async function handleAtlasExport(
+// ---------------------------------------------------------------------------
+// Shared atlas pixel-packing helper
+// ---------------------------------------------------------------------------
+
+interface AtlasPixels {
+  buffer: Uint8Array;
+  width: number;
+  height: number;
+  placements: ReturnType<typeof packRectangles>['placements'];
+}
+
+function buildAtlasPixels(
   workspace: ReturnType<typeof getWorkspace>,
-  outPath: string,
   scaleFactor: number,
   padding: number,
   extrude: boolean,
-) {
+): AtlasPixels | { error: ReturnType<typeof errors.domainError> } {
   const assetsToPack: PackInput[] = [];
   const rawAssets = Array.from(workspace.loadedAssets.values());
   const extrudeAmount = extrude ? 2 : 0; // 1px on each side
@@ -269,7 +293,7 @@ async function handleAtlasExport(
   }
 
   if (assetsToPack.length === 0) {
-    return errors.domainError('No loaded assets to pack in atlas.');
+    return { error: errors.domainError('No loaded assets to pack in atlas.') };
   }
 
   const scaledPadding = padding * scaleFactor;
@@ -352,13 +376,26 @@ async function handleAtlasExport(
     }
   }
 
-  await writePng(outPath, outWidth, outHeight, atlasBuffer);
+  return { buffer: atlasBuffer, width: outWidth, height: outHeight, placements: packResult.placements };
+}
+
+async function handleAtlasExport(
+  workspace: ReturnType<typeof getWorkspace>,
+  outPath: string,
+  scaleFactor: number,
+  padding: number,
+  extrude: boolean,
+) {
+  const result = buildAtlasPixels(workspace, scaleFactor, padding, extrude);
+  if ('error' in result) return result.error;
+
+  await writePng(outPath, result.width, result.height, result.buffer);
 
   return ok({
     message: `Exported atlas to '${outPath}'.`,
-    atlas_width: outWidth,
-    atlas_height: outHeight,
-    regions: packResult.placements,
+    atlas_width: result.width,
+    atlas_height: result.height,
+    regions: result.placements,
   });
 }
 
@@ -662,5 +699,97 @@ async function handleGodotStaticExport(
   return ok({
     message: `Exported Godot Static PNG to '${dirName}'.`,
     files: [pngPath, `${pngPath}.import`],
+  });
+}
+
+async function handleGodotUiFrameExport(
+  workspace: ReturnType<typeof getWorkspace>,
+  assetName: string,
+  outPath: string,
+  scaleFactor: number,
+) {
+  const asset = requireAsset(workspace, assetName);
+  if (isError(asset)) return asset;
+
+  if (!asset.nine_slice) {
+    return errors.domainError(
+      `Asset '${assetName}' has no nine_slice set. Use asset set_nine_slice first.`,
+    );
+  }
+
+  let buffer = compositeFrame(
+    asset.width,
+    asset.height,
+    buildCompositeLayers(asset),
+    buildPaletteMap(asset.palette),
+    0,
+  );
+  if (scaleFactor > 1) {
+    buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
+  }
+
+  const outWidth = asset.width * scaleFactor;
+  const outHeight = asset.height * scaleFactor;
+
+  let dirName = path.dirname(outPath);
+  let baseName = path.basename(outPath);
+  if (outPath.endsWith('/') || outPath.endsWith('\\')) {
+    dirName = outPath;
+    baseName = assetName;
+  }
+
+  const pngName = `${baseName}.png`;
+  const pngPath = path.join(dirName, pngName);
+
+  await writePng(pngPath, outWidth, outHeight, buffer);
+
+  const importSidecar = generateGodotImportSidecar(pngName);
+  await fs.promises.writeFile(`${pngPath}.import`, importSidecar);
+
+  const tresContent = godotResources.generateGodotStyleBoxTexture(pngName, asset.nine_slice, scaleFactor);
+  const tresPath = path.join(dirName, `${baseName}.tres`);
+  await fs.promises.writeFile(tresPath, tresContent);
+
+  return ok({
+    message: `Exported Godot UI frame (StyleBoxTexture) to '${dirName}'.`,
+    files: [pngPath, `${pngPath}.import`, tresPath],
+  });
+}
+
+async function handleGodotAtlasExport(
+  workspace: ReturnType<typeof getWorkspace>,
+  outPath: string,
+  scaleFactor: number,
+  padding: number,
+  extrude: boolean,
+) {
+  const result = buildAtlasPixels(workspace, scaleFactor, padding, extrude);
+  if ('error' in result) return result.error;
+
+  let dirName = path.dirname(outPath);
+  let baseName = path.basename(outPath);
+  if (outPath.endsWith('/') || outPath.endsWith('\\')) {
+    dirName = outPath;
+    baseName = 'atlas';
+  }
+
+  const pngName = `${baseName}.png`;
+  const pngPath = path.join(dirName, pngName);
+
+  await writePng(pngPath, result.width, result.height, result.buffer);
+
+  const importSidecar = generateGodotImportSidecar(pngName);
+  await fs.promises.writeFile(`${pngPath}.import`, importSidecar);
+
+  const tresContent = godotResources.generateGodotAtlasTextures(pngName, result.placements);
+  const tresPath = path.join(dirName, `${baseName}.tres`);
+  await fs.promises.writeFile(tresPath, tresContent);
+
+  return ok({
+    message: `Exported Godot atlas to '${dirName}'.`,
+    atlas_width: result.width,
+    atlas_height: result.height,
+    regions: result.placements,
+    files: [pngPath, `${pngPath}.import`, tresPath],
   });
 }
