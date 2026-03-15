@@ -38,6 +38,8 @@ import { registerAnalyzeAssetPrompt } from './prompts/analyze-asset.js';
 import { registerExportForGodotPrompt } from './prompts/export-for-godot.js';
 import { registerScaffoldUiIconsPrompt } from './prompts/scaffold-ui-icons.js';
 import { registerScaffoldUiFramePrompt } from './prompts/scaffold-ui-frame.js';
+import { registerScaffoldAttackPrompt } from './prompts/scaffold-attack.js';
+import { registerScaffoldSideScrollerPrompt } from './prompts/scaffold-side-scroller.js';
 
 // Create the MCP server instance
 const server = new McpServer({
@@ -68,6 +70,8 @@ registerAnalyzeAssetPrompt(server);
 registerExportForGodotPrompt(server);
 registerScaffoldUiIconsPrompt(server);
 registerScaffoldUiFramePrompt(server);
+registerScaffoldAttackPrompt(server);
+registerScaffoldSideScrollerPrompt(server);
 
 const useHttp = process.argv.includes('--http');
 const HTTP_PORT = 3001;

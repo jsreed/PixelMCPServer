@@ -755,7 +755,7 @@ High-impact features that reduce round trips and unlock common LLM pixel art wor
 
 #### 8A.7 `scaffold_attack` Prompt
 
-- [ ] **8A.7.1** **`scaffold_attack` prompt** (`src/prompts/scaffold-attack.ts`) — arguments: `name`, optional `attack_type` (`melee_slash`/`melee_thrust`/`ranged`/`magic_cast`), optional `weapon_asset`, optional `frame_count`. Messages guide through anticipation → smear → impact → follow-through → recovery frame structure with timing advice.
+- [x] **8A.7.1** **`scaffold_attack` prompt** (`src/prompts/scaffold-attack.ts`) — arguments: `name`, optional `attack_type` (`melee_slash`/`melee_thrust`/`ranged`/`magic_cast`), optional `weapon_asset`, optional `frame_count`. Messages guide through anticipation → smear → impact → follow-through → recovery frame structure with timing advice.
 
 #### 8A.8 `scaffold_side_scroller` Prompt
 
