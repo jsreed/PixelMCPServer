@@ -108,6 +108,12 @@ const isoWallOp = z.object({
   ...baseOp,
 });
 
+const colorReplaceOp = z.object({
+  action: z.literal('color_replace'),
+  from_color: z.number().int().describe('Palette index to find (0-255)'),
+  to_color: z.number().int().describe('Palette index to substitute (0-255)'),
+});
+
 const drawOperationSchema = z.discriminatedUnion('action', [
   pixelOp,
   lineOp,
@@ -119,6 +125,7 @@ const drawOperationSchema = z.discriminatedUnion('action', [
   isoTileOp,
   isoCubeOp,
   isoWallOp,
+  colorReplaceOp,
 ]);
 
 const drawInputSchema = {
@@ -421,6 +428,16 @@ function executeDrawOpsOnFrame(
         for (const p of points) putPixel(p.x, p.y, op.color);
         break;
       }
+      case 'color_replace': {
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            if (data[y][x] === op.from_color) {
+              putPixel(x, y, op.to_color);
+            }
+          }
+        }
+        break;
+      }
       case 'write_pixels': {
         // Pre-validated above, safe to write
         const ox = op.x ?? 0;
@@ -442,7 +459,7 @@ export function registerDrawTool(server: McpServer): void {
     {
       title: 'Draw',
       description:
-        'Batched pixel manipulation operations (pixel, line, rect, circle, ellipse, fill, write_pixels, iso_tile, iso_cube, iso_wall).',
+        'Batched pixel manipulation operations (pixel, line, rect, circle, ellipse, fill, write_pixels, color_replace, iso_tile, iso_cube, iso_wall).',
       inputSchema: drawInputZodSchema,
     },
     (args: DrawInput) => {
@@ -488,6 +505,10 @@ export function registerDrawTool(server: McpServer): void {
             return errors.colorOutOfRange(op.left_color);
           if (op.right_color < 0 || op.right_color > 255)
             return errors.colorOutOfRange(op.right_color);
+        } else if (op.action === 'color_replace') {
+          if (op.from_color < 0 || op.from_color > 255)
+            return errors.colorOutOfRange(op.from_color);
+          if (op.to_color < 0 || op.to_color > 255) return errors.colorOutOfRange(op.to_color);
         } else if ('color' in op) {
           if (op.color < 0 || op.color > 255) return errors.colorOutOfRange(op.color);
         }

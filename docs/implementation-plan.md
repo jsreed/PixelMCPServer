@@ -750,8 +750,8 @@ High-impact features that reduce round trips and unlock common LLM pixel art wor
 
 #### 8A.6 Color Replace Draw Operation
 
-- [ ] **8A.6.1** **`colorReplace` algorithm** — simple scan-and-replace on a 2D palette-index array. Respects selection mask when provided.
-- [ ] **8A.6.2** **Wire `color_replace` into draw tool** — add to operations Zod schema with `from_color` and `to_color` params, dispatch to algorithm.
+- [x] **8A.6.1** **`colorReplace` algorithm** — simple scan-and-replace on a 2D palette-index array. Respects selection mask when provided.
+- [x] **8A.6.2** **Wire `color_replace` into draw tool** — add to operations Zod schema with `from_color` and `to_color` params, dispatch to algorithm.
 
 #### 8A.7 `scaffold_attack` Prompt
 

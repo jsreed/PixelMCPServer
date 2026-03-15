@@ -417,6 +417,125 @@ describe('draw tool', () => {
     expect(r.content?.[0]?.text).toContain('invalid');
   });
 
+  // ─── color_replace tests ─────────────────────────────────────────────────
+
+  it('color_replace replaces all matching pixels', async () => {
+    // Seed the cel with some non-zero values
+    await handler({
+      layer_id: 1,
+      frame_index: 0,
+      operations: [{ action: 'rect', x: 0, y: 0, width: 5, height: 5, color: 3, filled: true }],
+    });
+
+    await handler({
+      layer_id: 1,
+      frame_index: 0,
+      operations: [{ action: 'color_replace', from_color: 3, to_color: 7 }],
+    });
+
+    const data = getCelData();
+    if (!data) throw new Error('No data');
+    // Every pixel that was 3 should now be 7
+    expect(data[0][0]).toBe(7);
+    expect(data[4][4]).toBe(7);
+    // Pixels outside the rect were 0 and should stay 0
+    expect(data[9][9]).toBe(0);
+  });
+
+  it('color_replace leaves non-matching pixels unchanged', async () => {
+    await handler({
+      layer_id: 1,
+      frame_index: 0,
+      operations: [{ action: 'pixel', x: 2, y: 2, color: 5 }],
+    });
+
+    await handler({
+      layer_id: 1,
+      frame_index: 0,
+      operations: [{ action: 'color_replace', from_color: 99, to_color: 7 }],
+    });
+
+    const data = getCelData();
+    if (!data) throw new Error('No data');
+    // No pixel matches 99, so nothing should change
+    expect(data[2][2]).toBe(5);
+    expect(data[0][0]).toBe(0);
+  });
+
+  it('color_replace with no matching pixels is a no-op', async () => {
+    // cel is all zeros
+    await handler({
+      layer_id: 1,
+      frame_index: 0,
+      operations: [{ action: 'color_replace', from_color: 42, to_color: 1 }],
+    });
+
+    const data = getCelData();
+    if (!data) throw new Error('No data');
+    const allZero = data.flat().every((v) => v === 0);
+    expect(allZero).toBe(true);
+  });
+
+  it('color_replace respects active selection mask', async () => {
+    // Fill entire cel with color 3
+    await handler({
+      layer_id: 1,
+      frame_index: 0,
+      operations: [{ action: 'rect', x: 0, y: 0, width: 10, height: 10, color: 3, filled: true }],
+    });
+
+    // Set a selection covering only [2..4, 2..4]
+    workspace.selection = {
+      asset_name: 'test_sprite',
+      layer_id: 1,
+      frame_index: 0,
+      x: 2,
+      y: 2,
+      width: 3,
+      height: 3,
+      mask: [
+        [true, true, true],
+        [true, true, true],
+        [true, true, true],
+      ],
+    };
+
+    await handler({
+      layer_id: 1,
+      frame_index: 0,
+      operations: [{ action: 'color_replace', from_color: 3, to_color: 9 }],
+    });
+
+    const data = getCelData();
+    if (!data) throw new Error('No data');
+
+    // Inside selection — should be replaced
+    expect(data[2][2]).toBe(9);
+    expect(data[4][4]).toBe(9);
+
+    // Outside selection — should remain 3
+    expect(data[0][0]).toBe(3);
+    expect(data[9][9]).toBe(3);
+  });
+
+  it('color_replace returns error for out-of-range from_color', async () => {
+    const r = (await handler({
+      layer_id: 1,
+      frame_index: 0,
+      operations: [{ action: 'color_replace', from_color: 300, to_color: 1 }],
+    })) as HandlerResult;
+    expect(r.isError).toBe(true);
+  });
+
+  it('color_replace returns error for out-of-range to_color', async () => {
+    const r = (await handler({
+      layer_id: 1,
+      frame_index: 0,
+      operations: [{ action: 'color_replace', from_color: 1, to_color: -5 }],
+    })) as HandlerResult;
+    expect(r.isError).toBe(true);
+  });
+
   it('flood fill respects selection boundaries', async () => {
     workspace.selection = {
       asset_name: 'test_sprite',
