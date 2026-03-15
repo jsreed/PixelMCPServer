@@ -432,6 +432,201 @@ describe('tileset tool', () => {
     });
   });
 
+  describe('set_tile_data', () => {
+    beforeEach(async () => {
+      await callTool({ action: 'extract_tile', x: 0, y: 0 });
+    });
+
+    it('sets custom data with auto-created layer', async () => {
+      const result = await callTool({
+        action: 'set_tile_data',
+        tile_index: 0,
+        data_layer_name: 'movement_cost',
+        data_layer_type: 'int',
+        data_value: 2,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      expect(asset.tile_custom_data?.layers[0]).toEqual({ name: 'movement_cost', type: 'int' });
+      expect(asset.tile_custom_data?.tiles['0']?.['movement_cost']).toBe(2);
+    });
+
+    it('does not duplicate data layer on subsequent set', async () => {
+      await callTool({
+        action: 'set_tile_data',
+        tile_index: 0,
+        data_layer_name: 'movement_cost',
+        data_layer_type: 'int',
+        data_value: 2,
+      });
+      await callTool({
+        action: 'set_tile_data',
+        tile_index: 0,
+        data_layer_name: 'movement_cost',
+        data_layer_type: 'int',
+        data_value: 3,
+      });
+
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      expect(asset.tile_custom_data?.layers.length).toBe(1);
+      expect(asset.tile_custom_data?.tiles['0']?.['movement_cost']).toBe(3);
+    });
+
+    it('stores multiple data types', async () => {
+      await callTool({
+        action: 'set_tile_data',
+        tile_index: 0,
+        data_layer_name: 'terrain_type',
+        data_layer_type: 'string',
+        data_value: 'grass',
+      });
+      await callTool({
+        action: 'set_tile_data',
+        tile_index: 0,
+        data_layer_name: 'cost',
+        data_layer_type: 'int',
+        data_value: 1,
+      });
+      await callTool({
+        action: 'set_tile_data',
+        tile_index: 0,
+        data_layer_name: 'passable',
+        data_layer_type: 'bool',
+        data_value: true,
+      });
+
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      expect(asset.tile_custom_data?.tiles['0']?.['terrain_type']).toBe('grass');
+      expect(asset.tile_custom_data?.tiles['0']?.['cost']).toBe(1);
+      expect(asset.tile_custom_data?.tiles['0']?.['passable']).toBe(true);
+    });
+
+    it('returns isError when data_layer_name missing', async () => {
+      const result = await callTool({
+        action: 'set_tile_data',
+        tile_index: 0,
+        data_layer_type: 'int',
+        data_value: 2,
+      });
+      expect(result.isError).toBeTruthy();
+    });
+
+    it('returns isError when data_layer_type missing', async () => {
+      const result = await callTool({
+        action: 'set_tile_data',
+        tile_index: 0,
+        data_layer_name: 'movement_cost',
+        data_value: 2,
+      });
+      expect(result.isError).toBeTruthy();
+    });
+
+    it('returns isError for nonexistent tile_index', async () => {
+      const result = await callTool({
+        action: 'set_tile_data',
+        tile_index: 99,
+        data_layer_name: 'movement_cost',
+        data_layer_type: 'int',
+        data_value: 2,
+      });
+      expect(result.isError).toBeTruthy();
+    });
+
+    it('undo removes custom data', async () => {
+      await callTool({
+        action: 'set_tile_data',
+        tile_index: 0,
+        data_layer_name: 'movement_cost',
+        data_layer_type: 'int',
+        data_value: 2,
+      });
+
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      expect(asset.tile_custom_data).toBeDefined();
+
+      workspace.undo();
+      expect(asset.tile_custom_data).toBeUndefined();
+    });
+  });
+
+  describe('clear_tile_data', () => {
+    beforeEach(async () => {
+      await callTool({ action: 'extract_tile', x: 0, y: 0 });
+      await callTool({
+        action: 'set_tile_data',
+        tile_index: 0,
+        data_layer_name: 'movement_cost',
+        data_layer_type: 'int',
+        data_value: 2,
+      });
+      await callTool({
+        action: 'set_tile_data',
+        tile_index: 0,
+        data_layer_name: 'terrain_type',
+        data_layer_type: 'string',
+        data_value: 'grass',
+      });
+    });
+
+    it('clears specific data layer from tile', async () => {
+      const result = await callTool({
+        action: 'clear_tile_data',
+        tile_index: 0,
+        data_layer_name: 'movement_cost',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      expect(asset.tile_custom_data?.tiles['0']?.['movement_cost']).toBeUndefined();
+      expect(asset.tile_custom_data?.tiles['0']?.['terrain_type']).toBe('grass');
+    });
+
+    it('clears all custom data for tile when no data_layer_name', async () => {
+      const result = await callTool({
+        action: 'clear_tile_data',
+        tile_index: 0,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      expect(asset.tile_custom_data?.tiles['0']).toBeUndefined();
+    });
+
+    it('returns isError for nonexistent tile_index', async () => {
+      const result = await callTool({
+        action: 'clear_tile_data',
+        tile_index: 99,
+      });
+      expect(result.isError).toBeTruthy();
+    });
+
+    it('clearing last tile data sets tile_custom_data to undefined', async () => {
+      await callTool({ action: 'clear_tile_data', tile_index: 0 });
+
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      expect(asset.tile_custom_data).toBeUndefined();
+    });
+
+    it('undo restores custom data', async () => {
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+
+      await callTool({ action: 'clear_tile_data', tile_index: 0 });
+      expect(asset.tile_custom_data).toBeUndefined();
+
+      workspace.undo();
+      expect(asset.tile_custom_data?.tiles['0']?.['terrain_type']).toBe('grass');
+    });
+  });
+
   // ─── 4.1.8.8 Resource link in response ──────────────────────────
 
   it('extract_tile response includes pixel:// tileset resource link', async () => {

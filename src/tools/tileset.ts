@@ -5,6 +5,7 @@ import * as errors from '../errors.js';
 import { createResourceLink } from '../utils/resource-link.js';
 import { TilesetCommand } from '../commands/tileset-command.js';
 import { TileAnimationCommand } from '../commands/tile-animation-command.js';
+import { TileDataCommand } from '../commands/tile-data-command.js';
 import { getCanonicalSlots, assignPeeringBits } from '../algorithms/autotile.js';
 import { isoToPixel } from '../algorithms/isometric.js';
 import { type ImageCel } from '../types/cel.js';
@@ -19,6 +20,8 @@ const tilesetInputSchema = {
       'set_tile_physics',
       'set_tile_animation',
       'clear_tile_animation',
+      'set_tile_data',
+      'clear_tile_data',
     ])
     .describe('Action to perform'),
   asset_name: z.string().optional().describe('Target asset. Defaults to first loaded.'),
@@ -59,6 +62,17 @@ const tilesetInputSchema = {
     .int()
     .optional()
     .describe('Which physics layer to assign (defaults to 0)'),
+
+  // set_tile_data args
+  data_layer_name: z.string().optional().describe('Custom data layer name'),
+  data_layer_type: z
+    .enum(['string', 'int', 'float', 'bool'])
+    .optional()
+    .describe('Custom data layer type'),
+  data_value: z
+    .union([z.string(), z.number(), z.boolean()])
+    .optional()
+    .describe('Custom data value to set'),
 
   // set_tile_animation args
   frame_count: z.number().int().optional().describe('Number of animation frames'),
@@ -444,6 +458,115 @@ export function registerTilesetTool(server: McpServer): void {
                 type: 'text',
                 text: JSON.stringify({
                   message: 'Tile animation cleared.',
+                  tile_index: clearTileIdx,
+                }),
+              },
+            ],
+          };
+        }
+
+        if (args.action === 'set_tile_data') {
+          if (args.tile_index === undefined)
+            return errors.invalidArgument('set_tile_data requires tile_index');
+          if (!asset.tile_width || !asset.tile_height) return errors.notATileset(assetName);
+          const count = asset.tile_count ?? 0;
+          if (args.tile_index < 0 || args.tile_index >= count) {
+            return errors.tileIndexNotFound(args.tile_index, assetName);
+          }
+          if (!args.data_layer_name || !args.data_layer_type) {
+            return errors.domainError(
+              'set_tile_data requires data_layer_name and data_layer_type.',
+            );
+          }
+          if (args.data_value === undefined) {
+            return errors.invalidArgument('set_tile_data requires data_value');
+          }
+          const tileIdx = args.tile_index;
+          const layerName = args.data_layer_name;
+          const layerType = args.data_layer_type;
+          const dataValue = args.data_value;
+
+          const dataCmd = new TileDataCommand(asset, () => {
+            const customData = asset.tile_custom_data ?? { layers: [], tiles: {} };
+
+            // Auto-create data layer if it doesn't exist
+            if (!customData.layers.find((l) => l.name === layerName)) {
+              customData.layers.push({ name: layerName, type: layerType });
+            }
+
+            // Store the value per-tile
+            if (!(tileIdx.toString() in customData.tiles)) {
+              customData.tiles[tileIdx.toString()] = {};
+            }
+            customData.tiles[tileIdx.toString()][layerName] = dataValue;
+
+            asset.tile_custom_data = { ...customData, layers: [...customData.layers] };
+          });
+          workspace.pushCommand(dataCmd);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  message: 'Tile custom data set.',
+                  tile_index: tileIdx,
+                  data_layer_name: layerName,
+                  data_value: dataValue,
+                }),
+              },
+            ],
+          };
+        }
+
+        if (args.action === 'clear_tile_data') {
+          if (args.tile_index === undefined)
+            return errors.invalidArgument('clear_tile_data requires tile_index');
+          if (!asset.tile_width || !asset.tile_height) return errors.notATileset(assetName);
+          const count = asset.tile_count ?? 0;
+          if (args.tile_index < 0 || args.tile_index >= count) {
+            return errors.tileIndexNotFound(args.tile_index, assetName);
+          }
+          const clearTileIdx = args.tile_index;
+          const clearLayerName = args.data_layer_name;
+
+          const clearDataCmd = new TileDataCommand(asset, () => {
+            const customData = asset.tile_custom_data;
+            if (!customData) return;
+
+            const tileKey = clearTileIdx.toString();
+            if (!(tileKey in customData.tiles)) return;
+
+            if (clearLayerName) {
+              // Remove specific data layer value
+              // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+              delete customData.tiles[tileKey][clearLayerName];
+              // If tile has no more data, remove the tile entry
+              if (Object.keys(customData.tiles[tileKey]).length === 0) {
+                // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+                delete customData.tiles[tileKey];
+              }
+            } else {
+              // Clear all custom data for the tile
+              // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+              delete customData.tiles[tileKey];
+            }
+
+            // If no tiles have custom data left, clean up entirely
+            if (Object.keys(customData.tiles).length === 0) {
+              asset.tile_custom_data = undefined;
+            } else {
+              asset.tile_custom_data = { ...customData, layers: [...customData.layers] };
+            }
+          });
+          workspace.pushCommand(clearDataCmd);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  message: clearLayerName
+                    ? `Tile custom data '${clearLayerName}' cleared.`
+                    : 'All tile custom data cleared.',
                   tile_index: clearTileIdx,
                 }),
               },

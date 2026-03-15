@@ -789,11 +789,11 @@ Features that produce richer Godot `.tres` resources for direct import without m
 
 #### 8B.2 TileSet Custom Data Layers
 
-- [ ] **8B.2.1** **`tile_custom_data` asset storage** — extend asset types with `tile_custom_data: { layers: Array<{ name, type }>, tiles: Record<string, Record<string, value>> }`. Add to roundtrip. Extends the Phase 1 Asset type definition (`src/types/asset.ts`) with new optional field.
-- [ ] **8B.2.2** **`TileDataCommand`** — captures custom data before-state.
-- [ ] **8B.2.3** **`set_tile_data` tileset action** — add to Zod schema, auto-create data layer if new, store value per tile, wrap in command.
-- [ ] **8B.2.4** **Emit custom data layers in `godot_tileset` `.tres`** — custom data layer definitions + per-tile custom data values.
-- [ ] **8B.2.5** **`clear_tile_data` tileset action** — add to Zod schema, remove custom data value for given `data_layer_name` (or all custom data if omitted), wrap in command.
+- [x] **8B.2.1** **`tile_custom_data` asset storage** — extend asset types with `tile_custom_data: { layers: Array<{ name, type }>, tiles: Record<string, Record<string, value>> }`. Add to roundtrip. Extends the Phase 1 Asset type definition (`src/types/asset.ts`) with new optional field.
+- [x] **8B.2.2** **`TileDataCommand`** — captures custom data before-state.
+- [x] **8B.2.3** **`set_tile_data` tileset action** — add to Zod schema, auto-create data layer if new, store value per tile, wrap in command.
+- [x] **8B.2.4** **Emit custom data layers in `godot_tileset` `.tres`** — custom data layer definitions + per-tile custom data values.
+- [x] **8B.2.5** **`clear_tile_data` tileset action** — add to Zod schema, remove custom data value for given `data_layer_name` (or all custom data if omitted), wrap in command.
 
 #### 8B.3 TileSet Occlusion Polygons
 

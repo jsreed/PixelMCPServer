@@ -6,6 +6,7 @@ import {
   type TileTerrain,
   type NineSlice,
   type TileAnimation,
+  type TileCustomData,
 } from '../types/asset.js';
 import { PaletteClass } from './palette.js';
 import * as errors from '../errors.js';
@@ -134,6 +135,15 @@ export class AssetClass {
 
   set tile_animation(value: TileAnimation | undefined) {
     this._data.tile_animation = value;
+    this.markDirty();
+  }
+
+  get tile_custom_data(): TileCustomData | undefined {
+    return this._data.tile_custom_data;
+  }
+
+  set tile_custom_data(value: TileCustomData | undefined) {
+    this._data.tile_custom_data = value;
     this.markDirty();
   }
 
@@ -873,6 +883,10 @@ export class AssetClass {
     if ('tile_animation' in patch)
       this._data.tile_animation = patch.tile_animation
         ? (JSON.parse(JSON.stringify(patch.tile_animation)) as TileAnimation)
+        : undefined;
+    if ('tile_custom_data' in patch)
+      this._data.tile_custom_data = patch.tile_custom_data
+        ? (JSON.parse(JSON.stringify(patch.tile_custom_data)) as TileCustomData)
         : undefined;
     this.markDirty();
   }

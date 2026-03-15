@@ -102,6 +102,29 @@ export interface TileAnimationEntry {
  */
 export type TileAnimation = Record<string, TileAnimationEntry>;
 
+// --- Tile custom data types ---
+
+/**
+ * Definition of a single custom data layer in the tileset.
+ * Corresponds to a Godot TileSet custom_data_layer definition.
+ */
+export interface TileCustomDataLayer {
+  name: string;
+  type: 'string' | 'int' | 'float' | 'bool';
+}
+
+/**
+ * Per-tile custom data storage for a tileset.
+ * `layers` defines the schema (ordered list of named+typed layers).
+ * `tiles` maps tile slot index strings to their custom data values,
+ * keyed by data layer name.
+ * Populated by `tileset set_tile_data`, consumed by `export godot_tileset`.
+ */
+export interface TileCustomData {
+  layers: TileCustomDataLayer[];
+  tiles: Record<string, Record<string, string | number | boolean>>;
+}
+
 // --- Nine-slice metadata types ---
 
 /**
@@ -154,6 +177,8 @@ export interface Asset {
   tile_terrain?: TileTerrain;
   /** Per-tile animation metadata for animated tiles */
   tile_animation?: TileAnimation;
+  /** Per-tile custom data for gameplay metadata */
+  tile_custom_data?: TileCustomData;
 
   // --- Optional Fields (UI Art) ---
 

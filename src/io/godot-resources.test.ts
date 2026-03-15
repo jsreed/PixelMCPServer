@@ -375,6 +375,134 @@ describe('godot-resources', () => {
       expect(res).toContain('physics_layer_0/collision_layer = 1');
     });
 
+    test('emits custom data layer definitions in [resource] section', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 4,
+        tile_custom_data: {
+          layers: [
+            { name: 'movement_cost', type: 'int' },
+            { name: 'terrain_type', type: 'string' },
+          ],
+          tiles: { '0': { movement_cost: 2, terrain_type: 'grass' } },
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      expect(res).toContain('custom_data_layer_0/name = "movement_cost"');
+      expect(res).toContain('custom_data_layer_0/type = 2');
+      expect(res).toContain('custom_data_layer_1/name = "terrain_type"');
+      expect(res).toContain('custom_data_layer_1/type = 4');
+    });
+
+    test('emits per-tile custom data values in sub_resource section', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 4,
+        tile_custom_data: {
+          layers: [
+            { name: 'movement_cost', type: 'int' },
+            { name: 'terrain_type', type: 'string' },
+          ],
+          tiles: { '0': { movement_cost: 2, terrain_type: 'grass' } },
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      expect(res).toContain('0:0/0/custom_data_0 = 2');
+      expect(res).toContain('0:0/0/custom_data_1 = "grass"');
+    });
+
+    test('formats bool custom data as true/false', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 4,
+        tile_custom_data: {
+          layers: [{ name: 'is_destructible', type: 'bool' }],
+          tiles: { '0': { is_destructible: true } },
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      expect(res).toContain('0:0/0/custom_data_0 = true');
+    });
+
+    test('formats float custom data as number', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 4,
+        tile_custom_data: {
+          layers: [{ name: 'speed_mult', type: 'float' }],
+          tiles: { '0': { speed_mult: 1.5 } },
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      expect(res).toContain('0:0/0/custom_data_0 = 1.5');
+    });
+
+    test('emits custom data alongside physics and animation', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 4,
+        tile_physics: {
+          physics_layers: [{ collision_layer: 1, collision_mask: 1 }],
+          tiles: {
+            '0': {
+              polygon: [
+                [0, 0],
+                [16, 0],
+                [16, 16],
+                [0, 16],
+              ],
+            },
+          },
+        },
+        tile_animation: {
+          '1': { frame_count: 2, frame_duration_ms: 100, separation: 0 },
+        },
+        tile_custom_data: {
+          layers: [{ name: 'movement_cost', type: 'int' }],
+          tiles: { '2': { movement_cost: 3 } },
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      expect(res).toContain('0:0/0/physics_layer_0/polygon_0/points');
+      expect(res).toContain('1:0/0/animation_columns = 2');
+      expect(res).toContain('2:0/0/custom_data_0 = 3');
+      expect(res).toContain('custom_data_layer_0/name = "movement_cost"');
+    });
+
+    test('does not emit custom data when tile_custom_data is undefined', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 4,
+        tile_physics: {
+          physics_layers: [{ collision_layer: 1, collision_mask: 1 }],
+          tiles: {
+            '0': {
+              polygon: [
+                [0, 0],
+                [16, 0],
+                [16, 16],
+                [0, 16],
+              ],
+            },
+          },
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      expect(res).not.toContain('custom_data_layer');
+    });
+
     test('uses col=slot_index row=0 for high tile indices (horizontal strip layout)', () => {
       // blob47 uses bitmask values as slot indices — some are >= tile_count.
       // With the old sqrt(tile_count) formula, tile 255 on a 47-tile set would have

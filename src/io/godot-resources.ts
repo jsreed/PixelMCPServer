@@ -251,7 +251,7 @@ export function generateGodotTileSet(
 
   // Tiles are stored in a horizontal strip on the asset canvas (slot N at x=N*tileW, y=0).
   // The exported PNG preserves that layout, so all tiles are at row=0, col=slot_index.
-  if (asset.tile_physics || asset.tile_terrain || asset.tile_animation) {
+  if (asset.tile_physics || asset.tile_terrain || asset.tile_animation || asset.tile_custom_data) {
     if (asset.tile_physics) {
       for (const tileStr of Object.keys(asset.tile_physics.tiles)) {
         const col = parseInt(tileStr, 10);
@@ -294,6 +294,28 @@ export function generateGodotTileSet(
         }
       }
     }
+    if (asset.tile_custom_data) {
+      const customData = asset.tile_custom_data;
+      for (const tileStr of Object.keys(customData.tiles)) {
+        const col = parseInt(tileStr, 10);
+        const tileData = customData.tiles[tileStr];
+        tres += `${String(col)}:0/0 = 0\n`;
+        for (const [layerName, value] of Object.entries(tileData)) {
+          const layerIdx = customData.layers.findIndex((l) => l.name === layerName);
+          if (layerIdx === -1) continue;
+          const layer = customData.layers[layerIdx];
+          let formattedValue: string;
+          if (layer.type === 'string') {
+            formattedValue = `"${String(value)}"`;
+          } else if (layer.type === 'bool') {
+            formattedValue = value ? 'true' : 'false';
+          } else {
+            formattedValue = String(value);
+          }
+          tres += `${String(col)}:0/0/custom_data_${String(layerIdx)} = ${formattedValue}\n`;
+        }
+      }
+    }
   }
 
   tres += `\n[resource]\n`;
@@ -310,6 +332,19 @@ export function generateGodotTileSet(
     const terrainName = asset.tile_terrain.terrain_name || 'Terrain';
     tres += `terrain_set_0/terrain_0/name = "${terrainName}"\n`;
     tres += `terrain_set_0/terrain_0/color = Color(0.5, 0.5, 0.5, 1)\n`;
+  }
+  if (asset.tile_custom_data) {
+    const godotTypeMap: Record<string, number> = {
+      bool: 1,
+      int: 2,
+      float: 3,
+      string: 4,
+    };
+    for (let i = 0; i < asset.tile_custom_data.layers.length; i++) {
+      const layer = asset.tile_custom_data.layers[i];
+      tres += `custom_data_layer_${String(i)}/name = "${layer.name}"\n`;
+      tres += `custom_data_layer_${String(i)}/type = ${String(godotTypeMap[layer.type] ?? 4)}\n`;
+    }
   }
   tres += `sources/0 = SubResource("TileSetAtlasSource_1")\n`;
 
