@@ -114,6 +114,16 @@ export function colorOutOfRange(color: number): DomainErrorResponse {
   return domainError(`Color index ${String(color)} is out of range (0–255).`);
 }
 
+export function frameRangeInvalid(start: number, end: number): DomainErrorResponse {
+  return domainError(
+    `frame_range [${String(start)}, ${String(end)}] is invalid. Requires 0 ≤ start ≤ end < frame_count.`,
+  );
+}
+
+export function frameRangeAndIndexExclusive(): DomainErrorResponse {
+  return domainError('frame_range and frame_index are mutually exclusive.');
+}
+
 export function writePixelsDimensionMismatch(
   dw: number,
   dh: number,

@@ -3,12 +3,14 @@ import { type McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { getWorkspace } from '../classes/workspace.js';
 import * as errors from '../errors.js';
 import { CelWriteCommand } from '../commands/cel-write-command.js';
+import { FrameRangeCommand } from '../commands/frame-range-command.js';
 import { linearGradient } from '../algorithms/gradient.js';
 import { checkerboard, noise, orderedDither, errorDiffusion } from '../algorithms/dither.js';
 import { generateOutline, cleanupOrphans } from '../algorithms/outline.js';
 import { autoAntiAlias } from '../algorithms/auto-aa.js';
 import { subpixelShift, smearFrame } from '../algorithms/motion.js';
 import { createResourceLink } from '../utils/resource-link.js';
+import { type AssetClass } from '../classes/asset.js';
 
 // ---------------------------------------------------------------------------
 // Zod Schema
@@ -102,6 +104,10 @@ const effectInputSchema = {
   asset_name: z.string().optional().describe('Target asset name. Defaults to first loaded asset.'),
   layer_id: z.number().int().optional().describe('Target layer ID. Defaults to 0.'),
   frame_index: z.number().int().optional().describe('Target frame index. Defaults to 0.'),
+  frame_range: z
+    .tuple([z.number().int(), z.number().int()])
+    .optional()
+    .describe('Inclusive frame range [start, end]. Mutually exclusive with frame_index.'),
   operations: z.array(effectOperationSchema).min(1).describe('Ordered list of effect operations.'),
 };
 
@@ -157,6 +163,53 @@ const effectInputZodSchema = z.object(effectInputSchema);
 type EffectInput = z.infer<typeof effectInputZodSchema>;
 type EffectOp = z.infer<typeof effectOperationSchema>;
 
+// ---------------------------------------------------------------------------
+// Core effect logic (extracted for reuse across single-frame and frame-range)
+// ---------------------------------------------------------------------------
+
+function executeEffectOpsOnFrame(
+  asset: AssetClass,
+  layerId: number,
+  frameIndex: number,
+  operations: EffectInput['operations'],
+  workspace: ReturnType<typeof getWorkspace>,
+  assetName: string,
+): void {
+  let cel = asset.getMutableCel(layerId, frameIndex);
+  if (!cel) {
+    const data = Array.from({ length: asset.height }, () => new Array<number>(asset.width).fill(0));
+    asset.setCel(layerId, frameIndex, { x: 0, y: 0, data });
+    cel = asset.getMutableCel(layerId, frameIndex);
+  }
+  if (!cel || !('data' in cel)) {
+    throw new Error('Could not resolve mutable image cel.');
+  }
+
+  const h = asset.height;
+  const w = asset.width;
+
+  // Expand cel data to full asset size
+  while (cel.data.length < h) cel.data.push(new Array<number>(w).fill(0));
+  for (let row = 0; row < h; row++) {
+    while (cel.data[row].length < w) cel.data[row].push(0);
+  }
+
+  const activeSelection =
+    workspace.selection &&
+    workspace.selection.asset_name === assetName &&
+    workspace.selection.layer_id === layerId &&
+    workspace.selection.frame_index === frameIndex
+      ? workspace.selection
+      : null;
+
+  // Convert PaletteClass to raw array for algorithms that need it
+  const paletteArray = asset.palette.toJSON();
+
+  for (const op of operations) {
+    applyEffectOp(op, cel.data, w, h, activeSelection, paletteArray);
+  }
+}
+
 export function registerEffectTool(server: McpServer): void {
   server.registerTool(
     'effect',
@@ -181,7 +234,6 @@ export function registerEffectTool(server: McpServer): void {
       if (!asset) return errors.assetNotLoaded(assetName);
 
       const layerId = args.layer_id ?? 0;
-      const frameIndex = args.frame_index ?? 0;
 
       const layer = asset.layers.find((l) => l.id === layerId);
       if (!layer) return errors.layerNotFound(layerId, assetName);
@@ -191,12 +243,13 @@ export function registerEffectTool(server: McpServer): void {
         );
       }
 
-      if (frameIndex < 0 || frameIndex >= asset.frames.length) {
-        return errors.frameOutOfRange(frameIndex, assetName, asset.frames.length);
-      }
-
       if (!Array.isArray(args.operations) || args.operations.length === 0) {
         return errors.invalidArgument('operations array is required and must not be empty.');
+      }
+
+      // Mutual exclusivity check
+      if (args.frame_range !== undefined && args.frame_index !== undefined) {
+        return errors.frameRangeAndIndexExclusive();
       }
 
       // Pre-validate color parameters before beginning mutation bundle
@@ -212,64 +265,75 @@ export function registerEffectTool(server: McpServer): void {
         }
       }
 
-      try {
-        const cmd = new CelWriteCommand(asset, layerId, frameIndex, () => {
-          let cel = asset.getMutableCel(layerId, frameIndex);
-          if (!cel) {
-            const data = Array.from({ length: asset.height }, () =>
-              new Array<number>(asset.width).fill(0),
+      // Branch on frame_range vs frame_index
+      if (args.frame_range) {
+        const [start, end] = args.frame_range;
+        if (start < 0 || end < start || end >= asset.frames.length) {
+          return errors.frameRangeInvalid(start, end);
+        }
+
+        try {
+          const cmd = new FrameRangeCommand(asset, layerId, start, end, (fi) => {
+            executeEffectOpsOnFrame(asset, layerId, fi, args.operations, workspace, assetName);
+          });
+          workspace.pushCommand(cmd);
+        } catch (e: unknown) {
+          return errors.domainError(e instanceof Error ? e.message : String(e));
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                message: `Applied ${String(args.operations.length)} effect operations across frames [${String(start)}, ${String(end)}].`,
+              }),
+            },
+            createResourceLink(
+              assetName,
+              `pixel://view/asset/${assetName}/layer/${String(layerId)}/${String(start)}`,
+            ),
+          ],
+        };
+      } else {
+        const frameIndex = args.frame_index ?? 0;
+
+        if (frameIndex < 0 || frameIndex >= asset.frames.length) {
+          return errors.frameOutOfRange(frameIndex, assetName, asset.frames.length);
+        }
+
+        try {
+          const cmd = new CelWriteCommand(asset, layerId, frameIndex, () => {
+            executeEffectOpsOnFrame(
+              asset,
+              layerId,
+              frameIndex,
+              args.operations,
+              workspace,
+              assetName,
             );
-            asset.setCel(layerId, frameIndex, { x: 0, y: 0, data });
-            cel = asset.getMutableCel(layerId, frameIndex);
-          }
-          if (!cel || !('data' in cel)) {
-            throw new Error('Could not resolve mutable image cel.');
-          }
+          });
 
-          const h = asset.height;
-          const w = asset.width;
+          workspace.pushCommand(cmd);
+        } catch (e: unknown) {
+          return errors.domainError(e instanceof Error ? e.message : String(e));
+        }
 
-          // Expand cel data to full asset size
-          while (cel.data.length < h) cel.data.push(new Array<number>(w).fill(0));
-          for (let row = 0; row < h; row++) {
-            while (cel.data[row].length < w) cel.data[row].push(0);
-          }
-
-          const activeSelection =
-            workspace.selection &&
-            workspace.selection.asset_name === assetName &&
-            workspace.selection.layer_id === layerId &&
-            workspace.selection.frame_index === frameIndex
-              ? workspace.selection
-              : null;
-
-          // Convert PaletteClass to raw array for algorithms that need it
-          const paletteArray = asset.palette.toJSON();
-
-          for (const op of args.operations) {
-            applyEffectOp(op, cel.data, w, h, activeSelection, paletteArray);
-          }
-        });
-
-        workspace.pushCommand(cmd);
-      } catch (e: unknown) {
-        return errors.domainError(e instanceof Error ? e.message : String(e));
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                message: `Applied ${String(args.operations.length)} effect operations.`,
+              }),
+            },
+            createResourceLink(
+              assetName,
+              `pixel://view/asset/${assetName}/layer/${String(layerId)}/${String(frameIndex)}`,
+            ),
+          ],
+        };
       }
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({
-              message: `Applied ${String(args.operations.length)} effect operations.`,
-            }),
-          },
-          createResourceLink(
-            assetName,
-            `pixel://view/asset/${assetName}/layer/${String(layerId)}/${String(frameIndex)}`,
-          ),
-        ],
-      };
     },
   );
 }

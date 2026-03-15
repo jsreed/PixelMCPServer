@@ -2,15 +2,9 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import {
-  registerAppResource,
-  RESOURCE_MIME_TYPE,
-} from '@modelcontextprotocol/ext-apps/server';
+import { registerAppResource, RESOURCE_MIME_TYPE } from '@modelcontextprotocol/ext-apps/server';
 
-const APP_HTML_PATH = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  '../../dist/app/app.html',
-);
+const APP_HTML_PATH = resolve(dirname(fileURLToPath(import.meta.url)), '../../dist/app/app.html');
 
 export function registerEditorResource(server: McpServer): void {
   registerAppResource(

@@ -335,6 +335,88 @@ describe('draw tool', () => {
     expect(links[0]?.uri).toContain('pixel://view/');
   });
 
+  // ─── frame_range tests ───────────────────────────────────────────────────
+
+  it('frame_range applies drawing operations across multiple frames', async () => {
+    // Add extra frames to the asset
+    const asset = workspace.loadedAssets.get('test_sprite');
+    if (!asset) throw new Error('Asset missing');
+    asset.addFrame({ index: 1, duration_ms: 100 });
+    asset.addFrame({ index: 2, duration_ms: 100 });
+
+    const r = (await handler({
+      layer_id: 1,
+      frame_range: [0, 2],
+      operations: [{ action: 'pixel', x: 5, y: 5, color: 42 }],
+    })) as HandlerResult;
+
+    expect(r.isError).toBeUndefined();
+
+    // All three frames should have the pixel set
+    for (let f = 0; f <= 2; f++) {
+      const cel = asset.getCel(1, f);
+      expect(cel).toBeDefined();
+      if (cel && 'data' in cel) {
+        expect(cel.data[5][5]).toBe(42);
+      }
+    }
+  });
+
+  it('frame_range undo/redo restores and reapplies all frames', async () => {
+    const asset = workspace.loadedAssets.get('test_sprite');
+    if (!asset) throw new Error('Asset missing');
+    asset.addFrame({ index: 1, duration_ms: 100 });
+
+    await handler({
+      layer_id: 1,
+      frame_range: [0, 1],
+      operations: [{ action: 'pixel', x: 3, y: 3, color: 7 }],
+    });
+
+    // Verify draw applied
+    for (let f = 0; f <= 1; f++) {
+      const cel = asset.getCel(1, f);
+      if (cel && 'data' in cel) expect(cel.data[3][3]).toBe(7);
+    }
+
+    workspace.undo();
+
+    // After undo, frame 0 reverts (had data before), frame 1 reverts
+    const cel0 = asset.getCel(1, 0);
+    if (cel0 && 'data' in cel0) expect(cel0.data[3][3]).toBe(0);
+
+    workspace.redo();
+
+    // After redo, frames are re-applied
+    for (let f = 0; f <= 1; f++) {
+      const cel = asset.getCel(1, f);
+      if (cel && 'data' in cel) expect(cel.data[3][3]).toBe(7);
+    }
+  });
+
+  it('frame_range and frame_index are mutually exclusive', async () => {
+    const r = (await handler({
+      layer_id: 1,
+      frame_index: 0,
+      frame_range: [0, 0],
+      operations: [{ action: 'pixel', x: 0, y: 0, color: 1 }],
+    })) as HandlerResult;
+
+    expect(r.isError).toBe(true);
+    expect(r.content?.[0]?.text).toContain('mutually exclusive');
+  });
+
+  it('frame_range returns error for invalid bounds', async () => {
+    const r = (await handler({
+      layer_id: 1,
+      frame_range: [0, 99],
+      operations: [{ action: 'pixel', x: 0, y: 0, color: 1 }],
+    })) as HandlerResult;
+
+    expect(r.isError).toBe(true);
+    expect(r.content?.[0]?.text).toContain('invalid');
+  });
+
   it('flood fill respects selection boundaries', async () => {
     workspace.selection = {
       asset_name: 'test_sprite',

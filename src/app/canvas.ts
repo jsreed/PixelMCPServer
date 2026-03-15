@@ -88,7 +88,11 @@ function flattenCompositeLayers(layers: CompositeLayer[]): CompositeLayer[] {
         if (layer.children) {
           walk(layer.children, visible);
         }
-      } else if ((layer.type === 'image' || layer.type === 'tilemap') && visible && layer.opacity > 0) {
+      } else if (
+        (layer.type === 'image' || layer.type === 'tilemap') &&
+        visible &&
+        layer.opacity > 0
+      ) {
         flat.push(layer);
       }
     }
@@ -182,8 +186,7 @@ export class CanvasRenderer {
   }
 
   private applyTransform(): void {
-    this.canvas.style.transform =
-      `translate(${String(this._offsetX)}px, ${String(this._offsetY)}px) scale(${String(this._zoom)})`;
+    this.canvas.style.transform = `translate(${String(this._offsetX)}px, ${String(this._offsetY)}px) scale(${String(this._zoom)})`;
     this._onViewChange?.();
   }
 
@@ -235,9 +238,15 @@ export class CanvasRenderer {
     );
 
     // Suppress context menu on middle-click (some browsers)
-    this.container.addEventListener('contextmenu', (e: MouseEvent) => { e.preventDefault(); }, {
-      signal,
-    });
+    this.container.addEventListener(
+      'contextmenu',
+      (e: MouseEvent) => {
+        e.preventDefault();
+      },
+      {
+        signal,
+      },
+    );
 
     // Track drag on window so panning works outside container
     window.addEventListener(

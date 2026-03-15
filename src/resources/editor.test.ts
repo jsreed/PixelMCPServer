@@ -68,10 +68,7 @@ describe('editor resource', () => {
     const { readFile } = await import('node:fs/promises');
     (readFile as ReturnType<typeof vi.fn>).mockResolvedValue('<html><body>test</body></html>');
 
-    const result = await resource.readCallback(
-      new URL('ui://pixel-editor/app.html'),
-      {},
-    );
+    const result = await resource.readCallback(new URL('ui://pixel-editor/app.html'), {});
 
     expect(result.contents).toHaveLength(1);
     expect(result.contents[0].text).toBe('<html><body>test</body></html>');
@@ -81,10 +78,7 @@ describe('editor resource', () => {
     const { readFile } = await import('node:fs/promises');
     (readFile as ReturnType<typeof vi.fn>).mockResolvedValue('<html></html>');
 
-    const result = await resource.readCallback(
-      new URL('ui://pixel-editor/app.html'),
-      {},
-    );
+    const result = await resource.readCallback(new URL('ui://pixel-editor/app.html'), {});
 
     expect(result.contents[0].uri).toBe('ui://pixel-editor/app.html');
   });
@@ -95,8 +89,8 @@ describe('editor resource', () => {
       new Error('ENOENT: no such file or directory'),
     );
 
-    await expect(
-      resource.readCallback(new URL('ui://pixel-editor/app.html'), {}),
-    ).rejects.toThrow('ENOENT');
+    await expect(resource.readCallback(new URL('ui://pixel-editor/app.html'), {})).rejects.toThrow(
+      'ENOENT',
+    );
   });
 });

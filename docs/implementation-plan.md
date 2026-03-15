@@ -724,10 +724,10 @@ High-impact features that reduce round trips and unlock common LLM pixel art wor
 
 #### 8A.1 Frame Range Batch Operations
 
-- [ ] **8A.1.1** **Frame range command infrastructure** — `FrameRangeCommand` that wraps an inner command factory, iterating over `[start, end]` frames and capturing/restoring all affected cels as a single undo step. Validates `0 ≤ start ≤ end < frame_count` and mutual exclusivity with `frame_index`.
-- [ ] **8A.1.2** **Wire `frame_range` into `draw` tool** — add `frame_range` to Zod schema (mutually exclusive with `frame_index`), dispatch through `FrameRangeCommand`. All operations in the `operations` array are applied to each frame sequentially.
-- [ ] **8A.1.3** **Wire `frame_range` into `transform` tool** — same pattern as draw.
-- [ ] **8A.1.4** **Wire `frame_range` into `effect` tool** — same pattern as draw.
+- [x] **8A.1.1** **Frame range command infrastructure** — `FrameRangeCommand` that wraps an inner command factory, iterating over `[start, end]` frames and capturing/restoring all affected cels as a single undo step. Validates `0 ≤ start ≤ end < frame_count` and mutual exclusivity with `frame_index`.
+- [x] **8A.1.2** **Wire `frame_range` into `draw` tool** — add `frame_range` to Zod schema (mutually exclusive with `frame_index`), dispatch through `FrameRangeCommand`. All operations in the `operations` array are applied to each frame sequentially.
+- [x] **8A.1.3** **Wire `frame_range` into `transform` tool** — same pattern as draw.
+- [x] **8A.1.4** **Wire `frame_range` into `effect` tool** — same pattern as draw.
 
 #### 8A.2 Linked Cel Creation
 
@@ -763,7 +763,7 @@ High-impact features that reduce round trips and unlock common LLM pixel art wor
 
 #### 8A.9 Testing
 
-- [ ] **8A.9.1** **Frame range tests** — `FrameRangeCommand` undo/redo across multiple frames; draw/transform/effect with `frame_range` verify all frames modified; mutual exclusivity error with `frame_index`.
+- [x] **8A.9.1** **Frame range tests** — `FrameRangeCommand` undo/redo across multiple frames; draw/transform/effect with `frame_range` verify all frames modified; mutual exclusivity error with `frame_index`.
 - [ ] **8A.9.2** **Link cel tests** — `LinkCelCommand` execute/undo/redo; `link_cel` action validation (self-link error, source not found, type mismatch); get_cel on linked cel returns source data.
 - [ ] **8A.9.3** **Per-layer spritesheet tests** — correct number of output files; each strip has correct dimensions; `layers` filter works; non-image layers skipped.
 - [ ] **8A.9.4** **Hue-shifted ramp tests** — HSL conversion roundtrip fidelity; ramp with hue shift produces different intermediate colors than without; warm→cool ramp verification.

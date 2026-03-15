@@ -324,6 +324,109 @@ describe('transform tool', () => {
     expect(links[0]?.uri).toContain('pixel://view/');
   });
 
+  // ─── frame_range tests ───────────────────────────────────────────────────
+
+  it('frame_range applies transform across multiple frames', async () => {
+    const asset = workspace.loadedAssets.get('test_sprite');
+    if (!asset) throw new Error('Asset missing');
+    // Add a second frame
+    asset.addFrame({ index: 1, duration_ms: 100 });
+    // Set second frame data identical to frame 0
+    asset.setCel(1, 1, {
+      x: 0,
+      y: 0,
+      data: [
+        [1, 2, 3, 4],
+        [5, 6, 7, 8],
+        [9, 10, 11, 12],
+        [13, 14, 15, 16],
+      ],
+    });
+
+    const r = (await handler({
+      layer_id: 1,
+      frame_range: [0, 1],
+      operations: [{ action: 'flip_h' }],
+    })) as HandlerResult;
+
+    expect(r.isError).toBeUndefined();
+
+    // Both frames should be flipped
+    for (let f = 0; f <= 1; f++) {
+      const cel = asset.getCel(1, f);
+      if (cel && 'data' in cel) {
+        expect(cel.data[0]).toEqual([4, 3, 2, 1]);
+      }
+    }
+  });
+
+  it('frame_range undo/redo restores and reapplies all frames', async () => {
+    const asset = workspace.loadedAssets.get('test_sprite');
+    if (!asset) throw new Error('Asset missing');
+    asset.addFrame({ index: 1, duration_ms: 100 });
+    asset.setCel(1, 1, {
+      x: 0,
+      y: 0,
+      data: [
+        [1, 2, 3, 4],
+        [5, 6, 7, 8],
+        [9, 10, 11, 12],
+        [13, 14, 15, 16],
+      ],
+    });
+
+    await handler({
+      layer_id: 1,
+      frame_range: [0, 1],
+      operations: [{ action: 'flip_h' }],
+    });
+
+    // Verify flip applied to both frames
+    for (let f = 0; f <= 1; f++) {
+      const cel = asset.getCel(1, f);
+      if (cel && 'data' in cel) expect(cel.data[0][0]).toBe(4);
+    }
+
+    workspace.undo();
+
+    // After undo, both frames revert
+    const cel0 = asset.getCel(1, 0);
+    if (cel0 && 'data' in cel0) expect(cel0.data[0][0]).toBe(1);
+    const cel1 = asset.getCel(1, 1);
+    if (cel1 && 'data' in cel1) expect(cel1.data[0][0]).toBe(1);
+
+    workspace.redo();
+
+    // After redo, both frames are re-flipped
+    for (let f = 0; f <= 1; f++) {
+      const cel = asset.getCel(1, f);
+      if (cel && 'data' in cel) expect(cel.data[0][0]).toBe(4);
+    }
+  });
+
+  it('frame_range and frame_index are mutually exclusive', async () => {
+    const r = (await handler({
+      layer_id: 1,
+      frame_index: 0,
+      frame_range: [0, 0],
+      operations: [{ action: 'flip_h' }],
+    })) as HandlerResult;
+
+    expect(r.isError).toBe(true);
+    expect(r.content?.[0]?.text).toContain('mutually exclusive');
+  });
+
+  it('frame_range returns error for invalid bounds', async () => {
+    const r = (await handler({
+      layer_id: 1,
+      frame_range: [0, 99],
+      operations: [{ action: 'flip_h' }],
+    })) as HandlerResult;
+
+    expect(r.isError).toBe(true);
+    expect(r.content?.[0]?.text).toContain('invalid');
+  });
+
   it('undo/redo: reverts and reinstates batched command', async () => {
     await handler({
       layer_id: 1,

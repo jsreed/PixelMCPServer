@@ -461,4 +461,87 @@ describe('effect tool', () => {
     const d3 = getCelData();
     expect(d3?.[0][0]).toBe(10); // Re-applied
   });
+
+  // ─── frame_range tests ───────────────────────────────────────────────────
+
+  it('frame_range applies effect across multiple frames', async () => {
+    const asset = loadAsset();
+    // Add a second frame
+    asset.addFrame({ index: 1, duration_ms: 100 });
+
+    const r = (await handler({
+      layer_id: 1,
+      frame_range: [0, 1],
+      operations: [{ action: 'checkerboard', color1: 10, color2: 20 }],
+    })) as HandlerResult;
+
+    expect(r.isError).toBeUndefined();
+
+    // Both frames should have the checkerboard pattern
+    for (let f = 0; f <= 1; f++) {
+      const cel = asset.getCel(1, f);
+      if (cel && 'data' in cel) {
+        expect(cel.data[0][0]).toBe(10);
+        expect(cel.data[0][1]).toBe(20);
+      }
+    }
+  });
+
+  it('frame_range undo/redo restores and reapplies all frames', async () => {
+    const asset = loadAsset();
+    asset.addFrame({ index: 1, duration_ms: 100 });
+
+    await handler({
+      layer_id: 1,
+      frame_range: [0, 1],
+      operations: [{ action: 'checkerboard', color1: 10, color2: 20 }],
+    });
+
+    // Verify checkerboard applied to both frames
+    for (let f = 0; f <= 1; f++) {
+      const cel = asset.getCel(1, f);
+      if (cel && 'data' in cel) expect(cel.data[0][0]).toBe(10);
+    }
+
+    workspace.undo();
+
+    // After undo, both frames revert to zeroed data
+    for (let f = 0; f <= 1; f++) {
+      const cel = asset.getCel(1, f);
+      if (cel && 'data' in cel) expect(cel.data[0][0]).toBe(0);
+    }
+
+    workspace.redo();
+
+    // After redo, both frames have checkerboard again
+    for (let f = 0; f <= 1; f++) {
+      const cel = asset.getCel(1, f);
+      if (cel && 'data' in cel) expect(cel.data[0][0]).toBe(10);
+    }
+  });
+
+  it('frame_range and frame_index are mutually exclusive', async () => {
+    loadAsset();
+    const r = (await handler({
+      layer_id: 1,
+      frame_index: 0,
+      frame_range: [0, 0],
+      operations: [{ action: 'cleanup_orphans' }],
+    })) as HandlerResult;
+
+    expect(r.isError).toBe(true);
+    expect(r.content?.[0]?.text).toContain('mutually exclusive');
+  });
+
+  it('frame_range returns error for invalid bounds', async () => {
+    loadAsset();
+    const r = (await handler({
+      layer_id: 1,
+      frame_range: [0, 99],
+      operations: [{ action: 'cleanup_orphans' }],
+    })) as HandlerResult;
+
+    expect(r.isError).toBe(true);
+    expect(r.content?.[0]?.text).toContain('invalid');
+  });
 });
