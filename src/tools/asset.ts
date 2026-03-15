@@ -129,12 +129,7 @@ const assetInputSchema = {
     .min(0)
     .optional()
     .describe('Nine-slice bottom margin in pixels'),
-  nine_slice_left: z
-    .number()
-    .int()
-    .min(0)
-    .optional()
-    .describe('Nine-slice left margin in pixels'),
+  nine_slice_left: z.number().int().min(0).optional().describe('Nine-slice left margin in pixels'),
   palette: z.array(z.array(z.number().int())).optional().describe('Initial palette for create'),
   layers: z
     .array(z.object({ name: z.string(), type: z.enum(['image', 'tilemap', 'shape']) }))
@@ -530,7 +525,12 @@ async function handleCreate(workspace: Workspace, args: Record<string, unknown>)
   const nsRight = args.nine_slice_right as number | undefined;
   const nsBottom = args.nine_slice_bottom as number | undefined;
   const nsLeft = args.nine_slice_left as number | undefined;
-  if (nsTop !== undefined || nsRight !== undefined || nsBottom !== undefined || nsLeft !== undefined) {
+  if (
+    nsTop !== undefined ||
+    nsRight !== undefined ||
+    nsBottom !== undefined ||
+    nsLeft !== undefined
+  ) {
     assetData.nine_slice = {
       top: nsTop ?? 0,
       right: nsRight ?? 0,

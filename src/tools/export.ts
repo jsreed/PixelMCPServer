@@ -376,7 +376,12 @@ function buildAtlasPixels(
     }
   }
 
-  return { buffer: atlasBuffer, width: outWidth, height: outHeight, placements: packResult.placements };
+  return {
+    buffer: atlasBuffer,
+    width: outWidth,
+    height: outHeight,
+    placements: packResult.placements,
+  };
 }
 
 async function handleAtlasExport(
@@ -746,7 +751,11 @@ async function handleGodotUiFrameExport(
   const importSidecar = generateGodotImportSidecar(pngName);
   await fs.promises.writeFile(`${pngPath}.import`, importSidecar);
 
-  const tresContent = godotResources.generateGodotStyleBoxTexture(pngName, asset.nine_slice, scaleFactor);
+  const tresContent = godotResources.generateGodotStyleBoxTexture(
+    pngName,
+    asset.nine_slice,
+    scaleFactor,
+  );
   const tresPath = path.join(dirName, `${baseName}.tres`);
   await fs.promises.writeFile(tresPath, tresContent);
 

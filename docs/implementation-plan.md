@@ -627,11 +627,11 @@ An interactive pixel art editor that renders **inline in the conversation** usin
 
 ### 7.2 Server-side: Editor Tool & Resource
 
-- [ ] **7.2.1** **`src/tools/editor.ts`** — uses `registerAppTool()` from `@modelcontextprotocol/ext-apps/server` (not `server.registerTool()`):
+- [x] **7.2.1** **`src/tools/editor.ts`** — uses `registerAppTool()` from `@modelcontextprotocol/ext-apps/server` (not `server.registerTool()`):
   - `open_editor({ asset_name })` — loads asset if not loaded; returns `structuredContent` with full asset state (palette, layers, frame list, tags, cels for frame 0) for the UI, and a brief text summary in `content` for the LLM; declares `_meta: { ui: { resourceUri: "ui://pixel-editor/app.html" } }`
   - `get_asset_state({ asset_name, frame_index? })` — returns cels + metadata for the given frame in `structuredContent`; declared with `visibility: ["app"]` so it only appears to the UI, not the LLM; called by the UI to refresh after any edit or AI tool call
-- [ ] **7.2.2** **`src/resources/editor.ts`** — uses `registerAppResource()` from `@modelcontextprotocol/ext-apps/server` to register `ui://pixel-editor/app.html`; reads `dist/app/app.html` and returns it (the SDK handles the MIME type)
-- [ ] **7.2.3** **Wire into `src/index.ts`** — call `registerEditorTool` and `registerEditorResource`
+- [x] **7.2.2** **`src/resources/editor.ts`** — uses `registerAppResource()` from `@modelcontextprotocol/ext-apps/server` to register `ui://pixel-editor/app.html`; reads `dist/app/app.html` and returns it (the SDK handles the MIME type)
+- [x] **7.2.3** **Wire into `src/index.ts`** — call `registerEditorTool` and `registerEditorResource`
 
 ---
 

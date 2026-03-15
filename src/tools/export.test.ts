@@ -526,7 +526,7 @@ describe('Export Tool', () => {
       const tresPath = path.join(TEST_DIR, 'e2e_ui_frame.tres');
       const tresData = fs.readFileSync(tresPath, 'utf8');
       expect(tresData).toContain('type="StyleBoxTexture"');
-      expect(tresData).toContain('texture_margin_top = 2.0');    // 1 * 2
+      expect(tresData).toContain('texture_margin_top = 2.0'); // 1 * 2
       expect(tresData).toContain('texture_margin_right = 2.0');
       expect(tresData).toContain('texture_margin_bottom = 2.0');
       expect(tresData).toContain('texture_margin_left = 2.0');
@@ -540,7 +540,12 @@ describe('Export Tool', () => {
           width: 4,
           height: 4,
           perspective: 'flat' as const,
-          palette: Array.from({ length: 256 }, (_, i) => [i === 1 ? 255 : 0, 0, 0, i === 0 ? 0 : 255]),
+          palette: Array.from({ length: 256 }, (_, i) => [
+            i === 1 ? 255 : 0,
+            0,
+            0,
+            i === 0 ? 0 : 255,
+          ]),
           layers: [{ id: 1, name: 'layer1', type: 'image' as const, visible: true, opacity: 255 }],
           frames: [{ index: 0, duration_ms: 100 }],
           tags: [],

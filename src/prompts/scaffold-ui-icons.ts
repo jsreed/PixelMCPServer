@@ -107,7 +107,11 @@ export function registerScaffoldUiIconsPrompt(server: McpServer): void {
       description:
         'Guide through creating a set of UI icon assets and exporting them as a packed Godot atlas with named AtlasTexture sub-resources.',
       argsSchema: {
-        name: z.string().describe('Base name for the icon set; individual icons are named {name}_01, {name}_02, etc.'),
+        name: z
+          .string()
+          .describe(
+            'Base name for the icon set; individual icons are named {name}_01, {name}_02, etc.',
+          ),
         icon_size: z
           .number()
           .int()

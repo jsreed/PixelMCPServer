@@ -28,7 +28,9 @@ import { registerTransformTool } from './tools/transform.js';
 import { registerEffectTool } from './tools/effect.js';
 import { registerTilesetTool } from './tools/tileset.js';
 import { registerExportTool } from './tools/export.js';
+import { registerEditorTool } from './tools/editor.js';
 import { registerResources } from './resources/index.js';
+import { registerEditorResource } from './resources/editor.js';
 import { registerScaffoldCharacterPrompt } from './prompts/scaffold-character.js';
 import { registerScaffoldTilesetPrompt } from './prompts/scaffold-tileset.js';
 import { registerScaffoldEquipmentPrompt } from './prompts/scaffold-equipment.js';
@@ -54,7 +56,9 @@ registerTransformTool(server);
 registerEffectTool(server);
 registerTilesetTool(server);
 registerExportTool(server);
+registerEditorTool(server);
 registerResources(server);
+registerEditorResource(server);
 
 // Register all prompt handlers
 registerScaffoldCharacterPrompt(server);

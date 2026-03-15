@@ -139,10 +139,12 @@ describe('godot-resources', () => {
 
   describe('generateGodotStyleBoxTexture', () => {
     test('generates StyleBoxTexture with correct margins', () => {
-      const res = generateGodotStyleBoxTexture(
-        'panels/dialog.png',
-        { top: 4, right: 6, bottom: 8, left: 10 },
-      );
+      const res = generateGodotStyleBoxTexture('panels/dialog.png', {
+        top: 4,
+        right: 6,
+        bottom: 8,
+        left: 10,
+      });
       expect(res).toContain('[gd_resource type="StyleBoxTexture" load_steps=2 format=3]');
       expect(res).toContain('path="res://panels/dialog.png"');
       expect(res).toContain('texture_margin_left = 10.0');
@@ -164,10 +166,12 @@ describe('godot-resources', () => {
     });
 
     test('formats margins with one decimal place', () => {
-      const res = generateGodotStyleBoxTexture(
-        'panel.png',
-        { top: 8, right: 8, bottom: 8, left: 8 },
-      );
+      const res = generateGodotStyleBoxTexture('panel.png', {
+        top: 8,
+        right: 8,
+        bottom: 8,
+        left: 8,
+      });
       expect(res).toContain('texture_margin_left = 8.0');
       expect(res).toContain('texture_margin_top = 8.0');
       // Should NOT have "8" without decimal
@@ -191,9 +195,7 @@ describe('godot-resources', () => {
     });
 
     test('sanitizes IDs (hyphens to underscores)', () => {
-      const placements: PackPlacement[] = [
-        { id: 'my-icon', x: 0, y: 0, width: 8, height: 8 },
-      ];
+      const placements: PackPlacement[] = [{ id: 'my-icon', x: 0, y: 0, width: 8, height: 8 }];
       const res = generateGodotAtlasTextures('atlas.png', placements);
       expect(res).toContain('AtlasTexture_my_icon');
       expect(res).not.toContain('my-icon');
