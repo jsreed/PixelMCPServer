@@ -797,8 +797,8 @@ Features that produce richer Godot `.tres` resources for direct import without m
 
 #### 8B.3 TileSet Occlusion Polygons
 
-- [ ] **8B.3.1** **Extend `set_tile_physics` with `occlusion_polygon`** — add optional param to Zod schema, store alongside physics polygon in `tile_physics`.
-- [ ] **8B.3.2** **Emit occlusion layer in `godot_tileset` `.tres`** — include occlusion polygon data for tiles that have it.
+- [x] **8B.3.1** **Extend `set_tile_physics` with `occlusion_polygon`** — add optional param to Zod schema, store alongside physics polygon in `tile_physics`.
+- [x] **8B.3.2** **Emit occlusion layer in `godot_tileset` `.tres`** — include occlusion polygon data for tiles that have it.
 
 #### 8B.4 Tile Alternatives
 

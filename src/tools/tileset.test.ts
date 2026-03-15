@@ -303,6 +303,96 @@ describe('tileset tool', () => {
       workspace.undo(); // undo set
       expect(asset.tile_physics?.tiles['0'].polygon).toBeUndefined();
     });
+
+    describe('occlusion_polygon', () => {
+      it('sets occlusion polygon on a tile', async () => {
+        const result = await callTool({
+          action: 'set_tile_physics',
+          tile_index: 0,
+          occlusion_polygon: [
+            [0, 0],
+            [16, 0],
+            [16, 16],
+            [0, 16],
+          ],
+        });
+        expect(result.isError).toBeFalsy();
+        const asset = workspace.loadedAssets.get('test_tileset');
+        if (!asset) throw new Error('Asset missing');
+        expect(asset.tile_physics?.tiles['0']?.occlusion_polygon).toEqual([
+          [0, 0],
+          [16, 0],
+          [16, 16],
+          [0, 16],
+        ]);
+      });
+
+      it('clears occlusion polygon with empty array', async () => {
+        await callTool({
+          action: 'set_tile_physics',
+          tile_index: 0,
+          occlusion_polygon: [
+            [0, 0],
+            [16, 0],
+            [16, 16],
+          ],
+        });
+        const asset = workspace.loadedAssets.get('test_tileset');
+        if (!asset) throw new Error('Asset missing');
+        expect(asset.tile_physics?.tiles['0']?.occlusion_polygon).toBeDefined();
+
+        await callTool({
+          action: 'set_tile_physics',
+          tile_index: 0,
+          occlusion_polygon: [],
+        });
+        expect(asset.tile_physics?.tiles['0']?.occlusion_polygon).toBeUndefined();
+      });
+
+      it('stores occlusion alongside physics and navigation polygons', async () => {
+        const asset = workspace.loadedAssets.get('test_tileset');
+        if (!asset) throw new Error('Asset missing');
+        await callTool({
+          action: 'set_tile_physics',
+          tile_index: 0,
+          physics_polygon: [
+            [0, 0],
+            [16, 0],
+            [16, 16],
+            [0, 16],
+          ],
+        });
+        await callTool({
+          action: 'set_tile_physics',
+          tile_index: 0,
+          navigation_polygon: [
+            [2, 2],
+            [14, 2],
+            [14, 14],
+            [2, 14],
+          ],
+        });
+        await callTool({
+          action: 'set_tile_physics',
+          tile_index: 0,
+          occlusion_polygon: [
+            [1, 1],
+            [15, 1],
+            [15, 15],
+            [1, 15],
+          ],
+        });
+        const entry = asset.tile_physics?.tiles['0'];
+        expect(entry?.polygon).toBeDefined();
+        expect(entry?.navigation_polygon).toBeDefined();
+        expect(entry?.occlusion_polygon).toEqual([
+          [1, 1],
+          [15, 1],
+          [15, 15],
+          [1, 15],
+        ]);
+      });
+    });
   });
 
   describe('set_tile_animation', () => {

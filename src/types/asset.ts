@@ -42,6 +42,7 @@ export interface TilePhysicsLayer {
 export interface TilePhysicsEntry {
   polygon?: [number, number][];
   navigation_polygon?: [number, number][];
+  occlusion_polygon?: [number, number][];
 }
 
 /**

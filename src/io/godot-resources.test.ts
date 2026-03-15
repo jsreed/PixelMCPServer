@@ -503,6 +503,106 @@ describe('godot-resources', () => {
       expect(res).not.toContain('custom_data_layer');
     });
 
+    test('emits occlusion layer definition when tiles have occlusion data', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 2,
+        tile_physics: {
+          physics_layers: [{ collision_layer: 1, collision_mask: 1 }],
+          tiles: {
+            '0': {
+              occlusion_polygon: [
+                [0, 0],
+                [16, 0],
+                [16, 16],
+                [0, 16],
+              ],
+            },
+          },
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      expect(res).toContain('occlusion_layer_0/light_mask = 1');
+    });
+
+    test('emits per-tile occlusion polygon', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 2,
+        tile_physics: {
+          physics_layers: [{ collision_layer: 1, collision_mask: 1 }],
+          tiles: {
+            '1': {
+              occlusion_polygon: [
+                [0, 0],
+                [16, 0],
+                [16, 16],
+                [0, 16],
+              ],
+            },
+          },
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      expect(res).toContain(
+        '1:0/0/occlusion_layer_0/polygon = PackedVector2Array(0, 0, 16, 0, 16, 16, 0, 16)',
+      );
+    });
+
+    test('scales occlusion polygon by scaleFactor', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 2,
+        tile_physics: {
+          physics_layers: [{ collision_layer: 1, collision_mask: 1 }],
+          tiles: {
+            '0': {
+              occlusion_polygon: [
+                [0, 0],
+                [8, 0],
+                [8, 8],
+                [0, 8],
+              ],
+            },
+          },
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 2);
+
+      expect(res).toContain(
+        '0:0/0/occlusion_layer_0/polygon = PackedVector2Array(0, 0, 16, 0, 16, 16, 0, 16)',
+      );
+    });
+
+    test('does not emit occlusion layer when no tiles have occlusion data', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 2,
+        tile_physics: {
+          physics_layers: [{ collision_layer: 1, collision_mask: 1 }],
+          tiles: {
+            '0': {
+              polygon: [
+                [0, 0],
+                [16, 0],
+                [16, 16],
+                [0, 16],
+              ],
+            },
+          },
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      expect(res).not.toContain('occlusion_layer');
+    });
+
     test('uses col=slot_index row=0 for high tile indices (horizontal strip layout)', () => {
       // blob47 uses bitmask values as slot indices — some are >= tile_count.
       // With the old sqrt(tile_count) formula, tile 255 on a 47-tile set would have

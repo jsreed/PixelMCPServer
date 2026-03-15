@@ -57,6 +57,10 @@ const tilesetInputSchema = {
     .array(z.tuple([z.number(), z.number()]))
     .optional()
     .describe('Navigation polygon vertices. Empty array to clear.'),
+  occlusion_polygon: z
+    .array(z.tuple([z.number(), z.number()]))
+    .optional()
+    .describe('Occlusion polygon vertices for light masking. Empty array to clear.'),
   physics_layer_index: z
     .number()
     .int()
@@ -602,6 +606,11 @@ export function registerTilesetTool(server: McpServer): void {
           if (args.navigation_polygon) {
             if (args.navigation_polygon.length === 0) delete entry.navigation_polygon;
             else entry.navigation_polygon = args.navigation_polygon;
+          }
+
+          if (args.occlusion_polygon) {
+            if (args.occlusion_polygon.length === 0) delete entry.occlusion_polygon;
+            else entry.occlusion_polygon = args.occlusion_polygon;
           }
 
           asset.tile_physics = Object.assign({}, physics); // trigger dirty

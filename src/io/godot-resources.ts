@@ -255,9 +255,15 @@ export function generateGodotTileSet(
     if (asset.tile_physics) {
       for (const tileStr of Object.keys(asset.tile_physics.tiles)) {
         const col = parseInt(tileStr, 10);
-        const poly = asset.tile_physics.tiles[tileStr].polygon;
-        if (poly && poly.length > 0) {
+        const tileEntry = asset.tile_physics.tiles[tileStr];
+        const poly = tileEntry.polygon;
+        const occPoly = tileEntry.occlusion_polygon;
+
+        if ((poly && poly.length > 0) || (occPoly && occPoly.length > 0)) {
           tres += `${String(col)}:0/0 = 0\n`;
+        }
+
+        if (poly && poly.length > 0) {
           const points = poly
             .map(
               (pt: [number, number]) =>
@@ -265,6 +271,16 @@ export function generateGodotTileSet(
             )
             .join(', ');
           tres += `${String(col)}:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(${points})\n`;
+        }
+
+        if (occPoly && occPoly.length > 0) {
+          const points = occPoly
+            .map(
+              (pt: [number, number]) =>
+                `${String(pt[0] * scaleFactor)}, ${String(pt[1] * scaleFactor)}`,
+            )
+            .join(', ');
+          tres += `${String(col)}:0/0/occlusion_layer_0/polygon = PackedVector2Array(${points})\n`;
         }
       }
     }
@@ -322,6 +338,12 @@ export function generateGodotTileSet(
   tres += `tile_size = Vector2i(${String(tileW)}, ${String(tileH)})\n`;
   if (asset.tile_physics) {
     tres += `physics_layer_0/collision_layer = 1\n`;
+    const hasOcclusion = Object.values(asset.tile_physics.tiles).some(
+      (entry) => entry.occlusion_polygon && entry.occlusion_polygon.length > 0,
+    );
+    if (hasOcclusion) {
+      tres += `occlusion_layer_0/light_mask = 1\n`;
+    }
   }
   if (asset.tile_terrain) {
     let mode = 0; // MATCH_CORNERS_AND_SIDES
