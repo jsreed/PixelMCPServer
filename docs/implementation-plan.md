@@ -647,9 +647,9 @@ An interactive pixel art editor that renders **inline in the conversation** usin
 
 ### 7.4 UI: Palette Panel (`src/app/palette.ts`)
 
-- [ ] **7.4.1** **Color swatch grid** — renders all non-null palette entries as colored squares (skip index 0 or render as checkerboard for transparent)
-- [ ] **7.4.2** **Active color selection** — click a swatch → set `activeColorIndex`; selected swatch gets a highlight border
-- [ ] **7.4.3** **Hover tooltip** — shows `[${index}] #${hexRGBA}` on mouse-over
+- [x] **7.4.1** **Color swatch grid** — renders all non-null palette entries as colored squares (skip index 0 or render as checkerboard for transparent)
+- [x] **7.4.2** **Active color selection** — click a swatch → set `activeColorIndex`; selected swatch gets a highlight border
+- [x] **7.4.3** **Hover tooltip** — shows `[${index}] #${hexRGBA}` on mouse-over
 
 ---
 
