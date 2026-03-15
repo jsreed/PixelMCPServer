@@ -239,6 +239,116 @@ describe('palette tool', () => {
     expect(result.content[0].text).toContain('color1 < color2');
   });
 
+  it('generate_ramp with hue_shift_start and hue_shift_end produces different intermediates', async () => {
+    const asset = getAsset('sprite');
+    // Set red and blue endpoints
+    asset.palette.set(30, [255, 0, 0, 255]);
+    asset.palette.set(34, [0, 0, 255, 255]);
+
+    // Get plain ramp intermediates first
+    await handler({ action: 'generate_ramp', asset_name: 'sprite', color1: 30, color2: 34 });
+    const plainMid = [...asset.palette.get(32)];
+
+    // Undo and redo with hue shift
+    workspace.undo();
+
+    const result = await handler({
+      action: 'generate_ramp',
+      asset_name: 'sprite',
+      color1: 30,
+      color2: 34,
+      hue_shift_start: 60,
+      hue_shift_end: -60,
+    });
+
+    expect(result.isError).toBeUndefined();
+
+    const shiftedMid = asset.palette.get(32);
+    const differs =
+      plainMid[0] !== shiftedMid[0] ||
+      plainMid[1] !== shiftedMid[1] ||
+      plainMid[2] !== shiftedMid[2];
+    expect(differs).toBe(true);
+  });
+
+  it('generate_ramp with hue shift preserves endpoints', async () => {
+    const asset = getAsset('sprite');
+    asset.palette.set(40, [255, 0, 0, 255]);
+    asset.palette.set(44, [0, 255, 0, 255]);
+
+    await handler({
+      action: 'generate_ramp',
+      asset_name: 'sprite',
+      color1: 40,
+      color2: 44,
+      hue_shift_start: 90,
+      hue_shift_end: 90,
+    });
+
+    expect(asset.palette.get(40)).toEqual([255, 0, 0, 255]);
+    expect(asset.palette.get(44)).toEqual([0, 255, 0, 255]);
+  });
+
+  it('generate_ramp with hue shift includes "(hue-shifted)" in response message', async () => {
+    const asset = getAsset('sprite');
+    asset.palette.set(50, [255, 0, 0, 255]);
+    asset.palette.set(54, [0, 0, 255, 255]);
+
+    const result = await handler({
+      action: 'generate_ramp',
+      asset_name: 'sprite',
+      color1: 50,
+      color2: 54,
+      hue_shift_start: 30,
+    });
+
+    expect(result.isError).toBeUndefined();
+    const data = JSON.parse(result.content[0].text) as { message: string };
+    expect(data.message).toContain('(hue-shifted)');
+  });
+
+  it('generate_ramp without hue shift does not include "(hue-shifted)" in response', async () => {
+    const asset = getAsset('sprite');
+    asset.palette.set(60, [255, 0, 0, 255]);
+    asset.palette.set(64, [0, 0, 255, 255]);
+
+    const result = await handler({
+      action: 'generate_ramp',
+      asset_name: 'sprite',
+      color1: 60,
+      color2: 64,
+    });
+
+    expect(result.isError).toBeUndefined();
+    const data = JSON.parse(result.content[0].text) as { message: string };
+    expect(data.message).not.toContain('(hue-shifted)');
+  });
+
+  it('hue-shifted ramp is undoable', async () => {
+    const asset = getAsset('sprite');
+    asset.palette.set(70, [255, 0, 0, 255]);
+    asset.palette.set(74, [0, 0, 255, 255]);
+
+    // Record original state of intermediates (should be transparent/zeroed)
+    const beforeMid = [...asset.palette.get(72)];
+
+    await handler({
+      action: 'generate_ramp',
+      asset_name: 'sprite',
+      color1: 70,
+      color2: 74,
+      hue_shift_start: 45,
+    });
+
+    // Intermediates should now be set
+    const afterMid = asset.palette.get(72);
+    expect(afterMid).not.toEqual(beforeMid);
+
+    // Undo should restore original state
+    workspace.undo();
+    expect(asset.palette.get(72)).toEqual(beforeMid);
+  });
+
   // ─── save action ─────────────────────────────────────────────────
 
   it('save writes palette to file', async () => {

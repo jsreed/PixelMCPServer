@@ -91,4 +91,56 @@ describe('PaletteClass', () => {
     const restored = PaletteClass.fromJSON(tooLong);
     expect(restored.toJSON().length).toBe(256);
   });
+
+  // ─── generateRamp with hue shifting ──────────────────────────────
+
+  it('generateRamp with hue shift produces different intermediates than without', () => {
+    const palette = new PaletteClass();
+    // Use red and blue as endpoints
+    palette.set(0, [255, 0, 0, 255]);
+    palette.set(4, [0, 0, 255, 255]);
+
+    const paletteShifted = PaletteClass.fromJSON(palette.toJSON());
+    palette.generateRamp(0, 4);
+    paletteShifted.generateRamp(0, 4, 30, 0);
+
+    // Intermediate at index 2 should differ
+    const plain = palette.get(2);
+    const shifted = paletteShifted.get(2);
+    // At least one channel should differ
+    const differs = plain[0] !== shifted[0] || plain[1] !== shifted[1] || plain[2] !== shifted[2];
+    expect(differs).toBe(true);
+  });
+
+  it('generateRamp with hue shift preserves endpoints', () => {
+    const palette = new PaletteClass();
+    palette.set(0, [255, 0, 0, 255]);
+    palette.set(4, [0, 0, 255, 255]);
+
+    palette.generateRamp(0, 4, 45, -45);
+
+    // Endpoints must not be overwritten
+    expect(palette.get(0)).toEqual([255, 0, 0, 255]);
+    expect(palette.get(4)).toEqual([0, 0, 255, 255]);
+  });
+
+  it('generateRamp with only hueShiftStart provided does not throw', () => {
+    const palette = new PaletteClass();
+    palette.set(0, [255, 0, 0, 255]);
+    palette.set(3, [0, 255, 0, 255]);
+
+    expect(() => {
+      palette.generateRamp(0, 3, 60);
+    }).not.toThrow();
+  });
+
+  it('generateRamp with only hueShiftEnd provided does not throw', () => {
+    const palette = new PaletteClass();
+    palette.set(0, [255, 0, 0, 255]);
+    palette.set(3, [0, 255, 0, 255]);
+
+    expect(() => {
+      palette.generateRamp(0, 3, undefined, 60);
+    }).not.toThrow();
+  });
 });

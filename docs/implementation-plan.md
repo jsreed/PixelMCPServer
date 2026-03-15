@@ -740,8 +740,8 @@ High-impact features that reduce round trips and unlock common LLM pixel art wor
 
 #### 8A.4 Hue-Shifting in generate_ramp
 
-- [ ] **8A.4.1** **HSL conversion utilities** (`src/algorithms/color-utils.ts`) — `rgbaToHsl()` and `hslToRgba()` pure functions. Unit tested independently.
-- [ ] **8A.4.2** **Hue-shifted ramp generation** — extend `Palette.generateRamp()` (or the palette tool handler) to accept `hue_shift_start` and `hue_shift_end`. Convert endpoints to HSL, apply hue rotation, interpolate in HSL space, convert back to RGBA, snap to nearest existing palette entry or write directly.
+- [x] **8A.4.1** **HSL conversion utilities** (`src/algorithms/color-utils.ts`) — `rgbaToHsl()` and `hslToRgba()` pure functions. Unit tested independently.
+- [x] **8A.4.2** **Hue-shifted ramp generation** — extend `Palette.generateRamp()` (or the palette tool handler) to accept `hue_shift_start` and `hue_shift_end`. Convert endpoints to HSL, apply hue rotation, interpolate in HSL space, convert back to RGBA, snap to nearest existing palette entry or write directly.
 
 #### 8A.5 Selective Outline Effect
 

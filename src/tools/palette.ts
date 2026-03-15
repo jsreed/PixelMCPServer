@@ -30,6 +30,18 @@ const paletteInputSchema = {
     .describe('Array of {index, rgba} for set_bulk'),
   color1: z.number().int().optional().describe('Start palette index for generate_ramp'),
   color2: z.number().int().optional().describe('End palette index for generate_ramp'),
+  hue_shift_start: z
+    .number()
+    .min(-360)
+    .max(360)
+    .optional()
+    .describe('Hue rotation degrees (-360 to +360) for start color in generate_ramp'),
+  hue_shift_end: z
+    .number()
+    .min(-360)
+    .max(360)
+    .optional()
+    .describe('Hue rotation degrees (-360 to +360) for end color in generate_ramp'),
   name: z.string().optional().describe('Palette name for save, or Lospec slug for fetch_lospec'),
   path: z.string().optional().describe('File path for load/save (relative to pixelmcp.json)'),
 };
@@ -73,7 +85,14 @@ export function registerPaletteTool(server: McpServer): void {
         case 'swap':
           return handleSwap(workspace, asset, args.index, args.index2);
         case 'generate_ramp':
-          return handleGenerateRamp(workspace, asset, args.color1, args.color2);
+          return handleGenerateRamp(
+            workspace,
+            asset,
+            args.color1,
+            args.color2,
+            args.hue_shift_start,
+            args.hue_shift_end,
+          );
         case 'load':
           return handleLoad(workspace, asset, args.path);
         case 'save':
@@ -227,6 +246,8 @@ function handleGenerateRamp(
   asset: Asset,
   color1: number | undefined,
   color2: number | undefined,
+  hueShiftStart: number | undefined,
+  hueShiftEnd: number | undefined,
 ) {
   if (color1 === undefined || color2 === undefined) {
     return errors.invalidArgument('palette generate_ramp requires "color1" and "color2".');
@@ -234,19 +255,20 @@ function handleGenerateRamp(
 
   try {
     const cmd = new PaletteCommand(asset.palette, () => {
-      asset.palette.generateRamp(color1, color2);
+      asset.palette.generateRamp(color1, color2, hueShiftStart, hueShiftEnd);
     });
     workspace.pushCommand(cmd);
   } catch (e: unknown) {
     return errors.domainError(e instanceof Error ? e.message : String(e));
   }
 
+  const hueShifted = hueShiftStart !== undefined || hueShiftEnd !== undefined;
   return {
     content: [
       {
         type: 'text' as const,
         text: JSON.stringify({
-          message: `Ramp generated from index ${String(color1)} to ${String(color2)}.`,
+          message: `Ramp generated from index ${String(color1)} to ${String(color2)}${hueShifted ? ' (hue-shifted)' : ''}.`,
         }),
       },
       createResourceLink(asset.name, `pixel://view/palette/${asset.name}`),

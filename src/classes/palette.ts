@@ -1,5 +1,6 @@
 import { type Palette, type Color, isValidColor } from '../types/palette.js';
 import * as errors from '../errors.js';
+import { generateHslRamp } from '../algorithms/color-utils.js';
 
 export const MAX_COLORS = 256;
 
@@ -73,11 +74,15 @@ export class PaletteClass {
   }
 
   /**
-   * Linearly interpolates RGBA between two palette indices, filling all entries
-   * between start and end inclusive. The colors at start and end are preserved.
+   * Interpolates between two palette indices, filling all entries between start and end
+   * inclusive. The colors at start and end are preserved.
    * Requires start < end and both endpoints to have defined (non-transparent) colors.
+   *
+   * When hueShiftStart or hueShiftEnd is provided, interpolation is performed in HSL
+   * space with shortest-arc hue blending and the specified hue rotations applied to
+   * the endpoints before interpolating. Otherwise, plain RGB linear interpolation is used.
    */
-  generateRamp(start: number, end: number): void {
+  generateRamp(start: number, end: number, hueShiftStart?: number, hueShiftEnd?: number): void {
     this.validateIndex(start);
     this.validateIndex(end);
     if (start >= end) {
@@ -96,13 +101,31 @@ export class PaletteClass {
     }
 
     const steps = end - start;
-    for (let i = 1; i < steps; i++) {
-      const t = i / steps;
-      const r = Math.round(c1[0] + (c2[0] - c1[0]) * t);
-      const g = Math.round(c1[1] + (c2[1] - c1[1]) * t);
-      const b = Math.round(c1[2] + (c2[2] - c1[2]) * t);
-      const a = Math.round(c1[3] + (c2[3] - c1[3]) * t);
-      this.colors[start + i] = [r, g, b, a] as Color;
+
+    if (hueShiftStart !== undefined || hueShiftEnd !== undefined) {
+      // HSL interpolation path with optional hue rotation on endpoints
+      const rampColors = generateHslRamp(
+        [c1[0], c1[1], c1[2], c1[3]],
+        [c2[0], c2[1], c2[2], c2[3]],
+        steps + 1, // includes endpoints
+        hueShiftStart ?? 0,
+        hueShiftEnd ?? 0,
+      );
+      // Write only intermediate entries (preserve endpoints)
+      for (let i = 1; i < steps; i++) {
+        const rgba = rampColors[i] ?? ([0, 0, 0, 0] as Color);
+        this.colors[start + i] = [rgba[0], rgba[1], rgba[2], rgba[3]] as Color;
+      }
+    } else {
+      // Original RGB linear interpolation path
+      for (let i = 1; i < steps; i++) {
+        const t = i / steps;
+        const r = Math.round(c1[0] + (c2[0] - c1[0]) * t);
+        const g = Math.round(c1[1] + (c2[1] - c1[1]) * t);
+        const b = Math.round(c1[2] + (c2[2] - c1[2]) * t);
+        const a = Math.round(c1[3] + (c2[3] - c1[3]) * t);
+        this.colors[start + i] = [r, g, b, a] as Color;
+      }
     }
   }
 
