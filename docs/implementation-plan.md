@@ -690,12 +690,12 @@ An interactive pixel art editor that renders **inline in the conversation** usin
 
 ---
 
-### 7.9 UI: App Shell & State (`src/app/app.ts`)
+### 7.9 UI: App Shell & State (`src/app/app.tsx`)
 
-- [ ] **7.9.1** **`App` from `@modelcontextprotocol/ext-apps`** — register all handlers (`ontoolresult`, `onhostcontextchanged`, `onteardown`) **before** calling `app.connect()` to avoid missing the initial tool result; `app.ontoolresult` receives initial asset state from `open_editor` via `structuredContent` and triggers first render
-- [ ] **7.9.2** **Top-level state** — `{ assetName, width, height, palette, layers, frames, tags, cels, activeLayerId, activeColorIndex, currentFrame, isPlaying, selection }`
-- [ ] **7.9.3** **Status bar** — shows active tool, active layer name, active palette color swatch + index, last AI operation
-- [ ] **7.9.4** **Auto-refresh on AI edits** — `ontoolresult` also fires when the AI calls tools (draw, transform, etc.); on receipt, call `get_asset_state` to sync canvas with any AI-made changes
+- [x] **7.9.1** **`App` from `@modelcontextprotocol/ext-apps`** — register all handlers (`ontoolresult`, `onhostcontextchanged`, `onteardown`) **before** calling `app.connect()` to avoid missing the initial tool result; `app.ontoolresult` receives initial asset state from `open_editor` via `structuredContent` and triggers first render
+- [x] **7.9.2** **Top-level state** — `{ assetName, width, height, palette, layers, frames, tags, cels, activeLayerId, activeColorIndex, currentFrame, isPlaying, selection }`
+- [x] **7.9.3** **Status bar** — shows active tool, active layer name, active palette color swatch + index, last AI operation
+- [x] **7.9.4** **Auto-refresh on AI edits** — `ontoolresult` also fires when the AI calls tools (draw, transform, etc.); on receipt, call `get_asset_state` to sync canvas with any AI-made changes
 
 ---
 

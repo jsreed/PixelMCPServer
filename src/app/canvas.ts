@@ -156,6 +156,7 @@ export class CanvasRenderer {
   private _artHeight = 0;
   private _frameIndex = 0;
   private abortController = new AbortController();
+  private _onViewChange: (() => void) | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -183,6 +184,7 @@ export class CanvasRenderer {
   private applyTransform(): void {
     this.canvas.style.transform =
       `translate(${String(this._offsetX)}px, ${String(this._offsetY)}px) scale(${String(this._zoom)})`;
+    this._onViewChange?.();
   }
 
   private attachWheelListener(): void {
@@ -307,6 +309,11 @@ export class CanvasRenderer {
 
   get canvasContainer(): HTMLElement {
     return this.container;
+  }
+
+  /** Register a callback that fires whenever zoom or pan changes. */
+  set onViewChange(cb: (() => void) | null) {
+    this._onViewChange = cb;
   }
 
   /**
