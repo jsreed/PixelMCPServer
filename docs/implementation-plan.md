@@ -731,8 +731,8 @@ High-impact features that reduce round trips and unlock common LLM pixel art wor
 
 #### 8A.2 Linked Cel Creation
 
-- [ ] **8A.2.1** **`LinkCelCommand`** (`src/commands/link-cel-command.ts`) — captures the target cel's existing data on construction, replaces with a link reference on `execute()`, restores original data on `undo()`.
-- [ ] **8A.2.2** **`link_cel` action on asset tool** — add to Zod schema with `source_layer_id` and `source_frame_index` params. Validate source exists, reject self-link, validate matching layer types. Wrap in `LinkCelCommand`.
+- [x] **8A.2.1** **`LinkCelCommand`** (`src/commands/link-cel-command.ts`) — captures the target cel's existing data on construction, replaces with a link reference on `execute()`, restores original data on `undo()`.
+- [x] **8A.2.2** **`link_cel` action on asset tool** — add to Zod schema with `source_layer_id` and `source_frame_index` params. Validate source exists, reject self-link, validate matching layer types. Wrap in `LinkCelCommand`.
 
 #### 8A.3 Per-Layer Spritesheet Export
 

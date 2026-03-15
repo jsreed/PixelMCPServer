@@ -10,6 +10,7 @@ import { ResizeCommand } from '../commands/resize-command.js';
 import { RenameCommand } from '../commands/rename-command.js';
 import { AssetDeleteCommand } from '../commands/asset-delete-command.js';
 import { NineSliceCommand } from '../commands/nine-slice-command.js';
+import { LinkCelCommand } from '../commands/link-cel-command.js';
 import { saveAssetFile } from '../io/asset-io.js';
 import { loadPaletteFile } from '../io/palette-io.js';
 import { marchingSquares, simplifyOrthogonal } from '../algorithms/marching-squares.js';
@@ -24,7 +25,7 @@ import { type Color } from '../types/palette.js';
 import { type Frame } from '../types/frame.js';
 import { type Tag, type Facing } from '../types/tag.js';
 import { type Shape } from '../types/shape.js';
-import { packCelKey } from '../types/cel.js';
+import { type Cel, packCelKey } from '../types/cel.js';
 
 // ---------------------------------------------------------------------------
 // Zod input schema
@@ -58,6 +59,7 @@ const assetInputSchema = {
       'remove_shape',
       'get_shapes',
       'set_nine_slice',
+      'link_cel',
     ])
     .describe('Asset action to perform'),
   asset_name: z.string().optional().describe('Target asset name'),
@@ -130,6 +132,8 @@ const assetInputSchema = {
     .optional()
     .describe('Nine-slice bottom margin in pixels'),
   nine_slice_left: z.number().int().min(0).optional().describe('Nine-slice left margin in pixels'),
+  source_layer_id: z.number().int().optional().describe('Source layer for link_cel'),
+  source_frame_index: z.number().int().optional().describe('Source frame for link_cel'),
   palette: z.array(z.array(z.number().int())).optional().describe('Initial palette for create'),
   layers: z
     .array(z.object({ name: z.string(), type: z.enum(['image', 'tilemap', 'shape']) }))
@@ -278,6 +282,8 @@ export function registerAssetTool(server: McpServer): void {
           return handleGenerateCollisionPolygon(workspace, args);
         case 'set_nine_slice':
           return handleSetNineSlice(workspace, args);
+        case 'link_cel':
+          return handleLinkCel(workspace, args);
 
         default:
           return errors.invalidArgument(`Unknown asset action: ${String(args.action)}`);
@@ -1331,5 +1337,59 @@ function handleSetNineSlice(workspace: Workspace, args: Record<string, unknown>)
   return ok({
     message: `Nine-slice set on '${asset.name}'.`,
     nine_slice: nineSlice,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// link_cel
+// ---------------------------------------------------------------------------
+
+function handleLinkCel(workspace: Workspace, args: Record<string, unknown>) {
+  const asset = requireAsset(workspace, args.asset_name as string | undefined);
+  if (isError(asset)) return asset;
+
+  const layerId = args.layer_id as number | undefined;
+  const frameIndex = args.frame_index as number | undefined;
+  const sourceLayerId = args.source_layer_id as number | undefined;
+  const sourceFrameIndex = args.source_frame_index as number | undefined;
+
+  if (layerId === undefined) return errors.invalidArgument('link_cel requires "layer_id".');
+  if (frameIndex === undefined) return errors.invalidArgument('link_cel requires "frame_index".');
+  if (sourceLayerId === undefined)
+    return errors.invalidArgument('link_cel requires "source_layer_id".');
+  if (sourceFrameIndex === undefined)
+    return errors.invalidArgument('link_cel requires "source_frame_index".');
+
+  // Validate target layer exists
+  const targetLayer = asset.getLayer(layerId);
+  if (!targetLayer) return errors.layerNotFound(layerId, asset.name);
+
+  // Validate source layer exists
+  const sourceLayer = asset.getLayer(sourceLayerId);
+  if (!sourceLayer) return errors.layerNotFound(sourceLayerId, asset.name);
+
+  // Reject self-link
+  if (layerId === sourceLayerId && frameIndex === sourceFrameIndex) {
+    return errors.linkCelSelf();
+  }
+
+  // Validate source cel exists (raw check, NOT resolved through getCel)
+  const sourceKey = packCelKey(sourceLayerId, sourceFrameIndex);
+  const rawCels = asset.cels;
+  const sourceCel = rawCels[sourceKey] as Cel | undefined;
+  if (sourceCel === undefined) {
+    return errors.linkCelSourceNotFound(sourceLayerId, sourceFrameIndex, asset.name);
+  }
+
+  // Validate source and target layers have the same type
+  if (sourceLayer.type !== targetLayer.type) {
+    return errors.linkCelLayerTypeMismatch(sourceLayerId, layerId);
+  }
+
+  const cmd = new LinkCelCommand(asset, layerId, frameIndex, sourceLayerId, sourceFrameIndex);
+  workspace.pushCommand(cmd);
+
+  return ok({
+    message: `Linked cel at layer ${String(layerId)}/frame ${String(frameIndex)} → layer ${String(sourceLayerId)}/frame ${String(sourceFrameIndex)}.`,
   });
 }

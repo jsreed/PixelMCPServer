@@ -4,6 +4,7 @@ import { WorkspaceClass } from '../classes/workspace.js';
 import { ProjectClass } from '../classes/project.js';
 import { AssetClass } from '../classes/asset.js';
 import { type Asset } from '../types/asset.js';
+import { packCelKey } from '../types/cel.js';
 
 // Mock I/O modules
 vi.mock('../io/asset-io.js', () => ({
@@ -659,6 +660,153 @@ describe('asset tool', () => {
     expect(r.isError).toBeUndefined();
     const asset = workspace.loadedAssets.get('plain_sprite');
     expect(asset?.nine_slice).toBeUndefined();
+  });
+
+  // ─── link_cel ─────────────────────────────────────────────────────────────
+
+  describe('link_cel', () => {
+    it('creates a LinkedCel with the correct link key', async () => {
+      const asset = getAsset('sprite');
+      // Add a second frame
+      await handler({ action: 'add_frame', asset_name: 'sprite' });
+
+      const r = await handler({
+        action: 'link_cel',
+        asset_name: 'sprite',
+        layer_id: 1,
+        frame_index: 1,
+        source_layer_id: 1,
+        source_frame_index: 0,
+      });
+      expect(r.isError).toBeUndefined();
+
+      // Raw cel should be a linked cel
+      const rawCel = asset.cels[packCelKey(1, 1)];
+      expect(rawCel).toBeDefined();
+      expect('link' in rawCel).toBe(true);
+      if ('link' in rawCel) {
+        expect(rawCel.link).toBe('1/0');
+      }
+
+      // Resolved cel should match source data
+      const resolved = asset.getCel(1, 1);
+      const source = asset.getCel(1, 0);
+      expect(resolved).toEqual(source);
+    });
+
+    it('returns error when source cel does not exist', async () => {
+      const r = await handler({
+        action: 'link_cel',
+        asset_name: 'sprite',
+        layer_id: 1,
+        frame_index: 0,
+        source_layer_id: 1,
+        source_frame_index: 5,
+      });
+      expect(r.isError).toBe(true);
+      expect(r.content[0].text).toContain('Source cel at layer');
+    });
+
+    it('rejects self-link', async () => {
+      const r = await handler({
+        action: 'link_cel',
+        asset_name: 'sprite',
+        layer_id: 1,
+        frame_index: 0,
+        source_layer_id: 1,
+        source_frame_index: 0,
+      });
+      expect(r.isError).toBe(true);
+      expect(r.content[0].text).toContain('Cannot link a cel to itself');
+    });
+
+    it('rejects layer type mismatch (image vs shape)', async () => {
+      const asset = getAsset('sprite');
+      // Put a cel on the shape layer so the source-exists check passes
+      asset.setCel(2, 0, { shapes: [] });
+
+      const r = await handler({
+        action: 'link_cel',
+        asset_name: 'sprite',
+        layer_id: 1,
+        frame_index: 0,
+        source_layer_id: 2,
+        source_frame_index: 0,
+      });
+      expect(r.isError).toBe(true);
+      expect(r.content[0].text).toContain('must be the same type');
+    });
+
+    it('undo restores original cel data', async () => {
+      const asset = getAsset('sprite');
+      await handler({ action: 'add_frame', asset_name: 'sprite' });
+
+      // Write data to frame 1 before linking
+      const originalData = [
+        [5, 6, 0, 0, 0, 0, 0, 0],
+        [7, 8, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+      ];
+      asset.setCel(1, 1, { x: 0, y: 0, data: originalData });
+
+      // Link frame 1 to frame 0
+      await handler({
+        action: 'link_cel',
+        asset_name: 'sprite',
+        layer_id: 1,
+        frame_index: 1,
+        source_layer_id: 1,
+        source_frame_index: 0,
+      });
+
+      // Verify it's now linked
+      const rawCelAfterLink = asset.cels[packCelKey(1, 1)];
+      expect('link' in rawCelAfterLink).toBe(true);
+
+      // Undo
+      workspace.undo();
+
+      // Should be restored to original data
+      const cel = asset.getCel(1, 1);
+      expect(cel).toBeDefined();
+      if (cel !== undefined) {
+        expect('data' in cel).toBe(true);
+        if ('data' in cel) {
+          expect(cel.data).toEqual(originalData);
+        }
+      }
+    });
+
+    it('undo removes cel when no cel existed before linking', async () => {
+      const asset = getAsset('sprite');
+      await handler({ action: 'add_frame', asset_name: 'sprite' });
+
+      // Frame 1 should have no cel for layer 1 initially
+      expect(asset.cels[packCelKey(1, 1)]).toBeUndefined();
+
+      await handler({
+        action: 'link_cel',
+        asset_name: 'sprite',
+        layer_id: 1,
+        frame_index: 1,
+        source_layer_id: 1,
+        source_frame_index: 0,
+      });
+
+      // Now a linked cel exists
+      expect(asset.cels[packCelKey(1, 1)]).toBeDefined();
+
+      // Undo
+      workspace.undo();
+
+      // Cel should be removed
+      expect(asset.cels[packCelKey(1, 1)]).toBeUndefined();
+    });
   });
 
   // ─── generate_collision_polygon ───────────────────────────────────

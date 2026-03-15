@@ -106,6 +106,29 @@ export function noRecolorPaletteSource(): DomainErrorResponse {
   );
 }
 
+export function linkCelSourceNotFound(
+  sourceLayerId: number,
+  sourceFrameIndex: number,
+  assetName: string,
+): DomainErrorResponse {
+  return domainError(
+    `Source cel at layer ${String(sourceLayerId)}/frame ${String(sourceFrameIndex)} does not exist in asset '${assetName}'.`,
+  );
+}
+
+export function linkCelSelf(): DomainErrorResponse {
+  return domainError('Cannot link a cel to itself.');
+}
+
+export function linkCelLayerTypeMismatch(
+  sourceLayerId: number,
+  targetLayerId: number,
+): DomainErrorResponse {
+  return domainError(
+    `Source layer ${String(sourceLayerId)} and target layer ${String(targetLayerId)} must be the same type for link_cel.`,
+  );
+}
+
 // ----------------------------------------------------------------------------
 // draw & effect
 // ----------------------------------------------------------------------------
