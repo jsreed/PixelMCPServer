@@ -682,11 +682,11 @@ An interactive pixel art editor that renders **inline in the conversation** usin
 
 ---
 
-### 7.8 UI: Selection & Context Bridge (`src/app/selection.ts`)
+### 7.8 UI: Selection & Context Bridge (`src/app/selection.tsx`)
 
-- [ ] **7.8.1** **Rect selection tool** — drag on canvas → draw dashed rectangle overlay; on `mouseup` call `selection rect { asset_name, layer_id, frame_index, x, y, width, height }` to set server-side mask; render marching ants (CSS `stroke-dashoffset` animation) on canvas overlay
-- [ ] **7.8.2** **Select All / Clear** — buttons calling `selection all` / `selection clear`; clear also removes marching ants overlay
-- [ ] **7.8.3** **"Reference in AI" button** — extracts dominant color histogram from the selected region using local canvas pixel data; calls `app.updateModelContext({ content: [{ type: "text", text: "..." }] })` with a YAML-frontmatter block containing `{ type: "pixel_selection", asset, region: { x, y, w, h }, dominant_colors }` so the AI knows exactly what region the user is pointing at in subsequent messages
+- [x] **7.8.1** **Rect selection tool** — drag on canvas → draw dashed rectangle overlay; on `mouseup` call `selection rect { asset_name, layer_id, frame_index, x, y, width, height }` to set server-side mask; render marching ants (CSS `stroke-dashoffset` animation) on canvas overlay
+- [x] **7.8.2** **Select All / Clear** — buttons calling `selection all` / `selection clear`; clear also removes marching ants overlay
+- [x] **7.8.3** **"Reference in AI" button** — extracts dominant color histogram from the selected region using local canvas pixel data; calls `app.updateModelContext({ content: [{ type: "text", text: "..." }] })` with a YAML-frontmatter block containing `{ type: "pixel_selection", asset, region: { x, y, w, h }, dominant_colors }` so the AI knows exactly what region the user is pointing at in subsequent messages
 
 ---
 

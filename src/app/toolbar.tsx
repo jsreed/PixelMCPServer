@@ -7,7 +7,7 @@ import type { CanvasRenderer } from './canvas.js';
 // Types
 // ---------------------------------------------------------------------------
 
-export type ToolType = 'pencil' | 'eraser' | 'eyedropper' | 'fill';
+export type ToolType = 'pencil' | 'eraser' | 'eyedropper' | 'fill' | 'select';
 
 export interface DrawStrokeParams {
   assetName: string;
@@ -81,6 +81,7 @@ const tools: Array<{ type: ToolType; label: string; title: string }> = [
   { type: 'eraser', label: '\u2327', title: 'Eraser' },
   { type: 'eyedropper', label: '\u25CE', title: 'Eyedropper' },
   { type: 'fill', label: '\u25A7', title: 'Fill' },
+  { type: 'select', label: '\u25A1', title: 'Select' },
 ];
 
 export function Toolbar({
