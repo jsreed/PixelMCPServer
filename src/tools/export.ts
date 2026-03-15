@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import { PNG } from 'pngjs';
 import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 
-import { compositeFrame } from '../algorithms/composite.js';
+import { compositeFrame, type CompositeLayer } from '../algorithms/composite.js';
 import { buildCompositeLayers, buildPaletteMap } from '../utils/render.js';
 import { upscale } from '../algorithms/upscale.js';
 import { packRectangles, type PackInput } from '../algorithms/bin-pack.js';
@@ -33,6 +33,7 @@ const exportInputZodSchema = z.object({
       'godot_static',
       'godot_ui_frame',
       'godot_atlas',
+      'spritesheet_per_layer',
     ])
     .describe('Export action to perform'),
   asset_name: z.string().optional().describe('Target asset name (required except for atlas)'),
@@ -42,6 +43,10 @@ const exportInputZodSchema = z.object({
   pad: z.number().int().optional().describe('Pixel padding for atlas (default 0)'),
   extrude: z.boolean().optional().describe('Extrude edge pixels for atlas (default false)'),
   tags: z.array(z.string()).optional().describe('Optional list of tag names to export for per_tag'),
+  layers: z
+    .array(z.number().int())
+    .optional()
+    .describe('Layer IDs to include for spritesheet_per_layer (defaults to all image layers)'),
 });
 
 function ok(data: object) {
@@ -119,6 +124,14 @@ export function registerExportTool(server: McpServer): void {
             return await handleGodotStaticExport(workspace, assetName, outPath, scaleFactor);
           case 'godot_ui_frame':
             return await handleGodotUiFrameExport(workspace, assetName, outPath, scaleFactor);
+          case 'spritesheet_per_layer':
+            return await handlePerLayerStripExport(
+              workspace,
+              assetName,
+              outPath,
+              scaleFactor,
+              args.layers,
+            );
           default:
             return errors.invalidArgument(`Unknown export action: ${String(args.action)}`);
         }
@@ -500,6 +513,99 @@ async function handlePerTagExport(
 
   return ok({
     message: `Exported ${String(generatedFiles.length)} tag sequences.`,
+    files: generatedFiles,
+  });
+}
+
+async function handlePerLayerStripExport(
+  workspace: ReturnType<typeof getWorkspace>,
+  assetName: string,
+  outDir: string,
+  scaleFactor: number,
+  layerIds: number[] | undefined,
+) {
+  const asset = requireAsset(workspace, assetName);
+  if (isError(asset)) return asset;
+
+  let targetLayers: Array<{ id: number; name: string }>;
+
+  if (layerIds !== undefined && layerIds.length > 0) {
+    targetLayers = [];
+    for (const id of layerIds) {
+      const layer = asset.getLayer(id);
+      if (!layer) return errors.layerNotFound(id, assetName);
+      if (layer.type !== 'image')
+        return errors.domainError(`Layer ${String(id)} is not an image layer.`);
+      targetLayers.push({ id: layer.id, name: layer.name });
+    }
+  } else {
+    targetLayers = asset.layers
+      .filter((l) => l.type === 'image')
+      .map((l) => ({ id: l.id, name: l.name }));
+  }
+
+  if (targetLayers.length === 0) {
+    return errors.domainError(`Asset '${assetName}' has no image layers to export.`);
+  }
+
+  const paletteMap = buildPaletteMap(asset.palette);
+  const frameCount = asset.frames.length;
+  const frameWidth = asset.width * scaleFactor;
+  const frameHeight = asset.height * scaleFactor;
+  const outWidth = frameWidth * frameCount;
+  const outHeight = frameHeight;
+  const generatedFiles: string[] = [];
+
+  for (const target of targetLayers) {
+    const singleLayer: CompositeLayer[] = [
+      {
+        id: target.id,
+        type: 'image',
+        visible: true,
+        opacity: 255,
+        getPixel: (x, y, frame) => {
+          const cel = asset.getCel(target.id, frame);
+          if (!cel || !('data' in cel)) return null;
+          const cx = x - cel.x;
+          const cy = y - cel.y;
+          if (cy >= 0 && cy < cel.data.length && cx >= 0 && cx < (cel.data[cy]?.length ?? 0)) {
+            const val = cel.data[cy]?.[cx] ?? 0;
+            return val === 0 ? null : val;
+          }
+          return null;
+        },
+      },
+    ];
+
+    const stripBuffer = new Uint8Array(outWidth * outHeight * 4);
+
+    for (let i = 0; i < frameCount; i++) {
+      let buffer = compositeFrame(asset.width, asset.height, singleLayer, paletteMap, i);
+      if (scaleFactor > 1) {
+        buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
+      }
+
+      const xOffset = i * frameWidth;
+      for (let y = 0; y < frameHeight; y++) {
+        for (let x = 0; x < frameWidth; x++) {
+          const srcIdx = (y * frameWidth + x) * 4;
+          const dstIdx = (y * outWidth + (xOffset + x)) * 4;
+          stripBuffer[dstIdx] = buffer[srcIdx];
+          stripBuffer[dstIdx + 1] = buffer[srcIdx + 1];
+          stripBuffer[dstIdx + 2] = buffer[srcIdx + 2];
+          stripBuffer[dstIdx + 3] = buffer[srcIdx + 3];
+        }
+      }
+    }
+
+    const filename = `${assetName}_${target.name}_strip.png`;
+    const fullPath = path.join(outDir, filename);
+    await writePng(fullPath, outWidth, outHeight, stripBuffer);
+    generatedFiles.push(fullPath);
+  }
+
+  return ok({
+    message: `Exported ${String(generatedFiles.length)} per-layer strips.`,
     files: generatedFiles,
   });
 }

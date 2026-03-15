@@ -736,7 +736,7 @@ High-impact features that reduce round trips and unlock common LLM pixel art wor
 
 #### 8A.3 Per-Layer Spritesheet Export
 
-- [ ] **8A.3.1** **`spritesheet_per_layer` export action** — iterate image layers (filtered by optional `layers` param), composite each layer in isolation across all frames into a horizontal strip, write to `{asset_name}_{layer_name}_strip.png` in `path` directory. Return file list.
+- [x] **8A.3.1** **`spritesheet_per_layer` export action** — iterate image layers (filtered by optional `layers` param), composite each layer in isolation across all frames into a horizontal strip, write to `{asset_name}_{layer_name}_strip.png` in `path` directory. Return file list.
 
 #### 8A.4 Hue-Shifting in generate_ramp
 

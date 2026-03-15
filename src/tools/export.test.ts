@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { PNG } from 'pngjs';
 import { fileURLToPath } from 'node:url';
+import { type Asset } from '../types/asset.js';
 // imported nothing from gifenc
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -119,10 +120,7 @@ describe('Export Tool', () => {
         },
       },
     };
-    workspace.loadedAssets.set(
-      'test_asset',
-      AssetClass.fromJSON(assetData as unknown as import('../types/asset.js').Asset),
-    );
+    workspace.loadedAssets.set('test_asset', AssetClass.fromJSON(assetData as unknown as Asset));
 
     registerExportTool(server);
     fs.mkdirSync(TEST_DIR, { recursive: true });
@@ -501,6 +499,233 @@ describe('Export Tool', () => {
     expect(tresData).toContain('test_asset');
   });
 
+  // ─── spritesheet_per_layer ─────────────────────────────────────
+
+  describe('spritesheet_per_layer', () => {
+    const multiLayerData = {
+      name: 'multi',
+      width: 4,
+      height: 4,
+      perspective: 'flat' as const,
+      palette: Array.from({ length: 256 }, (_, i) => [i === 1 ? 255 : 0, 0, 0, i === 0 ? 0 : 255]),
+      layers: [
+        { id: 1, name: 'base', type: 'image' as const, visible: true, opacity: 255 },
+        { id: 2, name: 'overlay', type: 'image' as const, visible: true, opacity: 255 },
+        {
+          id: 3,
+          name: 'hurtbox',
+          type: 'shape' as const,
+          visible: true,
+          opacity: 255,
+          role: 'hurtbox',
+          physics_layer: 1,
+        },
+      ],
+      frames: [
+        { index: 0, duration_ms: 100 },
+        { index: 1, duration_ms: 100 },
+      ],
+      tags: [],
+      cels: {
+        '1/0': {
+          x: 0,
+          y: 0,
+          data: [
+            [1, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+        },
+        '1/1': {
+          x: 0,
+          y: 0,
+          data: [
+            [0, 1, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+        },
+        '2/0': {
+          x: 0,
+          y: 0,
+          data: [
+            [0, 0, 1, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+        },
+        '2/1': {
+          x: 0,
+          y: 0,
+          data: [
+            [0, 0, 0, 1],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+        },
+      },
+    };
+
+    beforeEach(() => {
+      workspace.loadedAssets.set('multi', AssetClass.fromJSON(multiLayerData as unknown as Asset));
+    });
+
+    it('exports one strip per image layer and skips shape layers', async () => {
+      const outDir = path.join(TEST_DIR, 'per_layer_basic');
+      const result = await exportHandler(
+        {
+          action: 'spritesheet_per_layer',
+          asset_name: 'multi',
+          path: outDir,
+          scale_factor: 1,
+        },
+        {} as unknown,
+      );
+
+      const parsed = JSON.parse(result.content[0].text) as { message: string; files: string[] };
+      expect(parsed.message).toContain('2 per-layer strips');
+      expect(parsed.files).toHaveLength(2);
+
+      // Shape layer (id 3) must not appear
+      expect(parsed.files.every((f) => !f.includes('hurtbox'))).toBe(true);
+
+      const basePath = path.join(outDir, 'multi_base_strip.png');
+      const overlayPath = path.join(outDir, 'multi_overlay_strip.png');
+      expect(fs.existsSync(basePath)).toBe(true);
+      expect(fs.existsSync(overlayPath)).toBe(true);
+
+      // Width = frameWidth * frameCount = 4 * 2 = 8, height = 4
+      const basePng = PNG.sync.read(fs.readFileSync(basePath));
+      expect(basePng.width).toBe(8);
+      expect(basePng.height).toBe(4);
+
+      const overlayPng = PNG.sync.read(fs.readFileSync(overlayPath));
+      expect(overlayPng.width).toBe(8);
+      expect(overlayPng.height).toBe(4);
+    });
+
+    it('respects the layers filter and exports only the specified layer', async () => {
+      const outDir = path.join(TEST_DIR, 'per_layer_filter');
+      const result = await exportHandler(
+        {
+          action: 'spritesheet_per_layer',
+          asset_name: 'multi',
+          path: outDir,
+          scale_factor: 1,
+          layers: [2],
+        },
+        {} as unknown,
+      );
+
+      const parsed = JSON.parse(result.content[0].text) as { message: string; files: string[] };
+      expect(parsed.message).toContain('1 per-layer strips');
+      expect(parsed.files).toHaveLength(1);
+
+      const overlayPath = path.join(outDir, 'multi_overlay_strip.png');
+      expect(fs.existsSync(overlayPath)).toBe(true);
+      expect(parsed.files.every((f) => !f.includes('base'))).toBe(true);
+    });
+
+    it('returns isError when layers filter contains a non-image layer id', async () => {
+      const outDir = path.join(TEST_DIR, 'per_layer_shape_err');
+      const result = await exportHandler(
+        {
+          action: 'spritesheet_per_layer',
+          asset_name: 'multi',
+          path: outDir,
+          layers: [3], // shape layer
+        },
+        {} as unknown,
+      );
+
+      expect((result as { isError?: boolean }).isError).toBe(true);
+      expect(result.content[0].text).toContain('not an image layer');
+    });
+
+    it('returns isError when layers filter contains a layer id that does not exist', async () => {
+      const outDir = path.join(TEST_DIR, 'per_layer_missing_err');
+      const result = await exportHandler(
+        {
+          action: 'spritesheet_per_layer',
+          asset_name: 'multi',
+          path: outDir,
+          layers: [99],
+        },
+        {} as unknown,
+      );
+
+      expect((result as { isError?: boolean }).isError).toBe(true);
+      expect(result.content[0].text).toContain('does not exist');
+    });
+
+    it('returns isError when asset has no image layers', async () => {
+      // Create an asset with only a group layer
+      const groupOnlyData = {
+        name: 'group_only',
+        width: 4,
+        height: 4,
+        perspective: 'flat' as const,
+        palette: Array.from({ length: 256 }, (_, i) => [0, 0, 0, i === 0 ? 0 : 255]),
+        layers: [
+          {
+            id: 1,
+            name: 'folder',
+            type: 'group' as const,
+            visible: true,
+            opacity: 255,
+            children: [],
+          },
+        ],
+        frames: [{ index: 0, duration_ms: 100 }],
+        tags: [],
+        cels: {},
+      };
+      workspace.loadedAssets.set(
+        'group_only',
+        AssetClass.fromJSON(groupOnlyData as unknown as Asset),
+      );
+
+      const outDir = path.join(TEST_DIR, 'per_layer_no_img_err');
+      const result = await exportHandler(
+        {
+          action: 'spritesheet_per_layer',
+          asset_name: 'group_only',
+          path: outDir,
+        },
+        {} as unknown,
+      );
+
+      expect((result as { isError?: boolean }).isError).toBe(true);
+      expect(result.content[0].text).toContain('has no image layers to export');
+    });
+
+    it('applies scale_factor to output dimensions', async () => {
+      const outDir = path.join(TEST_DIR, 'per_layer_scale');
+      await exportHandler(
+        {
+          action: 'spritesheet_per_layer',
+          asset_name: 'multi',
+          path: outDir,
+          scale_factor: 2,
+          layers: [1],
+        },
+        {} as unknown,
+      );
+
+      const basePath = path.join(outDir, 'multi_base_strip.png');
+      expect(fs.existsSync(basePath)).toBe(true);
+
+      // width = frameWidth(4*2) * frameCount(2) = 16, height = 4*2 = 8
+      const png = PNG.sync.read(fs.readFileSync(basePath));
+      expect(png.width).toBe(16);
+      expect(png.height).toBe(8);
+    });
+  });
+
   // ─── E2E Tests ─────────────────────────────────────────────────
 
   describe('E2E', () => {
@@ -561,7 +786,7 @@ describe('Export Tool', () => {
               ],
             },
           },
-        } as unknown as import('../types/asset.js').Asset);
+        } as unknown as Asset);
         workspace.loadedAssets.set(name, iconAsset);
       }
 
