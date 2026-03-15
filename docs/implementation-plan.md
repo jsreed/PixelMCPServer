@@ -759,7 +759,7 @@ High-impact features that reduce round trips and unlock common LLM pixel art wor
 
 #### 8A.8 `scaffold_side_scroller` Prompt
 
-- [ ] **8A.8.1** **`scaffold_side_scroller` prompt** (`src/prompts/scaffold-side-scroller.ts`) — arguments: `name`, optional `width`/`height`, optional `palette`, optional `animations`. Messages guide through side-view character proportions, run cycle phases, jump arc frames.
+- [x] **8A.8.1** **`scaffold_side_scroller` prompt** (`src/prompts/scaffold-side-scroller.ts`) — arguments: `name`, optional `width`/`height`, optional `palette`, optional `animations`. Messages guide through side-view character proportions, run cycle phases, jump arc frames.
 
 #### 8A.9 Testing
 
