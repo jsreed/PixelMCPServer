@@ -126,6 +126,28 @@ export class WorkspaceClass {
     return { hadUnsavedChanges };
   }
 
+  /**
+   * Clears the selection if it targets a layer or frame that no longer exists
+   * in the given asset. Called after structural mutations (layer/frame removal).
+   */
+  public validateSelection(assetName: string): void {
+    if (this.selection === null || this.selection.asset_name !== assetName) {
+      return;
+    }
+    const asset = this.loadedAssets.get(assetName);
+    if (!asset) {
+      this.selection = null;
+      return;
+    }
+    if (!asset.getLayer(this.selection.layer_id)) {
+      this.selection = null;
+      return;
+    }
+    if (this.selection.frame_index >= asset.frames.length) {
+      this.selection = null;
+    }
+  }
+
   // ------------------------------------------------------------------------
   // Persistence
   // ------------------------------------------------------------------------

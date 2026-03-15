@@ -44,10 +44,9 @@ The model is structured hierarchically, separating the on-disk project structure
 * **Project**: The root on-disk configuration. Maps to a `pixelmcp.json` project file that defines filesystem paths, asset registry, naming conventions, and project-wide defaults. Does not contain pixel data — it is the "solution file" that ties everything together.
 * **Workspace**: The active, in-memory editing session. One or more Assets can be loaded into the Workspace simultaneously (e.g., editing an armor set while referencing the base character body). The Workspace maintains the **Command-Based Undo History** and is not persisted to disk — it exists only for the duration of the session.
 * **Asset**: An individual, self-contained art file (e.g., "Player," "Sword," or "Wall_Tileset") with defined pixel dimensions (width x height). Each Asset is persisted as a JSON file on disk and contains its own Layers, Frames, Cels, and Palette. Assets are registered in the Project's asset registry. Each Asset also carries a **perspective** property (a free string, e.g., `"flat"`, `"top_down"`, `"top_down_3/4"`, `"isometric"`) that documents the drawing convention and, when set to `"isometric"`, unlocks projection-aware coordinate helpers in the draw and tileset tools. The underlying pixel storage is always flat — perspective affects only how coordinates are interpreted, not how data is stored.
-* **Layer**: A hierarchical stacking plane within an Asset. Layers can be **Image Layers** (raw pixels), **Tilemap Layers** (grid-based), **Shape Layers** (non-rendered collision geometry — stores named rect/polygon shapes per frame for hitboxes, hurtboxes, navigation regions, etc.), or **Group Layers** (folders). Layers support visibility, opacity, and user-defined tags. Shape Layers carry two additional properties: `role` (free string classifying purpose, e.g. `"hitbox"`, `"hurtbox"`, `"pushbox"`, `"navigation"`, `"occlusion"`) and `physics_layer` (integer 1–32 mapping to a Godot physics layer number).
+* **Layer**: A hierarchical stacking plane within an Asset. Layers can be **Image Layers** (raw pixels), **Tilemap Layers** (grid-based), **Shape Layers** (non-rendered collision geometry — stores named rect/polygon shapes per frame for hitboxes, hurtboxes, navigation regions, etc.), or **Group Layers** (folders). Layers support visibility, opacity (integer, 0–255; 0 = fully transparent, 255 = fully opaque; default 255), and user-defined tags. Shape Layers carry two additional properties: `role` (free string classifying purpose, e.g. `"hitbox"`, `"hurtbox"`, `"pushbox"`, `"navigation"`, `"occlusion"`) and `physics_layer` (integer 1–32 mapping to a Godot physics layer number).
 * **Frame**: A specific point in time within an Asset. Each Asset contains one or more Frames, each with a specific duration (ms).
-* **Cel**: The atomic unit where pixel data is stored. It is the intersection of a **Layer** and a **Frame**. A Cel contains a Region of pixel data.
-* **Region**: A positioned rectangular chunk of pixel data (palette indices) on a layer.
+* **Cel**: The atomic unit where pixel data is stored. It is the intersection of a **Layer** and a **Frame**. An image cel's `x` and `y` fields position the top-left corner of its pixel data within the asset canvas (default `(0, 0)` = canvas origin). Cels can be smaller than the canvas — pixels outside the cel region are treated as transparent (index 0). Tilemap and shape cels do not carry offsets.
 * **Palette**: A collection of up to 256 RGBA colors. All pixel data in a Cel stores a **color index (0-255)** rather than raw color values, enabling instant global color swapping.
 * **Tag**: A named label applied to a range of frames or a set of layers. Frame tags define animation sequences (e.g., "idle" = frames 0-3, "walk" = frames 4-11) with playback properties including direction (`forward`, `reverse`, `ping_pong`) and an optional `facing` property (one of N, NE, E, SE, S, SW, W, NW) that records the screen-facing direction for directional character sprites. Layer tags group related layers for organizational purposes (e.g., "armor", "base_body").
 * **NineSlice**: Optional metadata on an Asset defining nine-slice scaling margins (`top`, `right`, `bottom`, `left` in pixels). When set, the asset is treated as a scalable UI element — the four corners are fixed, edges repeat/stretch, and the center tiles. Used by the `godot_ui_frame` export to produce a Godot `StyleBoxTexture` resource.
@@ -110,7 +109,7 @@ If the target cel is a linked cel, the link is broken on the first operation in 
 - `init` — creates a new `pixelmcp.json` at the given path. Does not create any directories — project directory structure is the developer's concern, not the server's.
 - `open` — sets the server's active Project by reading an existing `pixelmcp.json`.
 - `info` — returns the current Project configuration (paths, defaults, asset registry).
-- `add_file` — imports an external image file (PNG) into the Project. Reads the image at `import_path`, quantizes its colors into a palette of up to 256 entries (index 0 is transparent if the image has transparent pixels), creates a single image layer with the pixel data as palette indices, saves the resulting `.json` asset file alongside the source image, and registers it in the project's asset registry under `name` with the given `type`. Returns the registered name and file path. Not wrapped in a Command (file I/O).
+- `add_file` — imports an external image file (PNG) into the Project. Reads the image at `import_path` and quantizes its colors into a palette of up to 256 entries using the Median Cut algorithm. Pixels with alpha < 128 are treated as transparent (mapped to index 0); all others are treated as fully opaque. If the image has ≤ 255 distinct opaque colors (or ≤ 256 if no transparency), colors are mapped exactly without reduction. Palette indices are ordered by the median-cut bucket structure, not by frequency or luminance. Creates a single image layer with the pixel data as palette indices, saves the resulting `.json` asset file alongside the source image, and registers it in the project's asset registry under `name` with the given `type`. Returns the registered name and file path. Not wrapped in a Command (file I/O).
 
 **Example — starting a new project:**
 ```json
@@ -168,7 +167,7 @@ If the target cel is a linked cel, the link is broken on the first operation in 
 **Purpose:** Querying and modifying the structural hierarchy (layers, frames, tags) and properties of a loaded Asset.
 
 **Arguments:**
-- action (enum: `info`, `get_cel`, `get_cels`, `detect_banding`, `generate_collision_polygon`, `create`, `resize`, `rename`, `duplicate`, `create_recolor`, `delete`, `add_layer`, `add_group`, `remove_layer`, `reorder_layer`, `add_frame`, `remove_frame`, `set_frame_duration`, `add_tag`, `remove_tag`, `add_shape`, `update_shape`, `remove_shape`, `get_shapes`, `set_nine_slice`)
+- action (enum: `info`, `get_cel`, `get_cels`, `detect_banding`, `generate_collision_polygon`, `create`, `resize`, `rename`, `duplicate`, `create_recolor`, `delete`, `add_layer`, `add_group`, `remove_layer`, `reorder_layer`, `add_frame`, `remove_frame`, `set_frame_duration`, `add_tag`, `remove_tag`, `add_shape`, `update_shape`, `remove_shape`, `get_shapes`, `set_nine_slice`, `link_cel`)
 - asset_name (string, optional — identifies target asset)
 - name (string, optional — for rename, duplicate, new asset/layer/group/tag name)
 - delete_file (boolean, optional — for `delete`: also remove the asset's `.json` file from disk; defaults to false, which only removes the registry entry)
@@ -187,7 +186,7 @@ If the target cel is a linked cel, the link is broken on the first operation in 
 - tag_type (enum: `frame`, `layer` — for add_tag)
 - tag_start, tag_end (integers, optional — frame range for frame tags)
 - tag_layers (array of integers, optional — layer IDs for layer tags)
-- tag_direction (enum: `forward`, `reverse`, `ping_pong` — playback direction for frame tags, optional)
+- tag_direction (enum: `forward`, `reverse`, `ping_pong` — playback direction for frame tags; defaults to `forward`)
 - tag_facing (enum: `N`, `NE`, `E`, `SE`, `S`, `SW`, `W`, `NW`, optional — facing direction for directional sprite tags; maps to the `{direction}` token in export_pattern)
 - perspective (string, optional — drawing convention for `create`; e.g. `"flat"`, `"top_down"`, `"top_down_3/4"`, `"isometric"`; defaults to `"flat"`)
 - tile_width, tile_height (integers, optional — for `create`: iso grid cell dimensions when `perspective: "isometric"`, or tile dimensions for tileset assets; stored on the asset and used by isometric draw operations and tileset tools)
@@ -205,10 +204,12 @@ If the target cel is a linked cel, the link is broken on the first operation in 
 - palette_slug (string, optional — for `create_recolor`: Lospec palette slug, e.g. `"endesga-32"`)
 - palette_entries (array of {index, rgba}, optional — for `create_recolor`: inline palette overrides)
 - nine_slice_top, nine_slice_right, nine_slice_bottom, nine_slice_left (integers ≥ 0, optional — pixel margins for `set_nine_slice`; also accepted on `create` for convenience)
+- source_layer_id (integer, optional — source layer for `link_cel`)
+- source_frame_index (integer, optional — source frame for `link_cel`)
 
 **Behavior:**
 - `info` — returns full structural metadata for the asset: dimensions, perspective, layer tree (IDs, names, types, visibility, opacity, tags), frame list (indices, durations), all tags, and palette summary (color count, entries). This is the LLM's primary way to discover and inspect asset structure.
-- `get_cel` — returns pixel data for a specific cel as a **row integer array** (2D array of palette indices). Also returns the cel's origin offset and dimensions. This is how the LLM reads back pixel data to verify its work. **Linked cel behavior:** if the target cel is a link (`{ "link": "layer_id/frame_index" }`), the server transparently resolves it and returns the referenced pixel data — callers always receive data, never raw link references. The response includes `is_linked: true` and `link_source: "layer_id/frame_index"` as informational metadata when the cel was resolved through a link, so the LLM can choose to avoid writing to it (which would break the link and duplicate the data) if that is not the intent.
+- `get_cel` — returns pixel data for a specific cel as a **row integer array** (2D array of palette indices). Also returns the cel's origin offset and dimensions. This is how the LLM reads back pixel data to verify its work. **Linked cel behavior:** if the target cel is a link (`{ "link": "layer_id/frame_index" }`), the server transparently resolves it and returns the referenced pixel data — callers always receive data, never raw link references. The response includes `is_linked: true` and `link_source: "layer_id/frame_index"` as informational metadata when the cel was resolved through a link, so the LLM can choose to avoid writing to it (which would break the link and duplicate the data) if that is not the intent. Linked cels resolve transitively — if cel A links to B, and B links to C, `get_cel(A)` returns C's data. Circular links are prevented at creation time: the `link_cel` action rejects any link that would create a cycle.
 - `get_cels` — returns pixel data for multiple cels in one call. Supports two modes:
   - **Explicit list:** provide `cels` array of `{layer_id, frame_index}` pairs.
   - **Range shorthand:** provide `layer_id` + `frame_start` + `frame_end` to get all cels for one layer across a frame range (useful for animation review).
@@ -220,7 +221,7 @@ If the target cel is a linked cel, the link is broken on the first operation in 
 - `resize` — changes the canvas dimensions of the Asset. Accepts `width`, `height`, and optional `anchor` (enum: `top_left`, `top_center`, `top_right`, `center_left`, `center`, `center_right`, `bottom_left`, `bottom_center`, `bottom_right` — defaults to `top_left`). Existing pixel data is positioned relative to the new canvas according to the anchor. If the canvas grows, new pixels are filled with index 0 (transparent). If it shrinks, pixels outside the new bounds are cropped. All cels are resized. Cel origin offsets are adjusted to maintain positioning relative to the anchor. Wrapped in a Command.
 - `rename` — changes the logical name of a loaded Asset. Updates the asset's internal `name` property, renames the registry key in the Project (preserving `type`, `path`/`variants`, and all other metadata), and renames the `.json` file on disk to match the new name (in the same directory). The asset remains loaded in the Workspace under the new name. Wrapped in a Command for undo/redo (undo restores the original name, registry key, and filename).
 - `duplicate` — clones an Asset under a new `name` (required). The new file is saved in the same directory as the source asset's file, registered in the Project, and loaded into the Workspace. Returns the new asset's registry name and file path.
-- `create_recolor` — creates a palette-swap variant of an existing Asset in a single call. Clones the source asset's pixel data, layers, frames, tags, and all cels under a new `name`, then applies a replacement palette. At least one palette source is required: `palette_file` (path to a `.json` palette file, relative to `pixelmcp.json`), `palette_slug` (Lospec slug), or `palette_entries` (inline `{index, rgba}` array). If multiple sources are provided, they layer in order: file → slug → entries (later sources overwrite earlier ones for overlapping indices). The new asset file is saved in the same directory as the source, registered in the Project with a `recolor_of` metadata field pointing to the source asset name, and loaded into the Workspace. Returns the new asset's registry name and file path. Wrapped in a Command for undo/redo.
+- `create_recolor` — creates a palette-swap variant of an existing Asset in a single call. Clones the source asset's pixel data, layers, frames, tags, and all cels under a new `name` as an independent deep copy (subsequent changes to the source do not propagate to the recolor, and vice versa), then applies a replacement palette. At least one palette source is required: `palette_file` (path to a `.json` palette file, relative to `pixelmcp.json`), `palette_slug` (Lospec slug), or `palette_entries` (inline `{index, rgba}` array). If multiple sources are provided, they layer in order: file → slug → entries (later sources overwrite earlier ones for overlapping indices). The new asset file is saved in the same directory as the source, registered in the Project with a `recolor_of` metadata field pointing to the source asset name, and loaded into the Workspace. Returns the new asset's registry name and file path. Wrapped in a Command for undo/redo.
 - `delete` — removes an Asset from the Project registry. If `delete_file` is true, also deletes the `.json` file from disk. The asset is unloaded from the Workspace if currently loaded. Wrapped in a Command for undo/redo (undo restores the registry entry; file deletion is not reversible via undo).
 - `add_layer` / `add_group` / `remove_layer` / `reorder_layer` — structural layer operations. `reorder_layer` moves the target layer to a new `position` among its siblings (within the same parent group). If `parent_layer_id` is provided, the layer is reparented into that group at `position` within the group's children. Moving a group layer moves all its children with it. All operations are wrapped in Commands.
 - `add_frame` — inserts a new frame at `frame_index` (optional — defaults to appending at the end). New cels for image layers are initialized empty (all index 0); new cels for shape layers have no shapes; new cels for tilemap layers have all cells set to -1. Accepts optional `duration_ms` (defaults to 100). Frame tags with `start` or `end` >= the insertion index shift their indices by +1. Wrapped in a Command.
@@ -232,6 +233,19 @@ If the target cel is a linked cel, the link is broken on the first operation in 
 - `remove_shape` — deletes a named shape from a shape layer cel.
 - `get_shapes` — returns all shapes in a shape layer cel as an array of `{name, type, ...geometry}` objects.
 - `set_nine_slice` — sets nine-slice scaling margins on the asset. Requires at least one of `nine_slice_top`, `nine_slice_right`, `nine_slice_bottom`, `nine_slice_left` (unspecified margins default to 0). Validates that `top + bottom < height` and `left + right < width` — returns an error if margins exceed asset dimensions. Sets `asset.nine_slice = { top, right, bottom, left }`. Also accepted on `create` for convenience. Wrapped in a Command for undo/redo.
+- `link_cel` — creates a LinkedCel at the target cel (`layer_id` + `frame_index`) pointing to the source cel (`source_layer_id` + `source_frame_index`). The target cel's existing data (if any) is replaced by the link reference. Subsequent reads via `get_cel` on the target will transparently resolve to the source cel's data (with `is_linked: true` metadata). Writing to the linked cel (via `draw`, `transform`, `effect`) breaks the link as usual. Wrapped in a Command for undo/redo. Errors: source cel must exist; self-linking (target == source) is rejected; source must be on the same layer type as target.
+
+**Example — linking frame 3 to frame 0 on the same layer:**
+```json
+{
+  "action": "link_cel",
+  "asset_name": "player",
+  "layer_id": 0,
+  "frame_index": 3,
+  "source_layer_id": 0,
+  "source_frame_index": 0
+}
+```
 
 **Example — scaffolding a full asset in one call:**
 ```json
@@ -293,6 +307,7 @@ If the target cel is a linked cel, the link is broken on the first operation in 
 - asset_name (string, optional — defaults to first loaded asset)
 - layer_id (integer, optional — defaults to 0)
 - frame_index (integer, optional — defaults to 0)
+- frame_range (array of two integers `[start, end]`, optional — mutually exclusive with `frame_index`; applies all operations to every frame in the inclusive range `[start, end]`; produces a single undo Command)
 - operations (array of operation objects — executed sequentially)
 
 **Operation types:**
@@ -306,10 +321,15 @@ If the target cel is a linked cel, the link is broken on the first operation in 
 | `ellipse` | x, y, width, height, color, filled? | Draw an ellipse (outline or filled) |
 | `fill` | x, y, color | Flood fill from a point |
 | `write_pixels` | x?, y?, width, height, data | Write a rectangular region of pixel data |
+| `color_replace` | from_color, to_color | Replace all pixels of one palette index with another |
 
 - `color` is always an integer 0-255 (palette index).
 - `filled` defaults to false for rect, circle, ellipse.
 - `write_pixels` accepts `data` as a **row integer array** (2D array of palette indices), same format as `get_cel` responses and asset files. `x` and `y` default to 0. `width` and `height` must match the data dimensions.
+- `fill` replaces contiguous pixels matching the starting pixel's palette index with `color`. If the starting pixel already has index `color`, the operation is a no-op.
+- `color_replace` replaces every pixel in the target cel (or selected region, if a selection is active) that has palette index `from_color` with palette index `to_color`. Both must be valid palette indices (0–255).
+
+**Frame range mode:** When `frame_range` is provided instead of `frame_index`, all operations are applied to every frame in the inclusive range `[start, end]`. This is useful for batch operations like replacing a color across an entire animation. A single undo Command covers all frames in the range. `frame_range` and `frame_index` are mutually exclusive — providing both is an error.
 
 **Example — building a character frame with mixed operations:**
 ```json
@@ -373,6 +393,7 @@ These operations call flat draw primitives internally — the underlying pixel d
 - asset_name (string, optional — defaults to first loaded asset)
 - layer_id (integer, optional — defaults to 0)
 - frame_index (integer, optional — defaults to 0)
+- frame_range (array of two integers `[start, end]`, optional — mutually exclusive with `frame_index`; applies all operations to every frame in the inclusive range; single undo Command)
 - operations (array of operation objects — executed sequentially)
 
 **Operation types:**
@@ -400,13 +421,15 @@ These operations call flat draw primitives internally — the underlying pixel d
 
 **Behavior:** Operations execute in order on the target cel. If a Selection is active, only the selected region is affected. All operations in a single call are wrapped in a single undo Command.
 
+**Frame range mode:** When `frame_range` is provided instead of `frame_index`, all operations are applied to every frame in the inclusive range `[start, end]`. This is useful for batch operations like flipping an entire animation sequence. A single undo Command covers all frames in the range. `frame_range` and `frame_index` are mutually exclusive — providing both is an error.
+
 ---
 
 #### 6. **tileset**
 **Purpose:** Tools for creating and managing reusable tile-based environments.
 
 **Arguments:**
-- action (enum: `extract_tile`, `place_tile`, `autotile_generate`, `set_tile_physics`)
+- action (enum: `extract_tile`, `place_tile`, `autotile_generate`, `set_tile_physics`, `set_tile_animation`, `clear_tile_animation`, `set_tile_data`, `clear_tile_data`, `add_tile_alternative`, `remove_tile_alternative`)
 - asset_name (string, optional)
 - layer_id (integer, optional)
 - frame_index (integer, optional)
@@ -419,6 +442,17 @@ These operations call flat draw primitives internally — the underlying pixel d
 - physics_layer_index (integer, optional — which physics layer to assign; defaults to 0)
 - pattern (enum: `blob47`, `4side`, `4corner` — autotile bitmask pattern for `autotile_generate`)
 - terrain_name (string, optional — terrain name written into `tile_terrain` metadata and used as the terrain set name in Godot export; defaults to the asset name)
+- frame_count (integer, optional — number of animation frames for `set_tile_animation`)
+- frame_duration_ms (integer, optional — per-frame duration for `set_tile_animation`; defaults to 100)
+- separation (integer, optional — horizontal pixel gap between animation frames in the atlas for `set_tile_animation`; defaults to 0)
+- data_layer_name (string, optional — custom data layer name for `set_tile_data`)
+- data_layer_type (enum: `string`, `int`, `float`, `bool`, optional — data type for `set_tile_data`)
+- data_value (string | number | boolean, optional — value for `set_tile_data`)
+- occlusion_polygon (array of [x, y] pairs, optional — occlusion polygon for `set_tile_physics`)
+- alternative_id (integer, optional — alternative tile ID for `add_tile_alternative`)
+- flip_h (boolean, optional — horizontal flip for `add_tile_alternative`)
+- flip_v (boolean, optional — vertical flip for `add_tile_alternative`)
+- transpose (boolean, optional — diagonal transpose for `add_tile_alternative`)
 
 **Behavior:** Handles the creation of tile maps and the extraction of regions from standard sprites into tile libraries.
 
@@ -431,7 +465,19 @@ These operations call flat draw primitives internally — the underlying pixel d
 
 - `autotile_generate` — scans the tileset's occupied tile slots and assigns terrain metadata based on the selected `pattern`. Each tile slot index directly encodes its neighbor bitmask value (see **Autotile Slot Convention** below). The action computes Godot `CellNeighbor` peering bit assignments for every occupied slot and stores them in the asset JSON under `tile_terrain`. Returns the list of slot indices that were assigned and any expected-but-missing slots so the LLM can fill gaps. Wrapped in a Command for undo/redo. This metadata is consumed by `export godot_tileset`.
 
-- `set_tile_physics` — sets collision and/or navigation polygon data for a specific tile slot (`tile_index`). Polygons are in tile-local pixel coordinates (relative to the tile's top-left corner). A full-tile collision box would be `[[0,0],[tile_width,0],[tile_width,tile_height],[0,tile_height]]`. This data is stored in the asset JSON under `tile_physics` and is consumed by the `godot_tileset` export action. Wrapped in a Command for undo/redo.
+- `set_tile_physics` — sets collision and/or navigation polygon data for a specific tile slot (`tile_index`). Polygons are in tile-local pixel coordinates (relative to the tile's top-left corner). A full-tile collision box would be `[[0,0],[tile_width,0],[tile_width,tile_height],[0,tile_height]]`. This data is stored in the asset JSON under `tile_physics` and is consumed by the `godot_tileset` export action. If `occlusion_polygon` is provided, it is stored alongside the collision polygon and consumed by `export godot_tileset` to emit an occlusion layer for light-blocking tiles. Wrapped in a Command for undo/redo.
+
+- `set_tile_animation` — sets animation metadata for a tile slot (`tile_index`). Animated tiles cycle through `frame_count` sequential frames laid out horizontally in the atlas starting from the tile's position, each `frame_duration_ms` milliseconds. `separation` specifies extra horizontal pixels between each animation frame in the atlas (0 = frames packed tightly). The layout formula is: animation frame N occupies x-offset `tile_x + N × (tile_width + separation)`, y-offset `0`, with dimensions `tile_width × tile_height`. Frames are strictly horizontal (no row wrapping). The asset's canvas width must accommodate all animation frames — it is the caller's responsibility to ensure `(tile_index × tile_width) + frame_count × (tile_width + separation) ≤ canvas_width`. This metadata is stored in the asset JSON under `tile_animation` and consumed by `export godot_tileset` to emit `animation_columns`, `animation_speed_fps`, and `animation_frames_count` in the TileSet resource. Wrapped in a Command for undo/redo.
+
+- `set_tile_data` — sets a custom data value on a tile slot (`tile_index`). Custom data layers are defined by `data_layer_name` and `data_layer_type`; the layer is created automatically if it doesn't exist. The `data_value` is stored per-tile. This metadata is stored in the asset JSON under `tile_custom_data` and consumed by `export godot_tileset` to emit custom data layer definitions and per-tile custom data values in the TileSet resource. Useful for gameplay metadata (e.g., `"terrain_type": "grass"`, `"movement_cost": 2`, `"is_destructible": true`). Wrapped in a Command for undo/redo.
+
+- `add_tile_alternative` — creates an alternative tile variant for a base tile (`tile_index`). The alternative uses the same pixel data but with transform flags: `flip_h`, `flip_v`, and/or `transpose`. This allows a single tile's art to serve as multiple oriented variants without duplicating pixel data. The `alternative_id` is auto-assigned (incrementing from 1) if not provided. Stored in `tile_alternatives` in the asset JSON and consumed by `export godot_tileset` to emit alternative tile entries with transform flags. Wrapped in a Command for undo/redo.
+
+- `clear_tile_animation` — removes animation metadata from a tile slot (`tile_index`). Wrapped in a Command for undo/redo.
+
+- `clear_tile_data` — removes a specific custom data value from a tile slot (`tile_index`) for the given `data_layer_name`. If no `data_layer_name` is provided, clears all custom data for the tile. Wrapped in a Command for undo/redo.
+
+- `remove_tile_alternative` — removes a tile alternative by `alternative_id` from the base tile (`tile_index`). Wrapped in a Command for undo/redo.
 
 #### Autotile Slot Convention
 
@@ -528,6 +574,39 @@ Example assignments: slot `0` = isolated tile, slot `255` = interior (all neighb
 ```
 *Assigns Godot peering bits to every occupied canonical slot and stores the result in `tile_terrain`. Returns `{ "assigned": [0, 1, 4, ...], "missing_slots": [] }` on success.*
 
+**Example — setting tile animation for a water tile:**
+```json
+{
+  "action": "set_tile_animation",
+  "asset_name": "water_tileset",
+  "tile_index": 0,
+  "frame_count": 4,
+  "frame_duration_ms": 200
+}
+```
+
+**Example — setting custom data on a tile:**
+```json
+{
+  "action": "set_tile_data",
+  "asset_name": "grass_tileset",
+  "tile_index": 0,
+  "data_layer_name": "movement_cost",
+  "data_layer_type": "int",
+  "data_value": 1
+}
+```
+
+**Example — adding a horizontally flipped tile alternative:**
+```json
+{
+  "action": "add_tile_alternative",
+  "asset_name": "grass_tileset",
+  "tile_index": 5,
+  "flip_h": true
+}
+```
+
 ---
 
 #### 7. **effect**
@@ -537,6 +616,7 @@ Example assignments: slot `0` = isolated tile, slot `255` = interior (all neighb
 - asset_name (string, optional — defaults to first loaded asset)
 - layer_id (integer, optional — defaults to 0)
 - frame_index (integer, optional — defaults to 0)
+- frame_range (array of two integers `[start, end]`, optional — mutually exclusive with `frame_index`; applies all operations to every frame in the inclusive range; single undo Command)
 - operations (array of operation objects — executed sequentially)
 
 **Operation types:**
@@ -553,6 +633,8 @@ Example assignments: slot `0` = isolated tile, slot `255` = interior (all neighb
 | `cleanup_orphans` | — | Remove isolated single pixels |
 | `subpixel_shift` | intensity, direction_x?, direction_y? | Sub-pixel motion shift for animation smoothing along a direction vector |
 | `smear_frame` | intensity, direction_x?, direction_y? | Directional smear for motion blur along a direction vector |
+| `selout` | color | Selective outline: draws outline pixels using a darker shade determined by adjacent pixel luminance rather than a fixed color. `color` provides the base outline color; actual placed color is shifted toward the adjacent sprite color's hue. |
+| `background_remove` | target_color | Replace all pixels matching `target_color` with index 0 (transparent). Operates on the full cel regardless of selection. |
 
 - Region parameters (`x`, `y`, `width`, `height`) default to the full cel when omitted.
 - `direction` for `gradient` is an enum: `vertical` (top→bottom), `horizontal` (left→right), `diagonal_down` (top-left→bottom-right), `diagonal_up` (bottom-left→top-right). Defaults to `vertical`. `color1` is at the starting edge, `color2` at the ending edge.
@@ -576,23 +658,34 @@ Example assignments: slot `0` = isolated tile, slot `255` = interior (all neighb
 
 **Behavior:** Operations execute in order on the target cel. All effects respect the active Selection and are wrapped in a single undo Command.
 
+- `selout` (selective outline) is a pixel-art-specific outline technique where the outline color adapts to the adjacent sprite pixel's hue and luminance, producing softer, more natural outlines than a flat-color outline. The `color` parameter provides the base/fallback outline color for pixels adjacent to transparent areas. For pixels adjacent to colored sprite pixels, the actual outline color is interpolated between `color` and a darker shade of the adjacent color's hue (using the nearest existing palette entry). Only operates on the boundary of non-transparent pixel clusters, same as `outline`.
+- `background_remove` is a convenience operation that replaces every pixel matching `target_color` with palette index 0 (transparent). Useful for cleaning up imported sprites with solid-color backgrounds. Ignores the active selection — always operates on the full cel. `target_color` must be a valid palette index (0–255).
+
+**Frame range mode:** When `frame_range` is provided instead of `frame_index`, all operations are applied to every frame in the inclusive range `[start, end]`. This is useful for batch operations like applying an outline across all frames of an animation. A single undo Command covers all frames in the range. `frame_range` and `frame_index` are mutually exclusive — providing both is an error.
+
 ---
 
 #### 8. **export**
 **Purpose:** The gateway out of the engine — produces standard game-ready file formats.
 
 **Arguments:**
-- action (enum: `png`, `gif`, `spritesheet_strip`, `atlas`, `per_tag`, `godot_spriteframes`, `godot_tileset`, `godot_static`, `godot_ui_frame`, `godot_atlas`)
+- action (enum: `png`, `gif`, `spritesheet_strip`, `atlas`, `per_tag`, `godot_spriteframes`, `godot_tileset`, `godot_static`, `godot_ui_frame`, `godot_atlas`, `spritesheet_grid`, `spritesheet_per_layer`, `normal_map`, `palette_lut`)
 - asset_name (string, optional — defaults to first loaded asset)
 - path (string — output file path)
 - scale_factor (integer, optional — e.g., 4 for 4x upscale)
 - pad (integer, optional — pixel padding between atlas cells, default 0)
 - extrude (boolean, optional — extrude edge pixels for atlas bleeding prevention)
 - tags (array of strings, optional — for `per_tag`: filter which frame tags to export; defaults to all frame tags)
+- columns (integer, optional — number of columns for `spritesheet_grid` layout; defaults to `ceil(sqrt(frame_count))`)
+- layers (array of integers, optional — layer IDs to include for `spritesheet_per_layer`; defaults to all image layers)
+- frame_index (integer, optional — for `normal_map`: which frame to render; defaults to 0)
+- palette_sources (array of strings, optional — asset names whose palettes provide additional LUT rows for `palette_lut`)
 
 **Behavior:** Routes internal Asset data into standard game development file formats. Exports operate on a specific asset (or all loaded assets for atlas packing).
 
 - `per_tag` — iterates over all frame tags in the asset (or the `tags` subset) and exports each as a separate spritesheet strip PNG. Output filenames are generated from the project's `conventions.export_pattern`, substituting each tag's name, facing, and frame data. Tokens that have no value for a given tag are silently dropped along with their adjacent separator (e.g., a tag with no `facing` in a `{name}_{tag}_{direction}.png` pattern produces `{name}_{tag}.png`). Returns a list of generated file paths. This is the primary action that makes `export_pattern` functional: instead of 24 separate `png` calls for an 8-directional, 3-animation character, a single `per_tag` call produces all 24 files.
+
+- `gif` — exports an animated GIF of the asset. All visible layers are composited at each frame, upscaled by `scale_factor`, and encoded as a looping GIF with per-frame timing from `duration_ms` values. If `tags` is provided, only frames within those tag ranges are included; if omitted, all frames are exported. Writes to `path`.
 
 - `godot_spriteframes` — exports a complete Godot 4.x-ready sprite package to the given directory:
   1. `{name}_strip.png` — horizontal spritesheet strip of all frames at `scale_factor`.
@@ -604,7 +697,7 @@ Example assignments: slot `0` = isolated tile, slot `255` = interior (all neighb
 - `godot_tileset` — exports a complete Godot 4.x-ready tileset package to the given directory:
   1. `{name}.png` — tileset atlas image at `scale_factor`.
   2. `{name}.png.import` — import sidecar with lossless compression and disabled mipmaps.
-  3. `{name}.tres` — Godot `TileSet` text resource with a `TileSetAtlasSource` referencing the atlas. Tile size is read from the asset's `tile_width`/`tile_height`. Per-tile collision polygons from `tile_physics` data are embedded as physics layer polygon definitions. Navigation polygons (if present) populate navigation layer data. If the asset has `tile_terrain` data (populated by `tileset autotile_generate`), the resource also includes a terrain set with `TERRAIN_MODE_MATCH_CORNERS_AND_SIDES` (for `blob47`) or the appropriate mode for `4side`/`4corner`, and per-tile `terrain_peering_bits` assignments mapping the blob47 bitmask to Godot's `CellNeighbor` constants.
+  3. `{name}.tres` — Godot `TileSet` text resource with a `TileSetAtlasSource` referencing the atlas. Tile size is read from the asset's `tile_width`/`tile_height`. Per-tile collision polygons from `tile_physics` data are embedded as physics layer polygon definitions. Navigation polygons (if present) populate navigation layer data. If the asset has `tile_terrain` data (populated by `tileset autotile_generate`), the resource also includes a terrain set with `TERRAIN_MODE_MATCH_CORNERS_AND_SIDES` (for `blob47`) or the appropriate mode for `4side`/`4corner`, and per-tile `terrain_peering_bits` assignments mapping the blob47 bitmask to Godot's `CellNeighbor` constants. If the asset has `tile_animation` data (populated by `tileset set_tile_animation`), animated tile properties are emitted per-tile: `animation_columns`, `animation_speed_fps` (derived from `frame_duration_ms`), and `animation_frames_count`. If the asset has `tile_custom_data` (populated by `tileset set_tile_data`), the TileSet resource includes custom data layer definitions and per-tile custom data values. If any tile has `occlusion_polygon` data, an occlusion layer is included in the TileSet. If the asset has `tile_alternatives` (populated by `tileset add_tile_alternative`), alternative tile entries are emitted with `flip_h`, `flip_v`, and `transpose` transform flags.
 
 - `godot_static` — exports a single composited image (frame 0, all visible layers) for non-animated assets that need only an image file — foreground occlusion layers, particle textures, UI backgrounds, and any sprite that does not require a `SpriteFrames` resource:
   1. `{name}.png` — composited PNG at `scale_factor`.
@@ -624,6 +717,14 @@ Example assignments: slot `0` = isolated tile, slot `255` = interior (all neighb
   2. `{name}.png.import` — import sidecar with lossless compression and disabled mipmaps.
   3. `{name}.tres` — Godot resource file containing one `ext_resource` for the atlas texture and one `AtlasTexture` `sub_resource` per packed asset, each with a `region = Rect2(x, y, w, h)` pointing to its location in the atlas. Sub-resources are named by asset name, making them directly referenceable from Godot code.
   Returns message + file list + region metadata.
+
+- `spritesheet_grid` — lays out all frames in a grid with the specified number of `columns`. Output dimensions: `(width × columns × scale) × (height × rows × scale)` where `rows = ceil(frame_count / columns)`. Empty cells in the last row (when frame_count is not a multiple of columns) are filled with transparent pixels. Useful for game engines that expect grid-based spritesheets rather than horizontal strips.
+
+- `spritesheet_per_layer` — exports one horizontal strip PNG per image layer, writing them to the `path` directory as `{asset_name}_{layer_name}_strip.png`. Only image layers are included; tilemap, shape, and group layers are skipped. If `layers` is provided, only the listed layer IDs are exported (must all be image layers). Returns the list of generated file paths. Useful for engines that composite layers at runtime (e.g., paper-doll character systems).
+
+- `normal_map` — generates a normal map from the sprite's luminance using a Sobel filter. Composites all visible layers at frame 0 (or specified `frame_index`), converts to grayscale luminance, applies 3×3 Sobel operators for horizontal and vertical gradients, maps to RGB normal space (R = dx, G = dy, B = 1.0, normalized). Output is a standard tangent-space normal map PNG at `scale_factor`. Writes to `path`. Useful for 2D lighting systems in Godot (CanvasItem → Normal Map property).
+
+- `palette_lut` — generates a 256×N lookup texture (LUT) for runtime palette swapping. Each row N contains 256 pixels where pixel X has the RGBA color of palette index X from the Nth palette source. Row 0 is always the asset's current palette. Additional rows can be added by providing `palette_sources` (array of asset names whose palettes provide additional rows). The LUT is written as a PNG to `path`. Shader-based palette swap: sample the sprite to get the palette index (red channel of indexed texture), then sample the LUT at `(index / 256, row / N)` to get the swapped color.
 
 **Example — exporting all directional animation strips using the project export_pattern:**
 ```json
@@ -720,6 +821,51 @@ Example assignments: slot `0` = isolated tile, slot `255` = interior (all neighb
 ```
 *Produces: `tree_canopy_a.png`, `tree_canopy_a.png.import`. No `.tres` generated.*
 
+**Example — exporting a grid spritesheet with 4 columns:**
+```json
+{
+  "action": "spritesheet_grid",
+  "asset_name": "player",
+  "path": "exports/player_grid.png",
+  "columns": 4,
+  "scale_factor": 2
+}
+```
+*Produces: `player_grid.png` with frames laid out in a 4-column grid.*
+
+**Example — exporting per-layer strips for a paper-doll system:**
+```json
+{
+  "action": "spritesheet_per_layer",
+  "asset_name": "player",
+  "path": "exports/player/layers/",
+  "scale_factor": 4
+}
+```
+*Produces: `player_base_strip.png`, `player_outline_strip.png`, etc. — one strip per image layer.*
+
+**Example — generating a normal map for 2D lighting:**
+```json
+{
+  "action": "normal_map",
+  "asset_name": "tree",
+  "path": "exports/tree_normal.png",
+  "scale_factor": 4
+}
+```
+*Produces: `tree_normal.png` — tangent-space normal map for use with Godot's CanvasItem Normal Map property.*
+
+**Example — generating a palette LUT for runtime palette swapping:**
+```json
+{
+  "action": "palette_lut",
+  "asset_name": "player",
+  "path": "exports/player_lut.png",
+  "palette_sources": ["fire_player", "ice_player"]
+}
+```
+*Produces: `player_lut.png` — 256×3 lookup texture (base palette + 2 swap palettes).*
+
 ---
 
 #### 9. **palette**
@@ -734,6 +880,8 @@ Example assignments: slot `0` = isolated tile, slot `255` = interior (all neighb
 - name (string, optional — Lospec slug for fetch_lospec; palette name written into saved file for save)
 - path (string, optional — file path for load and save; relative to pixelmcp.json)
 - color1, color2 (integers 0-255, optional — start and end palette indices for generate_ramp)
+- hue_shift_start (float, optional — hue rotation in degrees, -360 to +360, applied to the start color before interpolation; for `generate_ramp`)
+- hue_shift_end (float, optional — hue rotation in degrees, -360 to +360, applied to the end color before interpolation; for `generate_ramp`)
 
 **Behavior:**
 - `info` — returns the full palette: all defined entries with their index, RGBA values, and usage counts (how many pixels in the asset reference each index). This is how the LLM inspects available colors before drawing.
@@ -743,7 +891,7 @@ Example assignments: slot `0` = isolated tile, slot `255` = interior (all neighb
 - `load` — reads a palette `.json` file at `path` (resolved relative to `pixelmcp.json`) and applies it to the asset's palette, replacing existing entries. Entries present in the file overwrite; entries absent in the file are left unchanged. Wrapped in a Command.
 - `save` — writes the asset's current palette to a palette `.json` file at `path` (resolved relative to `pixelmcp.json`), using the optional `name` field as the palette identifier in the file. Creates or overwrites the file. Useful for promoting a palette built via `set_bulk` into a shared project file. Not wrapped in a Command (file I/O only).
 - `fetch_lospec` — fetches a palette from the Lospec API by `name` (slug, e.g., `"endesga-32"`) and applies it to the asset's palette. Wrapped in a Command. To persist the fetched palette to a local file for project-wide reuse, follow with a `save` call.
-- `generate_ramp` — reads the existing RGBA values at `color1` and `color2` as the ramp start and end colors, then interpolates and writes intermediate colors to every palette index between `color1` and `color2` inclusive. The values at `color1` and `color2` themselves are preserved. Requires both endpoint indices to already have colors defined. Wrapped in a Command.
+- `generate_ramp` — reads the existing RGBA values at `color1` and `color2` as the ramp start and end colors, then interpolates and writes intermediate colors to every palette index between `color1` and `color2` inclusive. The values at `color1` and `color2` themselves are preserved. Requires both endpoint indices to already have colors defined. If `hue_shift_start` and/or `hue_shift_end` are provided, the endpoint colors are first converted to HSL, the specified hue rotation is applied, and interpolation proceeds in HSL space. This enables warm-to-cool ramps (e.g., orange highlight → blue shadow with `hue_shift_end: -180`) that are common in pixel art shading. HSL conversion uses the standard cylindrical model (H: 0–360°, S: 0–1, L: 0–1). Saturation and lightness are linearly interpolated between endpoints; hue is interpolated along the shortest arc (or the shifted arc when hue_shift is applied). The resulting RGB is snapped to integer 0–255 values. Without hue shift parameters, interpolation is in RGB space as before. Wrapped in a Command.
 - All palette mutations are wrapped in Commands for undo/redo.
 
 **Example — inspecting current colors before drawing:**
@@ -819,7 +967,7 @@ Example assignments: slot `0` = isolated tile, slot `255` = interior (all neighb
 - target_asset_name (string, optional — destination for paste, enables cross-asset copy)
 - offset_x, offset_y (integers, optional — position offset for paste)
 
-**Behavior:** The Workspace maintains one active selection at a time. Each selection is scoped to a specific `asset_name` + `layer_id` + `frame_index` — setting a new selection replaces any previous one, even on a different asset. The selection mask constrains `draw`, `effect`, and `transform` operations on the same target.
+**Behavior:** The Workspace maintains one active selection at a time. Each selection is scoped to a specific `asset_name` + `layer_id` + `frame_index` — setting a new selection replaces any previous one, even on a different asset. The selection is automatically cleared when its target layer is removed, its target frame is removed, or its parent asset is unloaded. The selection mask constrains `draw`, `effect`, and `transform` operations on the same target.
 
 - `rect` — selects a rectangular region on the target cel.
 - `all` — selects the entire cel.
@@ -929,13 +1077,15 @@ Prompts complement the tool surface: tools handle atomic operations; prompts han
 ---
 
 **`scaffold_character`**
-Guide the LLM through creating a base character sprite from scratch: palette selection, layer structure, directional frame tags, and optional hitbox shape layer.
+Guide the LLM through creating a character sprite from scratch — player characters, NPCs, enemies, or bosses. A character's art assets are the same regardless of its controller; the distinction between player/NPC/enemy is game logic, not art. Covers: palette selection, layer structure, directional frame tags, optional hitbox/hurtbox shape layers, and behavioral animation states.
 
 Arguments:
 - `name` (required) — asset name
 - `directions` (optional) — `"4"` or `"8"` directional; defaults to `"4"`
 - `width` / `height` (optional) — canvas size in pixels; defaults to 16×24
 - `palette` (optional) — Lospec slug or palette file path; defaults to project default
+- `role` (optional) — `"player"`, `"npc"`, `"enemy"`, `"boss"`; informs which behavioral animation states to suggest (e.g., enemies get `hurt`, `death`, `aggro`; NPCs get `idle_variant`, `interact`; bosses get `phase_transition`). Defaults to `"player"`.
+- `animations` (optional) — explicit list of animation state names to scaffold (e.g., `["idle", "walk", "attack", "hurt", "death"]`); overrides role-based defaults.
 
 ---
 
@@ -995,6 +1145,80 @@ Arguments:
 - `width` (optional) — canvas width in pixels; defaults to 48
 - `height` (optional) — canvas height in pixels; defaults to 48
 - `palette` (optional) — Lospec slug or palette file path; defaults to project default
+
+---
+
+**`scaffold_attack`**
+Guide the LLM through creating an attack animation sequence with proper pixel art timing principles: anticipation (wind-up, 2-3 frames), active/smear (fast motion, 1-2 frames with motion blur via `smear_frame`), impact/rebound (contact frame with screen-shake implied timing), follow-through (deceleration, 2-3 frames), and recovery (return to idle). Covers frame timing, layer organization for weapon trail effects, and hitbox shape keyframes.
+
+Arguments:
+- `name` (required) — asset name (or existing asset to add frames to)
+- `attack_type` (optional) — `"melee_slash"`, `"melee_thrust"`, `"ranged"`, `"magic_cast"`; informs default frame structure and motion direction. Defaults to `"melee_slash"`.
+- `weapon_asset` (optional) — registered weapon asset name for cross-reference alignment
+- `frame_count` (optional) — total frames in the attack cycle; defaults to 6
+
+---
+
+**`scaffold_side_scroller`**
+Guide the LLM through creating a side-view character sprite with animation states specific to side-scrolling gameplay: `idle` (breathing/bob loop), `run` (full run cycle with contact/passing/flight phases), `jump_rise`, `jump_apex`, `jump_fall`, `land` (squash recovery), and `attack`. Covers the characteristic side-view proportions (wider stance, more horizontal motion), run cycle principles (contact→recoil→passing→high point), and jump arc frame selection.
+
+Arguments:
+- `name` (required) — asset name
+- `width` / `height` (optional) — canvas size; defaults to 32×32 (side-scrollers typically use larger canvases than top-down)
+- `palette` (optional) — Lospec slug or palette file path
+- `animations` (optional) — explicit animation state list; defaults to `["idle", "run", "jump_rise", "jump_fall", "land", "attack"]`
+
+---
+
+**`scaffold_vfx`**
+Guide the LLM through creating particle-like VFX sprites: explosions, magic effects, hit sparks, projectile impacts, and environmental particles (dust, fire, water splash). Covers: short frame count with aggressive timing (fast attack → slow decay), additive-friendly color choices (bright core → edge fade), scale progression (small → large → dissipate), and optional trail/afterimage layers.
+
+Arguments:
+- `name` (required) — asset name
+- `vfx_type` (optional) — `"explosion"`, `"magic"`, `"hit_spark"`, `"projectile"`, `"environmental"`; informs default frame structure and palette guidance. Defaults to `"explosion"`.
+- `width` / `height` (optional) — canvas size; defaults to 32×32
+- `frame_count` (optional) — total frames; defaults to 6
+- `palette` (optional) — Lospec slug or palette file path
+
+---
+
+**`scaffold_parallax`**
+Guide the LLM through creating parallax background layers for side-scrolling or horizontal scenes. Each layer is a separate asset with a width that is a multiple of the viewport width (for seamless horizontal tiling). Covers: layer depth ordering (sky → far mountains → near hills → foreground), color perspective (less saturated and lighter for distant layers), tile-seam alignment, and scroll-rate metadata stored as asset-level custom properties.
+
+Arguments:
+- `name` (required) — base name prefix for the layer assets (e.g., `"forest"` → `"forest_sky"`, `"forest_far"`, `"forest_mid"`, `"forest_near"`)
+- `layer_count` (optional) — number of parallax depth layers; defaults to 4
+- `viewport_width` (optional) — game viewport width in pixels; layers are created as multiples of this; defaults to 320
+- `height` (optional) — layer height in pixels; defaults to 180
+- `palette` (optional) — Lospec slug or palette file path
+
+---
+
+**`scaffold_props`**
+Guide the LLM through creating environment props — objects that populate the game world: destructible objects (crates, pots with break animation), interactable objects (chests with open/close states, levers, doors), and decorative objects (flowers, signs, furniture with optional idle animation). Covers: state-based frame tags (`normal`, `activated`, `broken`, `open`, `closed`), hitbox/interaction-area shape layers, and consistent scale relative to a reference character.
+
+Arguments:
+- `name` (required) — asset name
+- `prop_type` (optional) — `"destructible"`, `"interactable"`, `"decoration"`; informs default state tags and layer structure. Defaults to `"decoration"`.
+- `reference_character` (optional) — registered character asset for scale reference
+- `width` / `height` (optional) — canvas size; defaults to 16×16
+- `palette` (optional) — Lospec slug or palette file path
+
+---
+
+#### Future Considerations (Tier 4)
+
+The following features are documented for future implementation but are lower priority than the core tool enhancements above.
+
+**`interpolate_frames` action on `asset` tool** — inserts N intermediate frames between two keyframes by interpolating pixel positions. Accepts `frame_start`, `frame_end`, `count` (number of intermediate frames to insert). Interpolation method: per-pixel nearest-neighbor blending between the two keyframe cels (for indexed color, picks the source or destination index based on a threshold). Useful for roughing out smooth animation transitions that the LLM can then refine. Wrapped in a Command for undo/redo.
+
+**`detect_jaggies` read-only action on `asset` tool** — analyzes a target cel for jaggy artifacts: staircase patterns on edges that should be smooth curves or diagonals. Reports pixel coordinates and suggested corrections (e.g., "add intermediate pixel at (x,y) with color between indices A and B"). Does not modify pixel data. Returns `{ clean: true }` or `{ jaggies: [{ x, y, severity, suggestion }] }`. Complements `detect_banding` for pixel art quality analysis.
+
+**`scale2x` algorithm option on export** — adds a `scale_algorithm` parameter (enum: `nearest`, `scale2x`) to export actions that accept `scale_factor`. Scale2x is a pixel art-specific upscaling algorithm that smooths edges while preserving sharp details, producing cleaner results than nearest-neighbor at 2× magnification. Only valid when `scale_factor` is a power of 2 (2, 4, 8 — applied iteratively).
+
+**Color cycling metadata** — adds an optional `color_cycling` array on the Asset type, where each entry defines a range of palette indices that cycle at a specified speed (`{ start_index, end_index, speed_ms, direction: "forward" | "reverse" | "ping_pong" }`). A `set_color_cycling` action on the `palette` tool manages this metadata. Color cycling is stored in the asset JSON and can be exported as Godot shader uniform metadata. Useful for retro water, fire, and rainbow effects without additional animation frames.
+
+**`scaffold_bitmap_font` prompt** — guides creation of a bitmap font asset: fixed-width glyph grid, character mapping, kerning metadata. Paired with a `bitmap_font` export action that outputs a Godot `BitmapFont` `.tres` resource referencing the glyph atlas PNG.
 
 
 ### 2.5 MCP App
@@ -1305,6 +1529,10 @@ Each Asset is stored as a self-contained JSON file. Pixel data uses the **row in
 
 **Why JSON for images?** Saving pixel art hierarchies this way (instead of as raw PNGs) is highly intentional for an AI agent. The JSON format is human-readable (allowing the LLM to inspect or debug specific layers/pixels), diff-friendly (working well with Git for game development workflows), and parsable (meaning generic tools can read the asset data without a specialized decoder). When actual images are needed for the game, the server runs an export pipeline to bake the JSON out into standard .png spritesheets or .gif animations.
 
+#### Version Policy
+
+The `pixelmcp_version` field in Asset and Project JSON files uses semantic versioning. Minor version increments when new optional fields are added (e.g., `tile_animation`, `tile_custom_data`). Major version increments when existing field semantics change. `fromJSON()` handles backward compatibility by defaulting missing optional fields — assets created with older versions load without migration.
+
 
 ### 2.7 Error Response Catalog
 
@@ -1329,8 +1557,14 @@ Domain errors are returned with `{ isError: true, content: [{ type: "text", text
 | asset | `add_shape` / `update_shape` — `layer_id` not a shape layer | `"Layer {id} is not a shape layer."` |
 | asset | `create_recolor` — no palette source provided | `"At least one palette source (palette_file, palette_slug, or palette_entries) is required for create_recolor."` |
 | asset | `set_nine_slice` — margins exceed dimensions | `"Nine-slice margins exceed asset dimensions (top + bottom must be < height, left + right must be < width)."` |
+| asset | `link_cel` — source cel does not exist | `"Source cel at layer {id}/frame {index} does not exist in asset '{name}'."` |
+| asset | `link_cel` — self-link (target == source) | `"Cannot link a cel to itself."` |
+| asset | `link_cel` — layer type mismatch | `"Source layer {id} and target layer {id} must be the same type for link_cel."` |
 | draw | any operation — `color` out of range | `"Color index {color} is out of range (0–255)."` |
 | draw | `write_pixels` — data dimensions mismatch | `"write_pixels data dimensions ({dw}×{dh}) do not match declared width×height ({w}×{h})."` |
+| draw | `color_replace` — `from_color` or `to_color` out of range | `"Color index {color} is out of range (0–255)."` |
+| draw / transform / effect | `frame_range` — invalid range | `"frame_range [{start}, {end}] is invalid. Requires 0 ≤ start ≤ end < frame_count."` |
+| draw / transform / effect | `frame_range` + `frame_index` both provided | `"frame_range and frame_index are mutually exclusive."` |
 | effect | any operation — `color1` / `color2` out of range | `"Color index {color} is out of range (0–255)."` |
 | palette | `set` / `swap` — index out of range | `"Palette index {index} is out of range (0–255)."` |
 | palette | `generate_ramp` — endpoint index has no color defined | `"Palette index {index} has no color defined. Set it before generating a ramp."` |
@@ -1341,9 +1575,18 @@ Domain errors are returned with `{ isError: true, content: [{ type: "text", text
 | tileset | `autotile_generate` — asset is not a tileset | `"Asset '{name}' has no tile dimensions. Create the asset with tile_width/tile_height via asset create."` |
 | tileset | `autotile_generate` — `pattern` missing | `"autotile_generate requires a pattern (blob47, 4side, or 4corner)."` |
 | tileset | `set_tile_physics` — tile index not found | `"Tile index {index} does not exist in tileset '{name}'."` |
+| tileset | `set_tile_animation` — `frame_count` < 1 | `"set_tile_animation requires frame_count ≥ 1."` |
+| tileset | `set_tile_data` — missing data_layer_name or data_layer_type | `"set_tile_data requires data_layer_name and data_layer_type."` |
+| tileset | `add_tile_alternative` — tile_index not found | `"Tile index {index} does not exist in tileset '{name}'."` |
+| tileset | `clear_tile_animation` — tile_index not found | `"Tile index {index} does not exist in tileset '{name}'."` |
+| tileset | `clear_tile_data` — tile_index not found | `"Tile index {index} does not exist in tileset '{name}'."` |
+| tileset | `remove_tile_alternative` — alternative_id not found | `"Alternative {id} does not exist for tile {index} in tileset '{name}'."` |
 | export | any action, asset not loaded | `"Asset '{name}' is not loaded in the workspace."` |
 | export | any action — output path not writable | `"Cannot write to path: {path}"` |
 | export | `godot_ui_frame` — no nine_slice set | `"Asset '{name}' has no nine_slice margins set. Call asset set_nine_slice first."` |
+| export | `spritesheet_grid` — `columns` < 1 | `"spritesheet_grid requires columns ≥ 1."` |
+| export | `spritesheet_per_layer` — no image layers | `"Asset '{name}' has no image layers to export."` |
+| export | `spritesheet_per_layer` — specified layer not an image layer | `"Layer {id} is not an image layer."` |
 | selection | `paste` — clipboard empty | `"Clipboard is empty. Copy or cut a selection first."` |
 | selection | `paste` — `target_asset_name` not loaded | `"Target asset '{name}' is not loaded in the workspace."` |
 

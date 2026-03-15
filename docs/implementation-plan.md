@@ -710,6 +710,213 @@ An interactive pixel art editor that renders **inline in the conversation** usin
 
 ---
 
+## Phase 8: Extended Features & Workflow Breadth
+
+Extends the tool surface with 25 features identified through gap analysis, organized by priority tier. Tiers communicate implementation priority — higher tiers should be completed first, but sub-tasks within a tier can be parallelized.
+
+**Depends on:** Phases 1–7 (full tool surface, working exports, MCP app)
+
+---
+
+### 8A — LLM Workflow Optimizations (Tier 1)
+
+High-impact features that reduce round trips and unlock common LLM pixel art workflows.
+
+#### 8A.1 Frame Range Batch Operations
+
+- [ ] **8A.1.1** **Frame range command infrastructure** — `FrameRangeCommand` that wraps an inner command factory, iterating over `[start, end]` frames and capturing/restoring all affected cels as a single undo step. Validates `0 ≤ start ≤ end < frame_count` and mutual exclusivity with `frame_index`.
+- [ ] **8A.1.2** **Wire `frame_range` into `draw` tool** — add `frame_range` to Zod schema (mutually exclusive with `frame_index`), dispatch through `FrameRangeCommand`. All operations in the `operations` array are applied to each frame sequentially.
+- [ ] **8A.1.3** **Wire `frame_range` into `transform` tool** — same pattern as draw.
+- [ ] **8A.1.4** **Wire `frame_range` into `effect` tool** — same pattern as draw.
+
+#### 8A.2 Linked Cel Creation
+
+- [ ] **8A.2.1** **`LinkCelCommand`** (`src/commands/link-cel-command.ts`) — captures the target cel's existing data on construction, replaces with a link reference on `execute()`, restores original data on `undo()`.
+- [ ] **8A.2.2** **`link_cel` action on asset tool** — add to Zod schema with `source_layer_id` and `source_frame_index` params. Validate source exists, reject self-link, validate matching layer types. Wrap in `LinkCelCommand`.
+
+#### 8A.3 Per-Layer Spritesheet Export
+
+- [ ] **8A.3.1** **`spritesheet_per_layer` export action** — iterate image layers (filtered by optional `layers` param), composite each layer in isolation across all frames into a horizontal strip, write to `{asset_name}_{layer_name}_strip.png` in `path` directory. Return file list.
+
+#### 8A.4 Hue-Shifting in generate_ramp
+
+- [ ] **8A.4.1** **HSL conversion utilities** (`src/algorithms/color-utils.ts`) — `rgbaToHsl()` and `hslToRgba()` pure functions. Unit tested independently.
+- [ ] **8A.4.2** **Hue-shifted ramp generation** — extend `Palette.generateRamp()` (or the palette tool handler) to accept `hue_shift_start` and `hue_shift_end`. Convert endpoints to HSL, apply hue rotation, interpolate in HSL space, convert back to RGBA, snap to nearest existing palette entry or write directly.
+
+#### 8A.5 Selective Outline Effect
+
+- [ ] **8A.5.1** **`selout` algorithm** (`src/algorithms/outline.ts`) — extend outline module with `selectiveOutline(data, palette, baseColor)`. For each outline candidate pixel, examine adjacent non-transparent sprite pixels, compute a blended outline color shifted toward the adjacent pixel's hue at reduced luminance, find the nearest palette entry, and place it. Falls back to `baseColor` for pixels adjacent only to transparency.
+- [ ] **8A.5.2** **Wire `selout` into effect tool** — add `selout` operation to Zod schema and dispatch to algorithm.
+
+#### 8A.6 Color Replace Draw Operation
+
+- [ ] **8A.6.1** **`colorReplace` algorithm** — simple scan-and-replace on a 2D palette-index array. Respects selection mask when provided.
+- [ ] **8A.6.2** **Wire `color_replace` into draw tool** — add to operations Zod schema with `from_color` and `to_color` params, dispatch to algorithm.
+
+#### 8A.7 `scaffold_attack` Prompt
+
+- [ ] **8A.7.1** **`scaffold_attack` prompt** (`src/prompts/scaffold-attack.ts`) — arguments: `name`, optional `attack_type` (`melee_slash`/`melee_thrust`/`ranged`/`magic_cast`), optional `weapon_asset`, optional `frame_count`. Messages guide through anticipation → smear → impact → follow-through → recovery frame structure with timing advice.
+
+#### 8A.8 `scaffold_side_scroller` Prompt
+
+- [ ] **8A.8.1** **`scaffold_side_scroller` prompt** (`src/prompts/scaffold-side-scroller.ts`) — arguments: `name`, optional `width`/`height`, optional `palette`, optional `animations`. Messages guide through side-view character proportions, run cycle phases, jump arc frames.
+
+#### 8A.9 Testing
+
+- [ ] **8A.9.1** **Frame range tests** — `FrameRangeCommand` undo/redo across multiple frames; draw/transform/effect with `frame_range` verify all frames modified; mutual exclusivity error with `frame_index`.
+- [ ] **8A.9.2** **Link cel tests** — `LinkCelCommand` execute/undo/redo; `link_cel` action validation (self-link error, source not found, type mismatch); get_cel on linked cel returns source data.
+- [ ] **8A.9.3** **Per-layer spritesheet tests** — correct number of output files; each strip has correct dimensions; `layers` filter works; non-image layers skipped.
+- [ ] **8A.9.4** **Hue-shifted ramp tests** — HSL conversion roundtrip fidelity; ramp with hue shift produces different intermediate colors than without; warm→cool ramp verification.
+- [ ] **8A.9.5** **Selective outline tests** — `selout` produces different outline colors near different sprite regions; fallback to base color near transparency; comparison with flat `outline`.
+- [ ] **8A.9.6** **Color replace tests** — all matching pixels replaced; non-matching pixels unchanged; respects selection mask; works with `frame_range`.
+- [ ] **8A.9.7** **Prompt tests** — `scaffold_attack` and `scaffold_side_scroller` registration, argument validation, messages reference correct tool actions.
+
+> **Definition of Done — Phase 8A:** Frame range operations work across draw/transform/effect with single undo step. Linked cels can be created explicitly. Per-layer spritesheet export produces correct output. Hue-shifted ramps produce warm→cool gradients. Selective outline adapts to adjacent colors. Color replace works with selection and frame range. Both new prompts pass registration and message tests.
+
+---
+
+### 8B — Godot Import Completeness (Tier 2)
+
+Features that produce richer Godot `.tres` resources for direct import without manual editor work. Depends on Phase 1 types (`src/types/asset.ts`) and Phase 3.3 tileset tool (`src/tools/tileset.ts`).
+
+#### 8B.1 Animated Tiles in TileSet
+
+- [ ] **8B.1.1** **`tile_animation` asset storage** — extend asset types with optional `tile_animation: Record<string, { frame_count, frame_duration_ms, separation }>` field. Add to `toJSON()`/`fromJSON()` roundtrip. Extends the Phase 1 Asset type definition (`src/types/asset.ts`) with new optional field.
+- [ ] **8B.1.2** **`TileAnimationCommand`** — captures `tile_animation` before-state for undo/redo.
+- [ ] **8B.1.3** **`set_tile_animation` tileset action** — add to Zod schema, validate `tile_index` exists and `frame_count ≥ 1`, store in asset, wrap in command.
+- [ ] **8B.1.4** **Emit animated tile properties in `godot_tileset` `.tres`** — `animation_columns`, `animation_speed_fps` (1000 / frame_duration_ms), `animation_frames_count` per animated tile.
+- [ ] **8B.1.5** **`clear_tile_animation` tileset action** — add to Zod schema, validate `tile_index` exists, remove animation metadata, wrap in command.
+
+#### 8B.2 TileSet Custom Data Layers
+
+- [ ] **8B.2.1** **`tile_custom_data` asset storage** — extend asset types with `tile_custom_data: { layers: Array<{ name, type }>, tiles: Record<string, Record<string, value>> }`. Add to roundtrip. Extends the Phase 1 Asset type definition (`src/types/asset.ts`) with new optional field.
+- [ ] **8B.2.2** **`TileDataCommand`** — captures custom data before-state.
+- [ ] **8B.2.3** **`set_tile_data` tileset action** — add to Zod schema, auto-create data layer if new, store value per tile, wrap in command.
+- [ ] **8B.2.4** **Emit custom data layers in `godot_tileset` `.tres`** — custom data layer definitions + per-tile custom data values.
+- [ ] **8B.2.5** **`clear_tile_data` tileset action** — add to Zod schema, remove custom data value for given `data_layer_name` (or all custom data if omitted), wrap in command.
+
+#### 8B.3 TileSet Occlusion Polygons
+
+- [ ] **8B.3.1** **Extend `set_tile_physics` with `occlusion_polygon`** — add optional param to Zod schema, store alongside physics polygon in `tile_physics`.
+- [ ] **8B.3.2** **Emit occlusion layer in `godot_tileset` `.tres`** — include occlusion polygon data for tiles that have it.
+
+#### 8B.4 Tile Alternatives
+
+- [ ] **8B.4.1** **`tile_alternatives` asset storage** — extend asset types with `tile_alternatives: Record<string, Array<{ alternative_id, flip_h, flip_v, transpose }>>`. Add to roundtrip. Extends the Phase 1 Asset type definition (`src/types/asset.ts`) with new optional field.
+- [ ] **8B.4.2** **`TileAlternativeCommand`** — captures alternatives before-state.
+- [ ] **8B.4.3** **`add_tile_alternative` tileset action** — add to Zod schema, auto-assign `alternative_id` if not provided, validate tile exists, store, wrap in command.
+- [ ] **8B.4.4** **Emit alternative tiles in `godot_tileset` `.tres`** — alternative tile entries with transform flags (`flip_h`, `flip_v`, `transpose`).
+- [ ] **8B.4.5** **`remove_tile_alternative` tileset action** — add to Zod schema, validate `tile_index` and `alternative_id` exist, remove alternative, wrap in command.
+
+#### 8B.5 Grid Spritesheet Export
+
+- [ ] **8B.5.1** **`spritesheet_grid` export action** — composite frames into grid layout with `columns` parameter (default `ceil(sqrt(frame_count))`). Validate `columns ≥ 1`. Fill incomplete final row with transparent pixels.
+
+#### 8B.6 Per-Tag Side-Scroller Verification
+
+- [ ] **8B.6.1** **Verify `export per_tag`** works correctly with side-scroller animation states (no `facing` property — just tag names like `idle`, `run`, `jump`). Ensure separator-dropping logic handles tags with no facing gracefully.
+
+#### 8B.7 Testing
+
+- [ ] **8B.7.1** **Animated tile tests** — `set_tile_animation` storage and roundtrip; `clear_tile_animation` removes metadata and round-trips; `.tres` output contains animation properties; command undo/redo.
+- [ ] **8B.7.2** **Custom data tests** — `set_tile_data` auto-creates layers; `clear_tile_data` removes single key or all custom data; multiple data types stored correctly; `.tres` output contains custom data; command undo/redo.
+- [ ] **8B.7.3** **Occlusion tests** — `set_tile_physics` with `occlusion_polygon`; `.tres` output contains occlusion layer.
+- [ ] **8B.7.4** **Tile alternative tests** — `add_tile_alternative` auto-assigns ID; `remove_tile_alternative` removes by ID; `.tres` output contains alternative entries with transform flags; command undo/redo.
+- [ ] **8B.7.5** **Grid spritesheet tests** — correct dimensions for various `columns` values; transparent fill in incomplete rows; `columns < 1` error.
+
+> **Definition of Done — Phase 8B:** Animated tiles, custom data layers, occlusion polygons, and tile alternatives all round-trip through save/load and appear in Godot `.tres` output. Grid spritesheet export produces correct layouts. All 8B.7 tests pass.
+
+---
+
+### 8C — Workflow Breadth (Tier 3)
+
+New prompts and export formats that broaden the range of art assets the LLM can create.
+
+#### 8C.1 Enhance `scaffold_character`
+
+- [ ] **8C.1.1** **Broaden `scaffold_character` prompt** — add `role` argument (player/npc/enemy/boss) and `animations` argument. Adjust messages to include behavioral animation states based on role: enemies get `hurt`/`death`/`aggro`; NPCs get `idle_variant`/`interact`; bosses get `phase_transition`. Player remains the default with `idle`/`walk`/`attack`.
+- [ ] **8C.1.2** **Update prompt tests** — verify role-based animation state suggestions, verify `animations` override works.
+
+#### 8C.2 `scaffold_vfx` Prompt
+
+- [ ] **8C.2.1** **`scaffold_vfx` prompt** (`src/prompts/scaffold-vfx.ts`) — arguments: `name`, optional `vfx_type`, optional `width`/`height`, optional `frame_count`, optional `palette`. Messages guide through VFX sprite creation with timing advice (fast attack → slow decay), color choices, scale progression.
+
+#### 8C.3 `scaffold_parallax` Prompt
+
+- [ ] **8C.3.1** **`scaffold_parallax` prompt** (`src/prompts/scaffold-parallax.ts`) — arguments: `name`, optional `layer_count`, optional `viewport_width`, optional `height`, optional `palette`. Messages guide through parallax layer creation with depth ordering, atmospheric perspective color guidance, tile-seam alignment.
+
+#### 8C.4 `scaffold_props` Prompt
+
+- [ ] **8C.4.1** **`scaffold_props` prompt** (`src/prompts/scaffold-props.ts`) — arguments: `name`, optional `prop_type`, optional `reference_character`, optional `width`/`height`, optional `palette`. Messages guide through environment prop creation with state-based tags, hitbox layers, scale consistency.
+
+#### 8C.5 Normal Map Generation
+
+- [ ] **8C.5.1** **Sobel normal map algorithm** (`src/algorithms/normal-map.ts`) — `generateNormalMap(rgbaBuffer, width, height): Uint8Array`. Convert to grayscale luminance, apply 3×3 Sobel operators, map gradients to tangent-space RGB normals. Pure function, unit tested.
+- [ ] **8C.5.2** **`normal_map` export action** — composite asset at target frame, pass RGBA buffer to normal map algorithm, upscale, encode as PNG, write to path.
+
+#### 8C.6 Palette Swap LUT Export
+
+- [ ] **8C.6.1** **LUT generation algorithm** (`src/algorithms/palette-lut.ts`) — `generatePaletteLUT(palettes: Array<Array<[r,g,b,a]>>): Uint8Array`. Build a 256×N RGBA texture where row R, column C = palettes[R][C]. Pure function.
+- [ ] **8C.6.2** **`palette_lut` export action** — gather asset palette + palette_sources palettes, pass to LUT algorithm, encode as PNG, write to path.
+
+#### 8C.7 Testing
+
+- [ ] **8C.7.1** **Enhanced scaffold_character tests** — role-based animation states, animations override, backward compatibility with existing arguments.
+- [ ] **8C.7.2** **New prompt tests** — `scaffold_vfx`, `scaffold_parallax`, `scaffold_props` registration, argument validation, messages reference correct tool actions.
+- [ ] **8C.7.3** **Normal map tests** — Sobel output verified against known gradient inputs; flat surface produces (128, 128, 255) blue; edge detection produces correct directional normals.
+- [ ] **8C.7.4** **Palette LUT tests** — LUT dimensions correct (256 × palette_count); pixel values match source palettes; single-palette LUT is 256×1.
+
+> **Definition of Done — Phase 8C:** Enhanced `scaffold_character` covers all character roles with behavioral states. Three new prompts (vfx, parallax, props) pass registration and message tests. Normal map export produces valid tangent-space normal maps. Palette LUT export produces correct lookup textures. All 8C.7 tests pass.
+
+---
+
+### 8D — Nice to Have (Tier 4)
+
+Lower-priority features that are documented for completeness. Implement as time allows.
+
+#### 8D.1 Background Removal Effect
+
+- [ ] **8D.1.1** **`background_remove` effect operation** — scan-and-replace: every pixel matching `target_color` → index 0. Ignores selection. Add to effect tool Zod schema.
+
+#### 8D.2 Animation Interpolation
+
+- [ ] **8D.2.1** **Frame interpolation algorithm** (`src/algorithms/interpolate.ts`) — `interpolateFrames(celA, celB, count): number[][][]`. Per-pixel threshold blending between two keyframe cels, producing `count` intermediate 2D arrays.
+- [ ] **8D.2.2** **`interpolate_frames` action on asset tool** — insert `count` new frames between `frame_start` and `frame_end`, populate cels from interpolation algorithm. Wrapped in Command.
+
+#### 8D.3 Advanced Upscaling (Scale2x)
+
+- [ ] **8D.3.1** **Scale2x algorithm** (`src/algorithms/scale2x.ts`) — pixel art upscaling that smooths edges while preserving sharp details. Applied iteratively for 4×, 8×.
+- [ ] **8D.3.2** **`scale_algorithm` parameter on export** — add optional enum param (`nearest` | `scale2x`) to export actions. Default `nearest`. Validate `scale2x` only valid with power-of-2 scale factors.
+
+#### 8D.4 Jaggy Detection
+
+- [ ] **8D.4.1** **Jaggy detection algorithm** (`src/algorithms/jaggies.ts`) — scan for staircase patterns on edges that should be smooth. Report coordinates and severity.
+- [ ] **8D.4.2** **`detect_jaggies` read-only action on asset tool** — delegate to algorithm, return structured report.
+
+#### 8D.5 Color Cycling
+
+- [ ] **8D.5.1** **`color_cycling` asset metadata** — optional array on Asset type: `Array<{ start_index, end_index, speed_ms, direction }>`.
+- [ ] **8D.5.2** **`set_color_cycling` palette action** — manage color cycling entries. Wrapped in Command.
+- [ ] **8D.5.3** **Export color cycling as shader metadata** — emit alongside Godot resources for runtime cycling.
+
+#### 8D.6 Bitmap Font Workflow
+
+- [ ] **8D.6.1** **`scaffold_bitmap_font` prompt** — guide creation of fixed-width glyph grid asset with character mapping.
+- [ ] **8D.6.2** **`bitmap_font` export action** — output glyph atlas PNG + Godot `BitmapFont` `.tres` resource.
+
+#### 8D.7 Testing
+
+- [ ] **8D.7.1** **Background removal tests** — matching pixels replaced with 0; non-matching unchanged; ignores selection.
+- [ ] **8D.7.2** **Interpolation tests** — correct number of intermediate frames inserted; boundary frames unchanged; command undo removes inserted frames.
+- [ ] **8D.7.3** **Scale2x tests** — output dimensions correct; known pattern produces expected smoothed output; error on non-power-of-2 scale factor.
+- [ ] **8D.7.4** **Jaggy detection tests** — known staircase pattern detected; clean diagonal not flagged; report structure correct.
+- [ ] **8D.7.5** **Color cycling tests** — metadata roundtrip; `set_color_cycling` command undo/redo.
+- [ ] **8D.7.6** **Bitmap font tests** — prompt registration and argument validation; export produces glyph atlas with correct dimensions.
+
+> **Definition of Done — Phase 8D:** All Tier 4 features implemented and tested. Background removal, animation interpolation, Scale2x upscaling, jaggy detection, color cycling, and bitmap font workflow all have passing tests.
+
+---
+
 ## Dependency Graph
 
 ```
@@ -813,6 +1020,39 @@ Phase 7 (MCP App — depends on Phases 1-6)
   ├── 7.8 UI: Selection + context bridge (rect select, marching ants, "Reference in AI")
   ├── 7.9 UI: App shell + state (App.connect, ontoolresult, auto-refresh)
   └── 7.10 Testing (CanvasRenderer unit tests + tool tests + smoke test)
+
+Phase 8 (Extended Features — depends on Phases 1-7)
+  ├── 8A LLM Workflow Optimizations (Tier 1)
+  │     ├── 8A.1 Frame range batch ops (new command + draw/transform/effect wiring)
+  │     ├── 8A.2 Linked cel creation (new command + asset tool action)
+  │     ├── 8A.3 Per-layer spritesheet export (export tool)
+  │     ├── 8A.4 Hue-shifting ramps (color-utils algorithm + palette tool)
+  │     ├── 8A.5 Selective outline (outline algorithm extension + effect tool)
+  │     ├── 8A.6 Color replace (draw tool operation)
+  │     ├── 8A.7-8 scaffold_attack + scaffold_side_scroller prompts
+  │     └── 8A.9 Testing
+  ├── 8B Godot Import Completeness (Tier 2, parallelizable with 8A; depends on 1.1 types + 3.3 tileset)
+  │     ├── 8B.1 Animated tiles (asset storage + tileset action + clear action + .tres emission)
+  │     ├── 8B.2 Custom data layers (asset storage + tileset action + clear action + .tres emission)
+  │     ├── 8B.3 Occlusion polygons (set_tile_physics extension + .tres emission)
+  │     ├── 8B.4 Tile alternatives (asset storage + tileset action + remove action + .tres emission)
+  │     ├── 8B.5 Grid spritesheet export
+  │     ├── 8B.6 Per-tag side-scroller verification
+  │     └── 8B.7 Testing
+  ├── 8C Workflow Breadth (Tier 3, after 8A prompts for consistency)
+  │     ├── 8C.1 Enhance scaffold_character (role + behavioral states)
+  │     ├── 8C.2-4 scaffold_vfx, scaffold_parallax, scaffold_props prompts
+  │     ├── 8C.5 Normal map generation (algorithm + export action)
+  │     ├── 8C.6 Palette swap LUT (algorithm + export action)
+  │     └── 8C.7 Testing
+  └── 8D Nice to Have (Tier 4, after 8A-8C)
+        ├── 8D.1 Background removal effect
+        ├── 8D.2 Animation interpolation (algorithm + asset action)
+        ├── 8D.3 Scale2x upscaling (algorithm + export param)
+        ├── 8D.4 Jaggy detection (algorithm + asset action)
+        ├── 8D.5 Color cycling (asset metadata + palette action + export)
+        ├── 8D.6 Bitmap font (prompt + export action)
+        └── 8D.7 Testing
 ```
 
 ## Implementation Rules

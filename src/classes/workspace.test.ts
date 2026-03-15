@@ -3,6 +3,9 @@ import { WorkspaceClass, getWorkspace } from './workspace.js';
 import { ProjectClass } from './project.js';
 import { type Asset } from '../types/asset.js';
 import { type Command } from '../commands/command.js';
+import { LayerCommand } from '../commands/layer-command.js';
+import { FrameCommand } from '../commands/frame-command.js';
+import { AssetClass } from './asset.js';
 import { loadAssetFile, saveAssetFile } from '../io/index.js';
 
 vi.mock('../io/index.js', () => ({
@@ -309,5 +312,139 @@ describe('WorkspaceClass', () => {
     ws.unloadAsset('armor');
     const summary2 = ws.info();
     expect(summary2.loadedAssets.find((a) => a.name === 'armor')).toBeUndefined();
+  });
+
+  describe('validateSelection on structural mutations', () => {
+    function makeAssetWithTwoLayersAndFrames(): AssetClass {
+      return new AssetClass({
+        name: 'sprite',
+        width: 16,
+        height: 16,
+        perspective: 'flat',
+        palette: [
+          [0, 0, 0, 0],
+          [255, 0, 0, 255],
+        ],
+        layers: [
+          { id: 1, name: 'base', type: 'image', visible: true, opacity: 255 },
+          { id: 2, name: 'overlay', type: 'image', visible: true, opacity: 255 },
+        ],
+        frames: [
+          { index: 0, duration_ms: 100 },
+          { index: 1, duration_ms: 100 },
+        ],
+        cels: {},
+        tags: [],
+      });
+    }
+
+    function setSelection(ws: WorkspaceClass, layerId: number, frameIndex: number): void {
+      ws.selection = {
+        asset_name: 'sprite',
+        layer_id: layerId,
+        frame_index: frameIndex,
+        x: 0,
+        y: 0,
+        width: 8,
+        height: 8,
+        mask: [[true]],
+      };
+    }
+
+    it('clears selection when targeted layer is removed via LayerCommand', () => {
+      const ws = WorkspaceClass.instance();
+      const asset = makeAssetWithTwoLayersAndFrames();
+      ws.loadedAssets.set('sprite', asset);
+      setSelection(ws, 2, 0);
+
+      const cmd = new LayerCommand(asset, () => {
+        asset.removeLayer(2);
+      });
+      cmd.execute();
+
+      expect(ws.selection).toBeNull();
+    });
+
+    it('clears selection when targeted frame is removed via FrameCommand', () => {
+      const ws = WorkspaceClass.instance();
+      const asset = makeAssetWithTwoLayersAndFrames();
+      ws.loadedAssets.set('sprite', asset);
+      setSelection(ws, 1, 1);
+
+      const cmd = new FrameCommand(asset, () => {
+        asset.removeFrame(1);
+      });
+      cmd.execute();
+
+      expect(ws.selection).toBeNull();
+    });
+
+    it('does NOT clear selection when unrelated layer is removed', () => {
+      const ws = WorkspaceClass.instance();
+      const asset = makeAssetWithTwoLayersAndFrames();
+      ws.loadedAssets.set('sprite', asset);
+      setSelection(ws, 1, 0);
+
+      const cmd = new LayerCommand(asset, () => {
+        asset.removeLayer(2);
+      });
+      cmd.execute();
+
+      expect(ws.selection).not.toBeNull();
+      expect(ws.selection?.layer_id).toBe(1);
+    });
+
+    it('does NOT clear selection when unrelated frame is removed', () => {
+      const ws = WorkspaceClass.instance();
+      const asset = makeAssetWithTwoLayersAndFrames();
+      ws.loadedAssets.set('sprite', asset);
+      setSelection(ws, 1, 0);
+
+      const cmd = new FrameCommand(asset, () => {
+        asset.removeFrame(1);
+      });
+      cmd.execute();
+
+      expect(ws.selection).not.toBeNull();
+      expect(ws.selection?.frame_index).toBe(0);
+    });
+
+    it('restores selection validity after undo of layer removal', () => {
+      const ws = WorkspaceClass.instance();
+      const asset = makeAssetWithTwoLayersAndFrames();
+      ws.loadedAssets.set('sprite', asset);
+      setSelection(ws, 2, 0);
+
+      const cmd = new LayerCommand(asset, () => {
+        asset.removeLayer(2);
+      });
+      cmd.execute();
+      expect(ws.selection).toBeNull();
+
+      // After undo, layer 2 exists again — set selection and validate
+      cmd.undo();
+      setSelection(ws, 2, 0);
+      ws.validateSelection('sprite');
+      expect(ws.selection).not.toBeNull();
+    });
+
+    it('restores selection validity after undo of frame removal', () => {
+      const ws = WorkspaceClass.instance();
+      const asset = makeAssetWithTwoLayersAndFrames();
+      ws.loadedAssets.set('sprite', asset);
+      setSelection(ws, 1, 1);
+
+      const cmd = new FrameCommand(asset, () => {
+        asset.removeFrame(1);
+      });
+      cmd.execute();
+      expect(ws.selection).toBeNull();
+
+      // After undo, frame 1 exists again — set selection and validate
+      cmd.undo();
+      setSelection(ws, 1, 1);
+      ws.validateSelection('sprite');
+      expect(ws.selection).not.toBeNull();
+    });
   });
 });

@@ -1,6 +1,7 @@
 import { type Command } from './command.js';
 import { type AssetClass } from '../classes/asset.js';
 import { type Asset } from '../types/asset.js';
+import { getWorkspace } from '../classes/workspace.js';
 
 export class LayerCommand implements Command {
   private beforePatch: Pick<Asset, 'layers' | 'tags' | 'cels'>;
@@ -30,9 +31,11 @@ export class LayerCommand implements Command {
         cels: snapshot.cels,
       };
     }
+    getWorkspace().validateSelection(this.asset.name);
   }
 
   undo(): void {
     this.asset._restoreDataPatch(this.beforePatch);
+    getWorkspace().validateSelection(this.asset.name);
   }
 }
