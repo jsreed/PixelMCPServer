@@ -297,6 +297,27 @@ export class CanvasRenderer {
     return { x: this._offsetX, y: this._offsetY };
   }
 
+  get isPanning(): boolean {
+    return this._isPanning;
+  }
+
+  get spaceHeld(): boolean {
+    return this._spaceHeld;
+  }
+
+  get canvasContainer(): HTMLElement {
+    return this.container;
+  }
+
+  /**
+   * Draws a single pixel directly on the canvas for optimistic rendering.
+   * Coordinates are in art-space (1:1 pixel).
+   */
+  drawPixel(x: number, y: number, r: number, g: number, b: number, a: number): void {
+    this.ctx.fillStyle = `rgba(${String(r)},${String(g)},${String(b)},${String(a / 255)})`;
+    this.ctx.fillRect(x, y, 1, 1);
+  }
+
   setPan(dx: number, dy: number): void {
     this._offsetX = dx;
     this._offsetY = dy;

@@ -674,11 +674,11 @@ An interactive pixel art editor that renders **inline in the conversation** usin
 
 ### 7.7 UI: Drawing Toolbar (`src/app/toolbar.ts`)
 
-- [ ] **7.7.1** **Pencil tool** — `mousedown` → `mousemove` → `mouseup` on canvas; accumulates `{x, y}` stroke pixels optimistically into local canvas; on `mouseup` commits as a single `draw write_pixels` batch call (efficient, produces one undo step)
-- [ ] **7.7.2** **Eraser tool** — same as pencil but uses `activeColorIndex = 0`
-- [ ] **7.7.3** **Eyedropper tool** — click canvas → `getPixelAt()` → set `activeColorIndex`; no server call needed
-- [ ] **7.7.4** **Fill tool** — click canvas → `getPixelAt()` → call `draw fill` with that `{x, y}` and `activeColorIndex` → call `get_asset_state` to refresh
-- [ ] **7.7.5** **Undo / Redo buttons** — call `workspace undo` / `workspace redo` → call `get_asset_state` to refresh canvas
+- [x] **7.7.1** **Pencil tool** — `mousedown` → `mousemove` → `mouseup` on canvas; accumulates `{x, y}` stroke pixels optimistically into local canvas; on `mouseup` commits as a batch of `draw pixel` operations (one undo step)
+- [x] **7.7.2** **Eraser tool** — same as pencil but uses `activeColorIndex = 0`
+- [x] **7.7.3** **Eyedropper tool** — click canvas → `getPixelAt()` → set `activeColorIndex`; no server call needed
+- [x] **7.7.4** **Fill tool** — click canvas → `getPixelAt()` → call `draw fill` with that `{x, y}` and `activeColorIndex` → call `get_asset_state` to refresh
+- [x] **7.7.5** **Undo / Redo buttons** — call `workspace undo` / `workspace redo` → call `get_asset_state` to refresh canvas
 
 ---
 
