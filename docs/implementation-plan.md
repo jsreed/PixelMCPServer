@@ -655,9 +655,9 @@ An interactive pixel art editor that renders **inline in the conversation** usin
 
 ### 7.5 UI: Layer Panel (`src/app/layers.ts`)
 
-- [ ] **7.5.1** **Layer list** — renders all layers top-to-bottom with name, type icon (image/tilemap/shape/group), and eye toggle icon
-- [ ] **7.5.2** **Visibility toggle** — click eye → optimistic local toggle + call `asset` tool to set `visible`; re-render canvas on confirmation
-- [ ] **7.5.3** **Active layer** — click row → set `activeLayerId`; highlighted in panel; pencil/fill tools target this layer
+- [x] **7.5.1** **Layer list** — renders all layers top-to-bottom with name, type icon (image/tilemap/shape/group), and eye toggle icon
+- [x] **7.5.2** **Visibility toggle** — click eye → optimistic local toggle + call `asset` tool to set `visible`; re-render canvas on confirmation
+- [x] **7.5.3** **Active layer** — click row → set `activeLayerId`; highlighted in panel; pencil/fill tools target this layer
 
 ---
 
