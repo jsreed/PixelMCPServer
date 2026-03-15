@@ -663,12 +663,12 @@ An interactive pixel art editor that renders **inline in the conversation** usin
 
 ### 7.6 UI: Frame Timeline (`src/app/timeline.ts`)
 
-- [ ] **7.6.1** **Frame strip** — small squares for each frame; current frame highlighted; click to jump to frame → call `get_asset_state` to reload cels
-- [ ] **7.6.2** **Prev / Next buttons** — step one frame at a time; wraps at ends
-- [ ] **7.6.3** **Frame counter** — "frame 3 / 8 (120ms)" label
-- [ ] **7.6.4** **Tag spans** — colored labels above the strip showing tag name and frame range for each frame tag
-- [ ] **7.6.5** **Play / Pause** — `requestAnimationFrame` loop; advances frame when elapsed time ≥ current frame's `duration_ms`; respects loop toggle
-- [ ] **7.6.6** **Loop toggle** — loops back to frame 0, or stops at last frame
+- [x] **7.6.1** **Frame strip** — small squares for each frame; current frame highlighted; click to jump to frame → call `get_asset_state` to reload cels
+- [x] **7.6.2** **Prev / Next buttons** — step one frame at a time; wraps at ends
+- [x] **7.6.3** **Frame counter** — "frame 3 / 8 (120ms)" label
+- [x] **7.6.4** **Tag spans** — colored labels above the strip showing tag name and frame range for each frame tag
+- [x] **7.6.5** **Play / Pause** — `requestAnimationFrame` loop; advances frame when elapsed time ≥ current frame's `duration_ms`; respects loop toggle
+- [x] **7.6.6** **Loop toggle** — loops back to frame 0, or stops at last frame
 
 ---
 
