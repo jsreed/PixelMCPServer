@@ -251,7 +251,7 @@ export function generateGodotTileSet(
 
   // Tiles are stored in a horizontal strip on the asset canvas (slot N at x=N*tileW, y=0).
   // The exported PNG preserves that layout, so all tiles are at row=0, col=slot_index.
-  if (asset.tile_physics || asset.tile_terrain) {
+  if (asset.tile_physics || asset.tile_terrain || asset.tile_animation) {
     if (asset.tile_physics) {
       for (const tileStr of Object.keys(asset.tile_physics.tiles)) {
         const col = parseInt(tileStr, 10);
@@ -278,6 +278,19 @@ export function generateGodotTileSet(
         tres += `${String(col)}:0/0/terrain = 0\n`;
         for (const [side, bitVal] of Object.entries(bits)) {
           tres += `${String(col)}:0/0/terrains_peering_bit/${side} = ${String(bitVal)}\n`;
+        }
+      }
+    }
+    if (asset.tile_animation) {
+      for (const tileStr of Object.keys(asset.tile_animation)) {
+        const col = parseInt(tileStr, 10);
+        const entry = asset.tile_animation[tileStr];
+        tres += `${String(col)}:0/0 = 0\n`;
+        tres += `${String(col)}:0/0/animation_columns = ${String(entry.frame_count)}\n`;
+        tres += `${String(col)}:0/0/animation_speed_fps = ${(1000 / entry.frame_duration_ms).toFixed(1)}\n`;
+        tres += `${String(col)}:0/0/animation_frames_count = ${String(entry.frame_count)}\n`;
+        if (entry.separation > 0) {
+          tres += `${String(col)}:0/0/animation_separation = Vector2i(${String(entry.separation * scaleFactor)}, 0)\n`;
         }
       }
     }

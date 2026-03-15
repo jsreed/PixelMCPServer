@@ -781,11 +781,11 @@ Features that produce richer Godot `.tres` resources for direct import without m
 
 #### 8B.1 Animated Tiles in TileSet
 
-- [ ] **8B.1.1** **`tile_animation` asset storage** — extend asset types with optional `tile_animation: Record<string, { frame_count, frame_duration_ms, separation }>` field. Add to `toJSON()`/`fromJSON()` roundtrip. Extends the Phase 1 Asset type definition (`src/types/asset.ts`) with new optional field.
-- [ ] **8B.1.2** **`TileAnimationCommand`** — captures `tile_animation` before-state for undo/redo.
-- [ ] **8B.1.3** **`set_tile_animation` tileset action** — add to Zod schema, validate `tile_index` exists and `frame_count ≥ 1`, store in asset, wrap in command.
-- [ ] **8B.1.4** **Emit animated tile properties in `godot_tileset` `.tres`** — `animation_columns`, `animation_speed_fps` (1000 / frame_duration_ms), `animation_frames_count` per animated tile.
-- [ ] **8B.1.5** **`clear_tile_animation` tileset action** — add to Zod schema, validate `tile_index` exists, remove animation metadata, wrap in command.
+- [x] **8B.1.1** **`tile_animation` asset storage** — extend asset types with optional `tile_animation: Record<string, { frame_count, frame_duration_ms, separation }>` field. Add to `toJSON()`/`fromJSON()` roundtrip. Extends the Phase 1 Asset type definition (`src/types/asset.ts`) with new optional field.
+- [x] **8B.1.2** **`TileAnimationCommand`** — captures `tile_animation` before-state for undo/redo.
+- [x] **8B.1.3** **`set_tile_animation` tileset action** — add to Zod schema, validate `tile_index` exists and `frame_count ≥ 1`, store in asset, wrap in command.
+- [x] **8B.1.4** **Emit animated tile properties in `godot_tileset` `.tres`** — `animation_columns`, `animation_speed_fps` (1000 / frame_duration_ms), `animation_frames_count` per animated tile.
+- [x] **8B.1.5** **`clear_tile_animation` tileset action** — add to Zod schema, validate `tile_index` exists, remove animation metadata, wrap in command.
 
 #### 8B.2 TileSet Custom Data Layers
 

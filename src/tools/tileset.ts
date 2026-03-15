@@ -4,6 +4,7 @@ import { getWorkspace } from '../classes/workspace.js';
 import * as errors from '../errors.js';
 import { createResourceLink } from '../utils/resource-link.js';
 import { TilesetCommand } from '../commands/tileset-command.js';
+import { TileAnimationCommand } from '../commands/tile-animation-command.js';
 import { getCanonicalSlots, assignPeeringBits } from '../algorithms/autotile.js';
 import { isoToPixel } from '../algorithms/isometric.js';
 import { type ImageCel } from '../types/cel.js';
@@ -11,7 +12,14 @@ import { type TileTerrain } from '../types/asset.js';
 
 const tilesetInputSchema = {
   action: z
-    .enum(['extract_tile', 'place_tile', 'autotile_generate', 'set_tile_physics'])
+    .enum([
+      'extract_tile',
+      'place_tile',
+      'autotile_generate',
+      'set_tile_physics',
+      'set_tile_animation',
+      'clear_tile_animation',
+    ])
     .describe('Action to perform'),
   asset_name: z.string().optional().describe('Target asset. Defaults to first loaded.'),
   layer_id: z.number().int().optional().describe('Target layer ID. Defaults to 0.'),
@@ -51,6 +59,19 @@ const tilesetInputSchema = {
     .int()
     .optional()
     .describe('Which physics layer to assign (defaults to 0)'),
+
+  // set_tile_animation args
+  frame_count: z.number().int().optional().describe('Number of animation frames'),
+  frame_duration_ms: z
+    .number()
+    .int()
+    .optional()
+    .describe('Per-frame duration in ms; defaults to 100'),
+  separation: z
+    .number()
+    .int()
+    .optional()
+    .describe('Horizontal pixel gap between animation frames; defaults to 0'),
 };
 
 const tilesetInputZodSchema = z.object(tilesetInputSchema);
@@ -350,6 +371,82 @@ export function registerTilesetTool(server: McpServer): void {
                 }),
               },
               createResourceLink(assetName, `pixel://view/tileset/${assetName}`),
+            ],
+          };
+        }
+
+        if (args.action === 'set_tile_animation') {
+          if (args.tile_index === undefined)
+            return errors.invalidArgument('set_tile_animation requires tile_index');
+          if (!asset.tile_width || !asset.tile_height) return errors.notATileset(assetName);
+          const animCount = asset.tile_count ?? 0;
+          if (args.tile_index < 0 || args.tile_index >= animCount) {
+            return errors.tileIndexNotFound(args.tile_index, assetName);
+          }
+          const frameCount = args.frame_count;
+          if (frameCount === undefined || frameCount < 1) {
+            return errors.domainError('set_tile_animation requires frame_count ≥ 1.');
+          }
+          const frameDurationMs = args.frame_duration_ms ?? 100;
+          const sep = args.separation ?? 0;
+          const tileIdx = args.tile_index;
+          const animCmd = new TileAnimationCommand(asset, () => {
+            const anim = asset.tile_animation ?? {};
+            anim[tileIdx.toString()] = {
+              frame_count: frameCount,
+              frame_duration_ms: frameDurationMs,
+              separation: sep,
+            };
+            asset.tile_animation = { ...anim };
+          });
+          workspace.pushCommand(animCmd);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  message: 'Tile animation set.',
+                  tile_index: tileIdx,
+                  frame_count: frameCount,
+                  frame_duration_ms: frameDurationMs,
+                  separation: sep,
+                }),
+              },
+            ],
+          };
+        }
+
+        if (args.action === 'clear_tile_animation') {
+          if (args.tile_index === undefined)
+            return errors.invalidArgument('clear_tile_animation requires tile_index');
+          if (!asset.tile_width || !asset.tile_height) return errors.notATileset(assetName);
+          const clearCount = asset.tile_count ?? 0;
+          if (args.tile_index < 0 || args.tile_index >= clearCount) {
+            return errors.tileIndexNotFound(args.tile_index, assetName);
+          }
+          const clearTileIdx = args.tile_index;
+          const clearCmd = new TileAnimationCommand(asset, () => {
+            const anim = asset.tile_animation;
+            if (anim) {
+              // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+              delete anim[clearTileIdx.toString()];
+              if (Object.keys(anim).length === 0) {
+                asset.tile_animation = undefined;
+              } else {
+                asset.tile_animation = { ...anim };
+              }
+            }
+          });
+          workspace.pushCommand(clearCmd);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  message: 'Tile animation cleared.',
+                  tile_index: clearTileIdx,
+                }),
+              },
             ],
           };
         }

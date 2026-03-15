@@ -79,6 +79,29 @@ export interface TileTerrain {
   peering_bits: Record<string, TilePeeringBits>;
 }
 
+// --- Animated tile metadata types ---
+
+/**
+ * Animation metadata for a single animated tile slot.
+ * Tile animation frames are laid out horizontally in the atlas,
+ * starting from the tile's base position.
+ */
+export interface TileAnimationEntry {
+  /** Number of animation frames (must be >= 1) */
+  frame_count: number;
+  /** Per-frame duration in milliseconds */
+  frame_duration_ms: number;
+  /** Horizontal pixel gap between animation frames in the atlas */
+  separation: number;
+}
+
+/**
+ * Per-tile animation metadata for a tileset.
+ * Keys are tile slot index strings (e.g., "0", "3").
+ * Populated by `tileset set_tile_animation`, consumed by `export godot_tileset`.
+ */
+export type TileAnimation = Record<string, TileAnimationEntry>;
+
 // --- Nine-slice metadata types ---
 
 /**
@@ -129,6 +152,8 @@ export interface Asset {
   tile_physics?: TilePhysics;
   /** Autotile terrain bitmask metadata */
   tile_terrain?: TileTerrain;
+  /** Per-tile animation metadata for animated tiles */
+  tile_animation?: TileAnimation;
 
   // --- Optional Fields (UI Art) ---
 

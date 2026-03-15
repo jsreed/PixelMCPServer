@@ -287,6 +287,94 @@ describe('godot-resources', () => {
       expect(res).toContain('1:0/0/terrains_peering_bit/right = 0');
     });
 
+    test('emits animation properties for animated tiles', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 4,
+        tile_animation: {
+          '0': { frame_count: 4, frame_duration_ms: 200, separation: 0 },
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      expect(res).toContain('0:0/0 = 0');
+      expect(res).toContain('0:0/0/animation_columns = 4');
+      expect(res).toContain('0:0/0/animation_speed_fps = 5.0'); // 1000/200
+      expect(res).toContain('0:0/0/animation_frames_count = 4');
+    });
+
+    test('does NOT emit animation_separation when separation is 0', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 4,
+        tile_animation: {
+          '2': { frame_count: 2, frame_duration_ms: 100, separation: 0 },
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      expect(res).not.toContain('animation_separation');
+    });
+
+    test('emits animation_separation when separation > 0', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 4,
+        tile_animation: {
+          '1': { frame_count: 3, frame_duration_ms: 100, separation: 4 },
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      expect(res).toContain('1:0/0/animation_separation = Vector2i(4, 0)');
+    });
+
+    test('scales separation by scaleFactor', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 4,
+        tile_animation: {
+          '0': { frame_count: 2, frame_duration_ms: 100, separation: 4 },
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 2);
+
+      expect(res).toContain('0:0/0/animation_separation = Vector2i(8, 0)');
+    });
+
+    test('emits animation alongside physics (both present in output)', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 4,
+        tile_physics: {
+          physics_layers: [{ collision_layer: 1, collision_mask: 1 }],
+          tiles: {
+            '0': {
+              polygon: [
+                [0, 0],
+                [16, 0],
+                [16, 16],
+                [0, 16],
+              ],
+            },
+          },
+        },
+        tile_animation: {
+          '1': { frame_count: 3, frame_duration_ms: 150, separation: 0 },
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      expect(res).toContain('0:0/0/physics_layer_0/polygon_0/points');
+      expect(res).toContain('1:0/0/animation_columns = 3');
+      expect(res).toContain('physics_layer_0/collision_layer = 1');
+    });
+
     test('uses col=slot_index row=0 for high tile indices (horizontal strip layout)', () => {
       // blob47 uses bitmask values as slot indices — some are >= tile_count.
       // With the old sqrt(tile_count) formula, tile 255 on a 47-tile set would have

@@ -305,6 +305,133 @@ describe('tileset tool', () => {
     });
   });
 
+  describe('set_tile_animation', () => {
+    beforeEach(async () => {
+      await callTool({ action: 'extract_tile', x: 0, y: 0 });
+    });
+
+    it('sets animation metadata with full params', async () => {
+      const result = await callTool({
+        action: 'set_tile_animation',
+        tile_index: 0,
+        frame_count: 4,
+        frame_duration_ms: 200,
+        separation: 2,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      expect(asset.tile_animation?.['0']?.frame_count).toBe(4);
+      expect(asset.tile_animation?.['0']?.frame_duration_ms).toBe(200);
+      expect(asset.tile_animation?.['0']?.separation).toBe(2);
+    });
+
+    it('uses defaults for frame_duration_ms (100) and separation (0)', async () => {
+      const result = await callTool({
+        action: 'set_tile_animation',
+        tile_index: 0,
+        frame_count: 2,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      expect(asset.tile_animation?.['0']?.frame_duration_ms).toBe(100);
+      expect(asset.tile_animation?.['0']?.separation).toBe(0);
+    });
+
+    it('returns isError for frame_count < 1', async () => {
+      const result = await callTool({
+        action: 'set_tile_animation',
+        tile_index: 0,
+        frame_count: 0,
+      });
+
+      expect(result.isError).toBeTruthy();
+    });
+
+    it('returns isError for nonexistent tile_index', async () => {
+      const result = await callTool({
+        action: 'set_tile_animation',
+        tile_index: 99,
+        frame_count: 2,
+      });
+
+      expect(result.isError).toBeTruthy();
+    });
+
+    it('undo removes animation metadata', async () => {
+      await callTool({
+        action: 'set_tile_animation',
+        tile_index: 0,
+        frame_count: 3,
+      });
+
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      expect(asset.tile_animation?.['0']).toBeDefined();
+
+      workspace.undo();
+      expect(asset.tile_animation).toBeUndefined();
+    });
+  });
+
+  describe('clear_tile_animation', () => {
+    beforeEach(async () => {
+      await callTool({ action: 'extract_tile', x: 0, y: 0 });
+      await callTool({
+        action: 'set_tile_animation',
+        tile_index: 0,
+        frame_count: 4,
+        frame_duration_ms: 150,
+        separation: 0,
+      });
+    });
+
+    it('clears animation from a tile', async () => {
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      expect(asset.tile_animation?.['0']).toBeDefined();
+
+      const result = await callTool({
+        action: 'clear_tile_animation',
+        tile_index: 0,
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(asset.tile_animation).toBeUndefined();
+    });
+
+    it('returns isError for nonexistent tile_index', async () => {
+      const result = await callTool({
+        action: 'clear_tile_animation',
+        tile_index: 99,
+      });
+
+      expect(result.isError).toBeTruthy();
+    });
+
+    it('clearing last entry makes tile_animation undefined', async () => {
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+
+      await callTool({ action: 'clear_tile_animation', tile_index: 0 });
+      expect(asset.tile_animation).toBeUndefined();
+    });
+
+    it('undo restores animation metadata', async () => {
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+
+      await callTool({ action: 'clear_tile_animation', tile_index: 0 });
+      expect(asset.tile_animation).toBeUndefined();
+
+      workspace.undo();
+      expect(asset.tile_animation?.['0']?.frame_count).toBe(4);
+    });
+  });
+
   // ─── 4.1.8.8 Resource link in response ──────────────────────────
 
   it('extract_tile response includes pixel:// tileset resource link', async () => {
