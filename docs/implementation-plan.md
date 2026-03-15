@@ -745,8 +745,8 @@ High-impact features that reduce round trips and unlock common LLM pixel art wor
 
 #### 8A.5 Selective Outline Effect
 
-- [ ] **8A.5.1** **`selout` algorithm** (`src/algorithms/outline.ts`) — extend outline module with `selectiveOutline(data, palette, baseColor)`. For each outline candidate pixel, examine adjacent non-transparent sprite pixels, compute a blended outline color shifted toward the adjacent pixel's hue at reduced luminance, find the nearest palette entry, and place it. Falls back to `baseColor` for pixels adjacent only to transparency.
-- [ ] **8A.5.2** **Wire `selout` into effect tool** — add `selout` operation to Zod schema and dispatch to algorithm.
+- [x] **8A.5.1** **`selout` algorithm** (`src/algorithms/outline.ts`) — extend outline module with `selectiveOutline(data, palette, baseColor)`. For each outline candidate pixel, examine adjacent non-transparent sprite pixels, compute a blended outline color shifted toward the adjacent pixel's hue at reduced luminance, find the nearest palette entry, and place it. Falls back to `baseColor` for pixels adjacent only to transparency.
+- [x] **8A.5.2** **Wire `selout` into effect tool** — add `selout` operation to Zod schema and dispatch to algorithm.
 
 #### 8A.6 Color Replace Draw Operation
 

@@ -6,7 +6,7 @@ import { CelWriteCommand } from '../commands/cel-write-command.js';
 import { FrameRangeCommand } from '../commands/frame-range-command.js';
 import { linearGradient } from '../algorithms/gradient.js';
 import { checkerboard, noise, orderedDither, errorDiffusion } from '../algorithms/dither.js';
-import { generateOutline, cleanupOrphans } from '../algorithms/outline.js';
+import { generateOutline, cleanupOrphans, selectiveOutline } from '../algorithms/outline.js';
 import { autoAntiAlias } from '../algorithms/auto-aa.js';
 import { subpixelShift, smearFrame } from '../algorithms/motion.js';
 import { createResourceLink } from '../utils/resource-link.js';
@@ -69,6 +69,11 @@ const outlineOp = z.object({
   color: z.number().int().describe('Palette index (0-255)'),
 });
 
+const seloutOp = z.object({
+  action: z.literal('selout'),
+  color: z.number().int().describe('Palette index (0-255)'),
+});
+
 const cleanupOrphansOp = z.object({
   action: z.literal('cleanup_orphans'),
 });
@@ -95,6 +100,7 @@ const effectOperationSchema = z.discriminatedUnion('action', [
   errorDiffusionOp,
   autoAaOp,
   outlineOp,
+  seloutOp,
   cleanupOrphansOp,
   subpixelShiftOp,
   smearFrameOp,
@@ -367,6 +373,7 @@ function applyEffectOp(
       applyRegionEffect(op, celData, canvasW, canvasH, selection);
       break;
     case 'auto_aa':
+    case 'selout':
       applyFullGridEffect(op, celData, canvasW, canvasH, selection, palette);
       break;
     case 'outline':
@@ -511,6 +518,12 @@ function applyFullGridAlgorithm(op: EffectOp, grid: Grid, palette?: unknown[]): 
       return autoAntiAlias(
         grid,
         (palette ?? []) as (import('../algorithms/auto-aa.js').RGBA | null)[],
+      );
+    case 'selout':
+      return selectiveOutline(
+        grid,
+        (palette ?? []) as (import('../algorithms/outline.js').RGBA | null)[],
+        op.color,
       );
     case 'subpixel_shift':
       return subpixelShift(grid, op.intensity, op.direction_x, op.direction_y);
