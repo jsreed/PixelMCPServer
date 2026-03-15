@@ -536,6 +536,41 @@ describe('draw tool', () => {
     expect(r.isError).toBe(true);
   });
 
+  it('color_replace works with frame_range across multiple frames', async () => {
+    const asset = workspace.loadedAssets.get('test_sprite');
+    if (!asset) throw new Error('Asset missing');
+    asset.addFrame({ index: 1, duration_ms: 100 });
+    asset.addFrame({ index: 2, duration_ms: 100 });
+
+    // Seed all three frames with color 3 in a 5x5 rect
+    await handler({
+      layer_id: 1,
+      frame_range: [0, 2],
+      operations: [{ action: 'rect', x: 0, y: 0, width: 5, height: 5, color: 3, filled: true }],
+    });
+
+    // Replace color 3 with color 7 across all three frames
+    const r = (await handler({
+      layer_id: 1,
+      frame_range: [0, 2],
+      operations: [{ action: 'color_replace', from_color: 3, to_color: 7 }],
+    })) as HandlerResult;
+
+    expect(r.isError).toBeUndefined();
+
+    for (let f = 0; f <= 2; f++) {
+      const cel = asset.getCel(1, f);
+      expect(cel).toBeDefined();
+      if (cel && 'data' in cel) {
+        // Inside the rect: replaced from 3 to 7
+        expect(cel.data[0][0]).toBe(7);
+        expect(cel.data[4][4]).toBe(7);
+        // Outside the rect: still 0
+        expect(cel.data[9][9]).toBe(0);
+      }
+    }
+  });
+
   it('flood fill respects selection boundaries', async () => {
     workspace.selection = {
       asset_name: 'test_sprite',

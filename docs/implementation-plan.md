@@ -764,12 +764,12 @@ High-impact features that reduce round trips and unlock common LLM pixel art wor
 #### 8A.9 Testing
 
 - [x] **8A.9.1** **Frame range tests** — `FrameRangeCommand` undo/redo across multiple frames; draw/transform/effect with `frame_range` verify all frames modified; mutual exclusivity error with `frame_index`.
-- [ ] **8A.9.2** **Link cel tests** — `LinkCelCommand` execute/undo/redo; `link_cel` action validation (self-link error, source not found, type mismatch); get_cel on linked cel returns source data.
-- [ ] **8A.9.3** **Per-layer spritesheet tests** — correct number of output files; each strip has correct dimensions; `layers` filter works; non-image layers skipped.
-- [ ] **8A.9.4** **Hue-shifted ramp tests** — HSL conversion roundtrip fidelity; ramp with hue shift produces different intermediate colors than without; warm→cool ramp verification.
-- [ ] **8A.9.5** **Selective outline tests** — `selout` produces different outline colors near different sprite regions; fallback to base color near transparency; comparison with flat `outline`.
-- [ ] **8A.9.6** **Color replace tests** — all matching pixels replaced; non-matching pixels unchanged; respects selection mask; works with `frame_range`.
-- [ ] **8A.9.7** **Prompt tests** — `scaffold_attack` and `scaffold_side_scroller` registration, argument validation, messages reference correct tool actions.
+- [x] **8A.9.2** **Link cel tests** — `LinkCelCommand` execute/undo/redo; `link_cel` action validation (self-link error, source not found, type mismatch); get_cel on linked cel returns source data.
+- [x] **8A.9.3** **Per-layer spritesheet tests** — correct number of output files; each strip has correct dimensions; `layers` filter works; non-image layers skipped.
+- [x] **8A.9.4** **Hue-shifted ramp tests** — HSL conversion roundtrip fidelity; ramp with hue shift produces different intermediate colors than without; warm→cool ramp verification.
+- [x] **8A.9.5** **Selective outline tests** — `selout` produces different outline colors near different sprite regions; fallback to base color near transparency; comparison with flat `outline`.
+- [x] **8A.9.6** **Color replace tests** — all matching pixels replaced; non-matching pixels unchanged; respects selection mask; works with `frame_range`.
+- [x] **8A.9.7** **Prompt tests** — `scaffold_attack` and `scaffold_side_scroller` registration, argument validation, messages reference correct tool actions.
 
 > **Definition of Done — Phase 8A:** Frame range operations work across draw/transform/effect with single undo step. Linked cels can be created explicitly. Per-layer spritesheet export produces correct output. Hue-shifted ramps produce warm→cool gradients. Selective outline adapts to adjacent colors. Color replace works with selection and frame range. Both new prompts pass registration and message tests.
 

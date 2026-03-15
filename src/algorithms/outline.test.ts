@@ -362,4 +362,61 @@ describe('selectiveOutline', () => {
     // The outline at (1,1) should be non-transparent
     expect(result[1][1]).not.toBe(0);
   });
+
+  it('produces different outline colors near red vs green sprite regions', () => {
+    // Use a chromatic base color so hue blending actually shifts the output.
+    // An achromatic base (s=0) cannot receive a hue shift from adjacentSprites.
+    const localPalette: (RGBA | null)[] = new Array<RGBA | null>(256).fill(null);
+    localPalette[0] = [0, 0, 0, 0]; // transparent
+    localPalette[1] = [255, 0, 0, 255]; // red sprite
+    localPalette[2] = [0, 255, 0, 255]; // green sprite
+    // Base: dim blue — gives the algorithm a hue to blend away from toward red/green
+    localPalette[4] = [30, 30, 90, 255]; // dim blue (h≈240, s≈0.5, l≈0.24)
+    // Dark reddish — nearest to hue-blend toward red from blue base
+    localPalette[10] = [70, 20, 30, 255]; // dark warm reddish
+    // Dark greenish — nearest to hue-blend toward green from blue base
+    localPalette[11] = [20, 70, 30, 255]; // dark cool greenish
+
+    // Red sprite on left side, green sprite on right side
+    const data = [
+      [0, 0, 0, 0, 0],
+      [1, 0, 0, 0, 2], // 1 = red, 2 = green
+      [0, 0, 0, 0, 0],
+    ];
+    const result = selectiveOutline(data, localPalette, 4);
+    // (0,0) is adjacent to red (1,0) — should get reddish-shifted outline
+    // (0,4) is adjacent to green (1,4) — should get greenish-shifted outline
+    const outlineNearRed = result[0][0];
+    const outlineNearGreen = result[0][4];
+    expect(outlineNearRed).not.toBe(0); // non-transparent
+    expect(outlineNearGreen).not.toBe(0); // non-transparent
+    // Key assertion: different sprite hues produce different outline colors
+    expect(outlineNearRed).not.toBe(outlineNearGreen);
+  });
+
+  it('selectiveOutline differs from flat generateOutline near colored sprites', () => {
+    const palette = makeTestPalette();
+    const data = [
+      [0, 0, 0],
+      [0, 1, 0], // 1 = red sprite
+      [0, 0, 0],
+    ];
+    const flatResult = generateOutline(data, 4);
+    const selResult = selectiveOutline(data, palette, 4);
+    // Flat outline always uses baseColor (4) for all outline pixels
+    expect(flatResult[0][1]).toBe(4);
+    // Selective outline should produce a non-transparent color
+    expect(selResult[0][1]).not.toBe(0);
+    // At least one outline pixel should differ from the flat version
+    const outlinePositions: Array<[number, number]> = [
+      [0, 1],
+      [2, 1],
+      [1, 0],
+      [1, 2],
+    ];
+    const anyDifferent = outlinePositions.some(
+      ([y, x]) => selResult[y]?.[x] !== flatResult[y]?.[x],
+    );
+    expect(anyDifferent).toBe(true);
+  });
 });
