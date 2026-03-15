@@ -637,11 +637,11 @@ An interactive pixel art editor that renders **inline in the conversation** usin
 
 ### 7.3 UI: Canvas Renderer (`src/app/canvas.ts`)
 
-- [ ] **7.3.1** **`CanvasRenderer` class** — wraps a `<canvas>` element; `render(cels, layers, palette, selection?)` composites all visible image layers for the current frame into `ImageData` using indexed→RGBA conversion (respects layer opacity, visibility order); draws to canvas
-- [ ] **7.3.2** **Transparency background** — checkerboard pattern drawn behind any pixel with index 0 (transparent)
-- [ ] **7.3.3** **Zoom** — CSS canvas scaling with `imageSmoothingEnabled = false` (nearest-neighbor); scroll-wheel to zoom 1×–16×; zoom anchored to cursor position
-- [ ] **7.3.4** **Pan** — middle-click or space+drag to pan; canvas offset tracked as `{ dx, dy }` state
-- [ ] **7.3.5** **`getPixelAt(clientX, clientY)`** — maps screen coordinates back to canvas pixel `{ x, y, colorIndex }` accounting for zoom and pan; used by pencil, eyedropper, and selection tools
+- [x] **7.3.1** **`CanvasRenderer` class** — wraps a `<canvas>` element; `render(cels, layers, palette, selection?)` composites all visible image layers for the current frame into `ImageData` using indexed→RGBA conversion (respects layer opacity, visibility order); draws to canvas
+- [x] **7.3.2** **Transparency background** — checkerboard pattern drawn behind any pixel with index 0 (transparent)
+- [x] **7.3.3** **Zoom** — CSS canvas scaling with `imageSmoothingEnabled = false` (nearest-neighbor); scroll-wheel to zoom 1×–16×; zoom anchored to cursor position
+- [x] **7.3.4** **Pan** — middle-click or space+drag to pan; canvas offset tracked as `{ dx, dy }` state
+- [x] **7.3.5** **`getPixelAt(clientX, clientY)`** — maps screen coordinates back to canvas pixel `{ x, y, colorIndex }` accounting for zoom and pan; used by pencil, eyedropper, and selection tools
 
 ---
 
