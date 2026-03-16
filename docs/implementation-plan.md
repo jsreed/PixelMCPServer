@@ -890,8 +890,8 @@ Lower-priority features that are documented for completeness. Implement as time 
 
 #### 8D.4 Jaggy Detection
 
-- [ ] **8D.4.1** **Jaggy detection algorithm** (`src/algorithms/jaggies.ts`) — scan for staircase patterns on edges that should be smooth. Report coordinates and severity.
-- [ ] **8D.4.2** **`detect_jaggies` read-only action on asset tool** — delegate to algorithm, return structured report.
+- [x] **8D.4.1** **Jaggy detection algorithm** (`src/algorithms/jaggies.ts`) — scan for staircase patterns on edges that should be smooth. Report coordinates and severity.
+- [x] **8D.4.2** **`detect_jaggies` read-only action on asset tool** — delegate to algorithm, return structured report.
 
 #### 8D.5 Color Cycling
 

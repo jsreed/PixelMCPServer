@@ -16,6 +16,7 @@ import { loadPaletteFile } from '../io/palette-io.js';
 import { marchingSquares, simplifyOrthogonal } from '../algorithms/marching-squares.js';
 import { simplifyPolygon } from '../algorithms/ramer-douglas-peucker.js';
 import { detectBanding } from '../algorithms/banding.js';
+import { detectJaggies } from '../algorithms/jaggies.js';
 import { interpolateFrames } from '../algorithms/interpolate.js';
 import * as errors from '../errors.js';
 import { createResourceLink } from '../utils/resource-link.js';
@@ -39,6 +40,7 @@ const assetInputSchema = {
       'get_cel',
       'get_cels',
       'detect_banding',
+      'detect_jaggies',
       'generate_collision_polygon',
       'create',
       'resize',
@@ -210,6 +212,8 @@ export function registerAssetTool(server: McpServer): void {
           return handleGetShapes(workspace, args.asset_name, args.layer_id, args.frame_index);
         case 'detect_banding':
           return handleDetectBanding(workspace, args.asset_name, args.layer_id, args.frame_index);
+        case 'detect_jaggies':
+          return handleDetectJaggies(workspace, args.asset_name, args.layer_id, args.frame_index);
 
         // --- Create / Lifecycle ---
         case 'create':
@@ -505,6 +509,44 @@ function handleDetectBanding(
   const regions = detectBanding(w, h, getPixel);
   if (regions.length === 0) return ok({ clean: true });
   return ok({ banding: regions });
+}
+
+function handleDetectJaggies(
+  workspace: Workspace,
+  assetName: string | undefined,
+  layerId: number | undefined,
+  frameIndex: number | undefined,
+) {
+  const asset = requireAsset(workspace, assetName);
+  if (isError(asset)) return asset;
+  if (layerId === undefined) return errors.invalidArgument('detect_jaggies requires "layer_id".');
+  if (frameIndex === undefined)
+    return errors.invalidArgument('detect_jaggies requires "frame_index".');
+
+  const layer = asset.getLayer(layerId);
+  if (!layer) return errors.layerNotFound(layerId, asset.name);
+
+  if (frameIndex < 0 || frameIndex >= asset.frames.length) {
+    return errors.frameOutOfRange(frameIndex, asset.name, asset.frames.length);
+  }
+
+  const cel = asset.getCel(layerId, frameIndex);
+  if (!cel || !('data' in cel)) return ok({ clean: true });
+
+  const data = cel.data;
+  const w = data[0]?.length ?? 0;
+  const h = data.length;
+  if (w === 0 || h === 0) return ok({ clean: true });
+
+  const getPixel = (x: number, y: number) => {
+    if (x < 0 || x >= w || y < 0 || y >= h) return null;
+    const v = data[y][x];
+    return v === 0 ? null : v; // index 0 is conventionally transparent
+  };
+
+  const jaggies = detectJaggies(w, h, getPixel);
+  if (jaggies.length === 0) return ok({ clean: true });
+  return ok({ jaggies });
 }
 
 // ---------------------------------------------------------------------------

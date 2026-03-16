@@ -545,6 +545,63 @@ describe('asset tool', () => {
     expect(data.banding.length).toBeGreaterThan(0);
   });
 
+  // ─── detect_jaggies ──────────────────────────────────────────────
+
+  it('detect_jaggies returns clean for small pixel data', async () => {
+    const r = await handler({
+      action: 'detect_jaggies',
+      asset_name: 'sprite',
+      layer_id: 1,
+      frame_index: 0,
+    });
+    const data = JSON.parse(r.content[0].text) as { clean: boolean };
+    expect(data.clean).toBe(true);
+  });
+
+  it('detect_jaggies finds jaggies in inconsistent staircase', async () => {
+    // Build a 20x8 asset with an inconsistent step pattern:
+    // runs of 3,3,2,3 vertical pixels stepping right — the short run is a jaggy
+    const jaggyData: number[][] = Array.from({ length: 8 }, () =>
+      Array.from({ length: 20 }, () => 0),
+    );
+    // Run of 3 at x=1
+    jaggyData[0][1] = 1;
+    jaggyData[1][1] = 1;
+    jaggyData[2][1] = 1;
+    // Run of 3 at x=2
+    jaggyData[3][2] = 1;
+    jaggyData[4][2] = 1;
+    jaggyData[5][2] = 1;
+    // Run of 2 at x=3 (jaggy — inconsistent)
+    jaggyData[6][3] = 1;
+    jaggyData[7][3] = 1;
+
+    const jaggyAsset = AssetClass.fromJSON({
+      name: 'jaggy_test',
+      width: 20,
+      height: 8,
+      perspective: 'flat' as const,
+      palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]) as Asset['palette'],
+      layers: [{ id: 1, name: 'Layer 1', type: 'image' as const, opacity: 255, visible: true }],
+      frames: [{ index: 0, duration_ms: 100 }],
+      tags: [],
+      cels: {
+        '1/0': { x: 0, y: 0, data: jaggyData },
+      },
+    });
+    workspace.loadedAssets.set('jaggy_test', jaggyAsset);
+
+    const r = await handler({
+      action: 'detect_jaggies',
+      asset_name: 'jaggy_test',
+      layer_id: 1,
+      frame_index: 0,
+    });
+    const data = JSON.parse(r.content[0].text) as { jaggies: unknown[] };
+    expect(data.jaggies).toBeDefined();
+    expect(data.jaggies.length).toBeGreaterThan(0);
+  });
+
   // ─── set_nine_slice ─────────────────────────────────────────────
 
   describe('set_nine_slice', () => {
