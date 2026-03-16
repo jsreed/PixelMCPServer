@@ -92,6 +92,11 @@ const smearFrameOp = z.object({
   direction_y: z.number().optional(),
 });
 
+const backgroundRemoveOp = z.object({
+  action: z.literal('background_remove'),
+  target_color: z.number().int().describe('Palette index (0-255) to replace with transparent (0)'),
+});
+
 const effectOperationSchema = z.discriminatedUnion('action', [
   gradientOp,
   checkerboardOp,
@@ -104,6 +109,7 @@ const effectOperationSchema = z.discriminatedUnion('action', [
   cleanupOrphansOp,
   subpixelShiftOp,
   smearFrameOp,
+  backgroundRemoveOp,
 ]);
 
 const effectInputSchema = {
@@ -269,6 +275,10 @@ export function registerEffectTool(server: McpServer): void {
         if ('color' in op) {
           if (op.color < 0 || op.color > 255) return errors.colorOutOfRange(op.color);
         }
+        if ('target_color' in op) {
+          if (op.target_color < 0 || op.target_color > 255)
+            return errors.colorOutOfRange(op.target_color);
+        }
       }
 
       // Branch on frame_range vs frame_index
@@ -383,6 +393,13 @@ function applyEffectOp(
     case 'subpixel_shift':
     case 'smear_frame':
       applyFullGridEffect(op, celData, canvasW, canvasH, selection);
+      break;
+    case 'background_remove':
+      for (let r = 0; r < canvasH; r++) {
+        for (let c = 0; c < canvasW; c++) {
+          if (celData[r][c] === op.target_color) celData[r][c] = 0;
+        }
+      }
       break;
   }
 }

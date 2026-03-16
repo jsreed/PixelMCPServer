@@ -876,7 +876,7 @@ Lower-priority features that are documented for completeness. Implement as time 
 
 #### 8D.1 Background Removal Effect
 
-- [ ] **8D.1.1** **`background_remove` effect operation** — scan-and-replace: every pixel matching `target_color` → index 0. Ignores selection. Add to effect tool Zod schema.
+- [x] **8D.1.1** **`background_remove` effect operation** — scan-and-replace: every pixel matching `target_color` → index 0. Ignores selection. Add to effect tool Zod schema.
 
 #### 8D.2 Animation Interpolation
 

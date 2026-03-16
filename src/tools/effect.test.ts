@@ -544,4 +544,85 @@ describe('effect tool', () => {
     expect(r.isError).toBe(true);
     expect(r.content?.[0]?.text).toContain('invalid');
   });
+
+  // --- background_remove ---
+
+  it('background_remove: replaces matching pixels with 0', async () => {
+    loadAsset(buildAssetWithPixels());
+    await handler({
+      layer_id: 1,
+      frame_index: 0,
+      operations: [{ action: 'background_remove', target_color: 5 }],
+    });
+
+    const d = getCelData();
+    if (!d) throw new Error('No data');
+    // All pixels that were 5 should now be 0
+    expect(d[1][1]).toBe(0);
+    expect(d[1][2]).toBe(0);
+    expect(d[2][1]).toBe(0);
+    expect(d[2][2]).toBe(0);
+  });
+
+  it('background_remove: leaves non-matching pixels unchanged', async () => {
+    // Build an asset with pixels of color 5 and color 7
+    const raw = buildMockAsset();
+    (raw as unknown as Record<string, unknown>).width = 4;
+    (raw as unknown as Record<string, unknown>).height = 4;
+    const data = [
+      [0, 7, 0, 0],
+      [0, 5, 5, 0],
+      [0, 5, 5, 0],
+      [0, 7, 0, 0],
+    ];
+    (raw.cels as Record<string, unknown>)['1/0'] = { x: 0, y: 0, data };
+    loadAsset(raw);
+
+    await handler({
+      layer_id: 1,
+      frame_index: 0,
+      operations: [{ action: 'background_remove', target_color: 5 }],
+    });
+
+    const d = getCelData();
+    if (!d) throw new Error('No data');
+    // Color 5 pixels replaced
+    expect(d[1][1]).toBe(0);
+    expect(d[2][2]).toBe(0);
+    // Color 7 pixels untouched
+    expect(d[0][1]).toBe(7);
+    expect(d[3][1]).toBe(7);
+  });
+
+  it('background_remove: ignores selection mask and replaces all matching pixels', async () => {
+    loadAsset(buildAssetWithPixels());
+    // Restrict selection to top-left 2x2 (only contains 0s, not 5s)
+    workspace.selection = {
+      asset_name: 'test_sprite',
+      layer_id: 1,
+      frame_index: 0,
+      x: 0,
+      y: 0,
+      width: 2,
+      height: 2,
+      mask: [
+        [true, true],
+        [true, true],
+      ],
+    };
+
+    await handler({
+      layer_id: 1,
+      frame_index: 0,
+      operations: [{ action: 'background_remove', target_color: 5 }],
+    });
+
+    const d = getCelData();
+    if (!d) throw new Error('No data');
+    // Pixels at (1,1), (1,2), (2,1), (2,2) are outside selection but should still be replaced
+    expect(d[1][1]).toBe(0);
+    expect(d[1][2]).toBe(0);
+    expect(d[2][1]).toBe(0);
+    expect(d[2][2]).toBe(0);
+  });
 });
