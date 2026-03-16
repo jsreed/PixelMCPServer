@@ -834,8 +834,8 @@ New prompts and export formats that broaden the range of art assets the LLM can 
 
 #### 8C.1 Enhance `scaffold_character`
 
-- [ ] **8C.1.1** **Broaden `scaffold_character` prompt** — add `role` argument (player/npc/enemy/boss/any) and `animations` argument. Adjust messages to include behavioral animation states based on role: enemies get `hurt`/`death`/`aggro`; NPCs get `idle_variant`/`interact`; bosses get `phase_transition`. Player remains the default with `idle`/`walk`/`attack`.
-- [ ] **8C.1.2** **Update prompt tests** — verify role-based animation state suggestions, verify `animations` override works.
+- [x] **8C.1.1** **Rework `scaffold_character` prompt** — remove `role` argument. Add `description` (free-text hint) and `animations` (explicit override list) arguments. Embed an animation menu in the prompt text (15 states across 4 categories, each with suggested frame count and duration). Teach the LLM the frame layout algorithm with a worked example instead of pre-computing frame indices in TypeScript.
+- [x] **8C.1.2** **Update prompt tests** — verify menu appears when `animations` is omitted, verify `animations` override skips the menu, verify layout algorithm example is correct, verify `description` is threaded into prompt text.
 
 #### 8C.2 `scaffold_vfx` Prompt
 
@@ -861,7 +861,7 @@ New prompts and export formats that broaden the range of art assets the LLM can 
 
 #### 8C.7 Testing
 
-- [ ] **8C.7.1** **Enhanced scaffold_character tests** — role-based animation states, animations override, backward compatibility with existing arguments.
+- [ ] **8C.7.1** **Reworked scaffold_character tests** — animation menu present when `animations` omitted, `animations` override skips menu, `description` threaded into text, layout algorithm example is arithmetically correct.
 - [ ] **8C.7.2** **New prompt tests** — `scaffold_vfx`, `scaffold_parallax`, `scaffold_props` registration, argument validation, messages reference correct tool actions.
 - [ ] **8C.7.3** **Normal map tests** — Sobel output verified against known gradient inputs; flat surface produces (128, 128, 255) blue; edge detection produces correct directional normals.
 - [ ] **8C.7.4** **Palette LUT tests** — LUT dimensions correct (256 × palette_count); pixel values match source palettes; single-palette LUT is 256×1.

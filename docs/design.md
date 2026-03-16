@@ -1077,15 +1077,42 @@ Prompts complement the tool surface: tools handle atomic operations; prompts han
 ---
 
 **`scaffold_character`**
-Guide the LLM through creating a character sprite from scratch — player characters, NPCs, enemies, or bosses. A character's art assets are the same regardless of its controller; the distinction between player/NPC/enemy is game logic, not art. Covers: palette selection, layer structure, directional frame tags, optional hitbox/hurtbox shape layers, and behavioral animation states.
+Guide the LLM through creating a character sprite from scratch.
+Covers: palette selection, layer structure, directional frame tags, hitbox/hurtbox shape layers, and animation states.
+The animation set is not role-prescribed; instead the prompt presents a curated menu of common animation states grouped by category, and the LLM selects what fits the character.
 
 Arguments:
 - `name` (required) — asset name
 - `directions` (optional) — `"4"` or `"8"` directional; defaults to `"4"`
 - `width` / `height` (optional) — canvas size in pixels; defaults to 16×24
 - `palette` (optional) — Lospec slug or palette file path; defaults to project default
-- `role` (optional) — `"player"`, `"npc"`, `"enemy"`, `"boss"`; informs which behavioral animation states to suggest (e.g., enemies get `hurt`, `death`, `aggro`; NPCs get `idle_variant`, `interact`; bosses get `phase_transition`). Defaults to `"player"`.
-- `animations` (optional) — explicit list of animation state names to scaffold (e.g., `["idle", "walk", "attack", "hurt", "death"]`); overrides role-based defaults.
+- `description` (optional) — free-text description of the character (e.g., `"shopkeeper NPC who sweeps"`); gives the LLM context when choosing from the animation menu
+- `animations` (optional) — explicit list of animation names (e.g., `["idle", "walk", "attack", "hurt", "death"]`); skips the menu entirely and uses this list directly
+
+Animation menu (embedded in the prompt text — LLM selects appropriate states):
+
+| Category | Animation | Frames | Duration/frame |
+|---|---|---|---|
+| Movement | `idle` | 1 | 500 ms |
+| | `walk` | 4 | 150 ms |
+| | `run` | 4 | 100 ms |
+| | `crouch` | 2 | 150 ms |
+| | `jump` | 3 | 100 ms |
+| Combat | `attack` | 3 | 100 ms |
+| | `hurt` | 2 | 150 ms |
+| | `death` | 4 | 200 ms |
+| | `block` | 1 | 500 ms |
+| | `dash` | 2 | 80 ms |
+| Interaction | `interact` | 2 | 300 ms |
+| | `talk` | 2 | 200 ms |
+| | `idle_variant` | 4 | 200 ms |
+| Special | `cast` | 3 | 150 ms |
+| | `emote` | 3 | 200 ms |
+
+Frame layout algorithm (taught to the LLM in the prompt text):
+For each facing direction (in order), for each selected animation (in menu order): lay frames sequentially, note start/end indices, create the tag.
+`totalFrames = sum(frameCounts) × directionCount`.
+A worked example is embedded so the LLM can verify its arithmetic before calling tools.
 
 ---
 

@@ -72,61 +72,40 @@ describe('scaffold_character prompt', () => {
   });
 
   describe('4-dir vs 8-dir facing values', () => {
-    it('4-directional uses S, N, E, W facings', () => {
+    it('4-directional has S, N, E, W in the algorithm facings list', () => {
       const text = buildScaffoldCharacterText({ name: 'hero', directions: '4' });
-      expect(text).toContain('facing="S"');
-      expect(text).toContain('facing="N"');
-      expect(text).toContain('facing="E"');
-      expect(text).toContain('facing="W"');
+      expect(text).toContain('"S"');
+      expect(text).toContain('"N"');
+      expect(text).toContain('"E"');
+      expect(text).toContain('"W"');
     });
 
     it('4-directional does not include diagonal facings', () => {
       const text = buildScaffoldCharacterText({ name: 'hero', directions: '4' });
-      expect(text).not.toContain('facing="NE"');
-      expect(text).not.toContain('facing="SE"');
-      expect(text).not.toContain('facing="SW"');
-      expect(text).not.toContain('facing="NW"');
+      expect(text).not.toContain('"NE"');
+      expect(text).not.toContain('"SE"');
+      expect(text).not.toContain('"SW"');
+      expect(text).not.toContain('"NW"');
     });
 
     it('8-directional includes all 8 cardinal and diagonal facings', () => {
       const text = buildScaffoldCharacterText({ name: 'hero', directions: '8' });
-      expect(text).toContain('facing="S"');
-      expect(text).toContain('facing="N"');
-      expect(text).toContain('facing="E"');
-      expect(text).toContain('facing="W"');
-      expect(text).toContain('facing="NE"');
-      expect(text).toContain('facing="SE"');
-      expect(text).toContain('facing="SW"');
-      expect(text).toContain('facing="NW"');
+      expect(text).toContain('"S"');
+      expect(text).toContain('"N"');
+      expect(text).toContain('"E"');
+      expect(text).toContain('"W"');
+      expect(text).toContain('"NE"');
+      expect(text).toContain('"SE"');
+      expect(text).toContain('"SW"');
+      expect(text).toContain('"NW"');
     });
 
-    it('4-dir produces fewer total frames than 8-dir', () => {
-      const text4 = buildScaffoldCharacterText({ name: 'hero', directions: '4' });
-      const text8 = buildScaffoldCharacterText({ name: 'hero', directions: '8' });
-      // Extract the total frames count from "X frames total"
-      const match4 = /(\d+) frames total/.exec(text4);
-      const match8 = /(\d+) frames total/.exec(text8);
-      expect(match4).not.toBeNull();
-      expect(match8).not.toBeNull();
-      if (match4 && match8) {
-        expect(Number(match4[1])).toBeLessThan(Number(match8[1]));
-      }
-    });
-
-    it('4-dir produces exactly 20 frames (4 dirs × 5 frames)', () => {
-      const text = buildScaffoldCharacterText({ name: 'hero', directions: '4' });
-      expect(text).toContain('20 frames total');
-    });
-
-    it('8-dir produces exactly 40 frames (8 dirs × 5 frames)', () => {
-      const text = buildScaffoldCharacterText({ name: 'hero', directions: '8' });
-      expect(text).toContain('40 frames total');
-    });
-
-    it('defaults to 4-directional when not specified', () => {
-      const textDefault = buildScaffoldCharacterText({ name: 'hero' });
-      const text4 = buildScaffoldCharacterText({ name: 'hero', directions: '4' });
-      expect(textDefault).toBe(text4);
+    it('defaults to 4-directional when not specified — no diagonal facings', () => {
+      const text = buildScaffoldCharacterText({ name: 'hero' });
+      expect(text).not.toContain('"NE"');
+      expect(text).not.toContain('"SE"');
+      expect(text).not.toContain('"SW"');
+      expect(text).not.toContain('"NW"');
     });
   });
 
@@ -177,18 +156,129 @@ describe('scaffold_character prompt', () => {
   });
 
   describe('animation structure', () => {
-    it('creates idle and walk tags for each direction', () => {
-      const text = buildScaffoldCharacterText({ name: 'hero', directions: '4' });
-      // Should have 4 idle tags and 4 walk tags (one per facing)
-      const idleMatches = text.match(/name="idle"/g) ?? [];
-      const walkMatches = text.match(/name="walk"/g) ?? [];
-      expect(idleMatches.length).toBeGreaterThanOrEqual(4);
-      expect(walkMatches.length).toBeGreaterThanOrEqual(4);
-    });
-
     it('includes pixel://view resource URI for the asset', () => {
       const text = buildScaffoldCharacterText({ name: 'my_hero' });
       expect(text).toContain('pixel://view/asset/my_hero');
+    });
+  });
+
+  describe('animation selection — menu path', () => {
+    it('shows animation menu when animations not provided', () => {
+      const text = buildScaffoldCharacterText({ name: 'hero' });
+      expect(text).toContain('Movement');
+      expect(text).toContain('Combat');
+      expect(text).toContain('Interaction');
+      expect(text).toContain('Special');
+      expect(text).toContain('idle_variant');
+    });
+
+    it('menu includes all 15 animation states', () => {
+      const text = buildScaffoldCharacterText({ name: 'hero' });
+      const names = [
+        'idle',
+        'walk',
+        'run',
+        'crouch',
+        'jump',
+        'attack',
+        'hurt',
+        'death',
+        'block',
+        'dash',
+        'interact',
+        'talk',
+        'idle_variant',
+        'cast',
+        'emote',
+      ];
+      for (const animName of names) {
+        expect(text).toContain(animName);
+      }
+    });
+  });
+
+  describe('animation selection — override path', () => {
+    it('skips menu when animations provided', () => {
+      const text = buildScaffoldCharacterText({ name: 'hero', animations: ['idle', 'walk'] });
+      expect(text).not.toContain('Interaction');
+      expect(text).not.toContain('Special');
+    });
+
+    it('lists provided animations when animations override given', () => {
+      const text = buildScaffoldCharacterText({
+        name: 'hero',
+        animations: ['idle', 'walk', 'attack'],
+      });
+      expect(text).toContain('idle');
+      expect(text).toContain('walk');
+      expect(text).toContain('attack');
+    });
+
+    it('falls back to menu when animations array is empty', () => {
+      const text = buildScaffoldCharacterText({ name: 'hero', animations: [] });
+      expect(text).toContain('Movement');
+      expect(text).toContain('Combat');
+    });
+
+    it('labels unknown animation names as custom', () => {
+      const text = buildScaffoldCharacterText({ name: 'hero', animations: ['idle', 'fly'] });
+      expect(text).toContain('fly');
+      expect(text).toContain('custom');
+    });
+
+    it('description appears in header but not as step 4 hint when animations also provided', () => {
+      const text = buildScaffoldCharacterText({
+        name: 'hero',
+        description: 'a brave warrior',
+        animations: ['idle', 'walk'],
+      });
+      expect(text).toContain('Character: "a brave warrior"');
+      expect(text).not.toContain('Character description:');
+    });
+  });
+
+  describe('description argument', () => {
+    it('includes description in prompt text when provided', () => {
+      const text = buildScaffoldCharacterText({
+        name: 'hero',
+        description: 'shopkeeper NPC who sweeps',
+      });
+      expect(text).toContain('shopkeeper NPC who sweeps');
+    });
+
+    it('does not include Character label when description omitted', () => {
+      const text = buildScaffoldCharacterText({ name: 'hero' });
+      expect(text).not.toContain('Character:');
+    });
+  });
+
+  describe('frame layout algorithm', () => {
+    it('includes algorithm explanation', () => {
+      const text = buildScaffoldCharacterText({ name: 'hero' });
+      expect(text).toContain('framesPerDir');
+      expect(text).toContain('totalFrames');
+    });
+
+    it('includes worked example with correct arithmetic', () => {
+      const text = buildScaffoldCharacterText({ name: 'hero' });
+      // framesPerDir = 8, total = 32 for the example
+      expect(text).toContain('32');
+      // S idle starts at 0
+      expect(text).toMatch(/S\s*\|\s*idle\s*\|\s*0\s*\|\s*0/);
+      // S walk: 1-4
+      expect(text).toMatch(/S\s*\|\s*walk\s*\|\s*1\s*\|\s*4/);
+      // S attack: 5-7
+      expect(text).toMatch(/S\s*\|\s*attack\s*\|\s*5\s*\|\s*7/);
+      // N idle: 8-8
+      expect(text).toMatch(/N\s*\|\s*idle\s*\|\s*8\s*\|\s*8/);
+      // W attack: 29-31
+      expect(text).toMatch(/W\s*\|\s*attack\s*\|\s*29\s*\|\s*31/);
+    });
+
+    it('teaches asset add_frame and asset add_tag', () => {
+      const text = buildScaffoldCharacterText({ name: 'hero' });
+      expect(text).toContain('asset add_frame');
+      expect(text).toContain('asset add_tag');
     });
   });
 });
