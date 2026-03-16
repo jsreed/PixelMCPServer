@@ -16,6 +16,7 @@ import { loadPaletteFile } from '../io/palette-io.js';
 import { marchingSquares, simplifyOrthogonal } from '../algorithms/marching-squares.js';
 import { simplifyPolygon } from '../algorithms/ramer-douglas-peucker.js';
 import { detectBanding } from '../algorithms/banding.js';
+import { interpolateFrames } from '../algorithms/interpolate.js';
 import * as errors from '../errors.js';
 import { createResourceLink } from '../utils/resource-link.js';
 import * as path from 'node:path';
@@ -60,6 +61,7 @@ const assetInputSchema = {
       'get_shapes',
       'set_nine_slice',
       'link_cel',
+      'interpolate_frames',
     ])
     .describe('Asset action to perform'),
   asset_name: z.string().optional().describe('Target asset name'),
@@ -162,6 +164,12 @@ const assetInputSchema = {
     .array(z.object({ index: z.number().int(), rgba: z.array(z.number().int()) }))
     .optional()
     .describe('Inline palette overrides for create_recolor'),
+  count: z
+    .number()
+    .int()
+    .min(1)
+    .optional()
+    .describe('Number of intermediate frames (interpolate_frames)'),
 };
 
 // ---------------------------------------------------------------------------
@@ -284,6 +292,8 @@ export function registerAssetTool(server: McpServer): void {
           return handleSetNineSlice(workspace, args);
         case 'link_cel':
           return handleLinkCel(workspace, args);
+        case 'interpolate_frames':
+          return handleInterpolateFrames(workspace, args);
 
         default:
           return errors.invalidArgument(`Unknown asset action: ${String(args.action)}`);
@@ -1392,4 +1402,145 @@ function handleLinkCel(workspace: Workspace, args: Record<string, unknown>) {
   return ok({
     message: `Linked cel at layer ${String(layerId)}/frame ${String(frameIndex)} → layer ${String(sourceLayerId)}/frame ${String(sourceFrameIndex)}.`,
   });
+}
+
+// ---------------------------------------------------------------------------
+// interpolate_frames
+// ---------------------------------------------------------------------------
+
+function handleInterpolateFrames(workspace: Workspace, args: Record<string, unknown>) {
+  const assetName = args.asset_name as string | undefined;
+  const asset = requireAsset(workspace, assetName);
+  if (isError(asset)) return asset;
+
+  const frameStart = args.frame_start as number | undefined;
+  const frameEnd = args.frame_end as number | undefined;
+  const count = args.count as number | undefined;
+
+  if (frameStart === undefined)
+    return errors.invalidArgument('interpolate_frames requires "frame_start".');
+  if (frameEnd === undefined)
+    return errors.invalidArgument('interpolate_frames requires "frame_end".');
+  if (count === undefined || count < 1)
+    return errors.invalidArgument('interpolate_frames requires "count" >= 1.');
+  if (frameStart < 0 || frameStart >= asset.frames.length)
+    return errors.frameOutOfRange(frameStart, asset.name, asset.frames.length);
+  if (frameEnd < 0 || frameEnd >= asset.frames.length)
+    return errors.frameOutOfRange(frameEnd, asset.name, asset.frames.length);
+  if (frameStart >= frameEnd)
+    return errors.invalidArgument('interpolate_frames requires frame_start < frame_end.');
+
+  const duration = asset.frames[frameStart].duration_ms;
+  const w = asset.width;
+  const h = asset.height;
+
+  // Helper to expand an ImageCel to full canvas grid
+  function expandCelToCanvas(cel: { x: number; y: number; data: number[][] }): number[][] {
+    const grid: number[][] = Array.from({ length: h }, () => new Array<number>(w).fill(0));
+    for (let r = 0; r < cel.data.length; r++) {
+      for (let c = 0; c < cel.data[r].length; c++) {
+        const gy = cel.y + r;
+        const gx = cel.x + c;
+        if (gy >= 0 && gy < h && gx >= 0 && gx < w) {
+          grid[gy][gx] = cel.data[r][c];
+        }
+      }
+    }
+    return grid;
+  }
+
+  // Pre-compute interpolated data for all image layers BEFORE mutating
+  const layerInterpolations: Array<{ layerId: number; frames: number[][][] }> = [];
+
+  for (const layer of asset.layers) {
+    if (layer.type !== 'image') continue;
+
+    // Check raw cel to distinguish LinkedCel from missing
+    const rawCels = asset.cels;
+    const rawCelA = rawCels[packCelKey(layer.id, frameStart)] as Cel | undefined;
+    const rawCelB = rawCels[packCelKey(layer.id, frameEnd)] as Cel | undefined;
+
+    // If raw cel is a LinkedCel and resolution fails, error
+    if (rawCelA !== undefined && 'link' in rawCelA) {
+      const resolved = asset.getCel(layer.id, frameStart);
+      if (resolved === undefined) {
+        return errors.domainError(
+          `LinkedCel resolution failed for layer ${String(layer.id)} at frame ${String(frameStart)}.`,
+        );
+      }
+    }
+    if (rawCelB !== undefined && 'link' in rawCelB) {
+      const resolved = asset.getCel(layer.id, frameEnd);
+      if (resolved === undefined) {
+        return errors.domainError(
+          `LinkedCel resolution failed for layer ${String(layer.id)} at frame ${String(frameEnd)}.`,
+        );
+      }
+    }
+
+    // Resolve cels (getCel auto-resolves LinkedCels)
+    const celA = asset.getCel(layer.id, frameStart);
+    const celB = asset.getCel(layer.id, frameEnd);
+
+    // If resolved cel exists but is not an ImageCel, error
+    if (celA !== undefined && !('data' in celA)) {
+      return errors.domainError(
+        `Cel at layer ${String(layer.id)}/frame ${String(frameStart)} is not an ImageCel.`,
+      );
+    }
+    if (celB !== undefined && !('data' in celB)) {
+      return errors.domainError(
+        `Cel at layer ${String(layer.id)}/frame ${String(frameEnd)} is not an ImageCel.`,
+      );
+    }
+
+    // Expand to full canvas (missing cel = all transparent)
+    const gridA =
+      celA !== undefined && 'data' in celA
+        ? expandCelToCanvas(celA)
+        : Array.from({ length: h }, () => new Array<number>(w).fill(0));
+    const gridB =
+      celB !== undefined && 'data' in celB
+        ? expandCelToCanvas(celB)
+        : Array.from({ length: h }, () => new Array<number>(w).fill(0));
+
+    const interpolated = interpolateFrames(gridA, gridB, count);
+    layerInterpolations.push({ layerId: layer.id, frames: interpolated });
+  }
+
+  // Wrap the mutation in a single FrameCommand for atomic undo/redo
+  try {
+    const cmd = new FrameCommand(asset, () => {
+      // Insert count new frames at frame_start + 1
+      for (let i = 0; i < count; i++) {
+        asset.addFrame(
+          { index: frameStart + 1 + i, duration_ms: duration } as Frame,
+          frameStart + 1 + i,
+        );
+      }
+      // Set interpolated cels for each image layer
+      for (const { layerId, frames } of layerInterpolations) {
+        for (let i = 0; i < frames.length; i++) {
+          asset.setCel(layerId, frameStart + 1 + i, {
+            x: 0,
+            y: 0,
+            data: frames[i],
+          });
+        }
+      }
+    });
+    workspace.pushCommand(cmd);
+  } catch (e: unknown) {
+    return errors.domainError(e instanceof Error ? e.message : String(e));
+  }
+
+  return okWithAssetLink(
+    {
+      message: `Inserted ${String(count)} interpolated frame(s) between frames ${String(frameStart)} and ${String(frameEnd + count)}.`,
+      frame_start: frameStart,
+      frame_end: frameEnd + count,
+      count,
+    },
+    assetName as string,
+  );
 }

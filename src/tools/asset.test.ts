@@ -888,4 +888,365 @@ describe('asset tool', () => {
     // When there are no solid pixels, the handler returns { vertices: [] }
     expect(data.vertices).toHaveLength(0);
   });
+
+  // ─── interpolate_frames ──────────────────────────────────────────
+
+  describe('interpolate_frames', () => {
+    function buildMultiFrameAsset() {
+      // Asset with 2 frames and 1 image layer, plus 1 shape layer
+      const assetData: Asset = {
+        name: 'anim_sprite',
+        width: 4,
+        height: 4,
+        perspective: 'flat' as const,
+        palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]) as Asset['palette'],
+        layers: [
+          { id: 1, name: 'Base', type: 'image' as const, opacity: 255, visible: true },
+          {
+            id: 2,
+            name: 'Hitbox',
+            type: 'shape' as const,
+            opacity: 255,
+            visible: true,
+            role: 'hitbox',
+            physics_layer: 1,
+          },
+        ],
+        frames: [
+          { index: 0, duration_ms: 100 },
+          { index: 1, duration_ms: 150 },
+        ],
+        tags: [],
+        cels: {
+          // frame 0: top-left pixel = index 1
+          '1/0': {
+            x: 0,
+            y: 0,
+            data: [
+              [1, 0, 0, 0],
+              [0, 0, 0, 0],
+              [0, 0, 0, 0],
+              [0, 0, 0, 0],
+            ],
+          },
+          // frame 1: bottom-right pixel = index 2
+          '1/1': {
+            x: 0,
+            y: 0,
+            data: [
+              [0, 0, 0, 0],
+              [0, 0, 0, 0],
+              [0, 0, 0, 0],
+              [0, 0, 0, 2],
+            ],
+          },
+        },
+      };
+      const a = AssetClass.fromJSON(assetData);
+      workspace.loadedAssets.set('anim_sprite', a);
+      return a;
+    }
+
+    it('inserts correct number of frames', async () => {
+      buildMultiFrameAsset();
+      const r = await handler({
+        action: 'interpolate_frames',
+        asset_name: 'anim_sprite',
+        frame_start: 0,
+        frame_end: 1,
+        count: 2,
+      });
+      expect(r.isError).toBeUndefined();
+      const asset = getAsset('anim_sprite');
+      // started with 2 frames, inserted 2 → now 4
+      expect(asset.frames).toHaveLength(4);
+    });
+
+    it('interpolated cels have correct threshold-blended data', async () => {
+      buildMultiFrameAsset();
+      await handler({
+        action: 'interpolate_frames',
+        asset_name: 'anim_sprite',
+        frame_start: 0,
+        frame_end: 1,
+        count: 2,
+      });
+      const asset = getAsset('anim_sprite');
+      // frame 0 = original start (unchanged), frames 1,2 = interpolated, frame 3 = original end
+      // i=0: t=1/3 < 0.5 → picks gridA (all 0 except top-left=1)
+      const cel1 = asset.getCel(1, 1);
+      expect(cel1).toBeDefined();
+      if (cel1 && 'data' in cel1) {
+        expect(cel1.data[0][0]).toBe(1); // top-left from celA
+        expect(cel1.data[3][3]).toBe(0); // bottom-right from celA (transparent)
+      }
+      // i=1: t=2/3 >= 0.5 → picks gridB (all 0 except bottom-right=2)
+      const cel2 = asset.getCel(1, 2);
+      expect(cel2).toBeDefined();
+      if (cel2 && 'data' in cel2) {
+        expect(cel2.data[0][0]).toBe(0); // top-left from celB (transparent)
+        expect(cel2.data[3][3]).toBe(2); // bottom-right from celB
+      }
+    });
+
+    it('inserted frames inherit duration_ms from frame_start', async () => {
+      buildMultiFrameAsset();
+      await handler({
+        action: 'interpolate_frames',
+        asset_name: 'anim_sprite',
+        frame_start: 0,
+        frame_end: 1,
+        count: 1,
+      });
+      const asset = getAsset('anim_sprite');
+      // Inserted frame is at index 1, original frame_end shifts to 2
+      expect(asset.frames[1].duration_ms).toBe(100); // inherited from frame_start=0 (100ms)
+    });
+
+    it('non-image layers are skipped (no cels set on shape layer)', async () => {
+      buildMultiFrameAsset();
+      await handler({
+        action: 'interpolate_frames',
+        asset_name: 'anim_sprite',
+        frame_start: 0,
+        frame_end: 1,
+        count: 1,
+      });
+      const asset = getAsset('anim_sprite');
+      // Shape layer (id=2) should have no cel at inserted frame index 1
+      const shapeCel = asset.getCel(2, 1);
+      expect(shapeCel).toBeUndefined();
+    });
+
+    it('missing cels treated as transparent', async () => {
+      // Asset with a layer that has no cel on frame 0
+      const assetData: Asset = {
+        name: 'sparse_sprite',
+        width: 2,
+        height: 2,
+        perspective: 'flat' as const,
+        palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]) as Asset['palette'],
+        layers: [{ id: 1, name: 'Base', type: 'image' as const, opacity: 255, visible: true }],
+        frames: [
+          { index: 0, duration_ms: 100 },
+          { index: 1, duration_ms: 100 },
+        ],
+        tags: [],
+        cels: {
+          // only frame 1 has data; frame 0 is missing (treated as all-zero)
+          '1/1': {
+            x: 0,
+            y: 0,
+            data: [
+              [3, 3],
+              [3, 3],
+            ],
+          },
+        },
+      };
+      const a = AssetClass.fromJSON(assetData);
+      workspace.loadedAssets.set('sparse_sprite', a);
+
+      const r = await handler({
+        action: 'interpolate_frames',
+        asset_name: 'sparse_sprite',
+        frame_start: 0,
+        frame_end: 1,
+        count: 2,
+      });
+      expect(r.isError).toBeUndefined();
+      const asset = getAsset('sparse_sprite');
+      // i=0: t=1/3 < 0.5 → gridA (all transparent)
+      const cel1 = asset.getCel(1, 1);
+      expect(cel1).toBeDefined();
+      if (cel1 && 'data' in cel1) {
+        expect(cel1.data[0][0]).toBe(0);
+      }
+      // i=1: t=2/3 >= 0.5 → gridB (all 3)
+      const cel2 = asset.getCel(1, 2);
+      expect(cel2).toBeDefined();
+      if (cel2 && 'data' in cel2) {
+        expect(cel2.data[0][0]).toBe(3);
+      }
+    });
+
+    it('undo removes inserted frames', async () => {
+      buildMultiFrameAsset();
+      await handler({
+        action: 'interpolate_frames',
+        asset_name: 'anim_sprite',
+        frame_start: 0,
+        frame_end: 1,
+        count: 3,
+      });
+      const asset = getAsset('anim_sprite');
+      expect(asset.frames).toHaveLength(5); // 2 + 3
+      workspace.undo();
+      expect(asset.frames).toHaveLength(2); // restored
+    });
+
+    it('returns error when asset_name is missing', async () => {
+      const r = await handler({
+        action: 'interpolate_frames',
+        frame_start: 0,
+        frame_end: 1,
+        count: 1,
+      });
+      expect(r.isError).toBe(true);
+    });
+
+    it('returns error when frame_start is out of range', async () => {
+      buildMultiFrameAsset();
+      const r = await handler({
+        action: 'interpolate_frames',
+        asset_name: 'anim_sprite',
+        frame_start: 99,
+        frame_end: 1,
+        count: 1,
+      });
+      expect(r.isError).toBe(true);
+      expect(r.content[0].text).toContain('out of range');
+    });
+
+    it('returns error when frame_start >= frame_end', async () => {
+      buildMultiFrameAsset();
+      const r = await handler({
+        action: 'interpolate_frames',
+        asset_name: 'anim_sprite',
+        frame_start: 1,
+        frame_end: 0,
+        count: 1,
+      });
+      expect(r.isError).toBe(true);
+      expect(r.content[0].text).toContain('frame_start < frame_end');
+    });
+
+    it('returns error when frame_start equals frame_end', async () => {
+      buildMultiFrameAsset();
+      const r = await handler({
+        action: 'interpolate_frames',
+        asset_name: 'anim_sprite',
+        frame_start: 0,
+        frame_end: 0,
+        count: 1,
+      });
+      expect(r.isError).toBe(true);
+    });
+
+    it('returns error when count is missing', async () => {
+      buildMultiFrameAsset();
+      const r = await handler({
+        action: 'interpolate_frames',
+        asset_name: 'anim_sprite',
+        frame_start: 0,
+        frame_end: 1,
+      });
+      expect(r.isError).toBe(true);
+      expect(r.content[0].text).toContain('"count"');
+    });
+
+    it('resolves LinkedCels and interpolates their data', async () => {
+      const assetData: Asset = {
+        name: 'linked_sprite',
+        width: 2,
+        height: 2,
+        perspective: 'flat' as const,
+        palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]) as Asset['palette'],
+        layers: [{ id: 1, name: 'Base', type: 'image' as const, opacity: 255, visible: true }],
+        frames: [
+          { index: 0, duration_ms: 100 },
+          { index: 1, duration_ms: 100 },
+          { index: 2, duration_ms: 100 },
+        ],
+        tags: [],
+        cels: {
+          '1/0': {
+            x: 0,
+            y: 0,
+            data: [
+              [5, 5],
+              [5, 5],
+            ],
+          },
+          // frame 1 is a LinkedCel pointing to frame 0
+          '1/1': { link: '1/0' },
+          '1/2': {
+            x: 0,
+            y: 0,
+            data: [
+              [9, 9],
+              [9, 9],
+            ],
+          },
+        },
+      };
+      const a = AssetClass.fromJSON(assetData);
+      workspace.loadedAssets.set('linked_sprite', a);
+
+      // Interpolate between frame 1 (LinkedCel → frame 0 data) and frame 2
+      const r = await handler({
+        action: 'interpolate_frames',
+        asset_name: 'linked_sprite',
+        frame_start: 1,
+        frame_end: 2,
+        count: 2,
+      });
+      expect(r.isError).toBeUndefined();
+      const asset = getAsset('linked_sprite');
+      expect(asset.frames).toHaveLength(5); // 3 + 2
+
+      // i=0: t=1/3 < 0.5 → picks gridA (resolved LinkedCel = all 5)
+      const cel1 = asset.getCel(1, 2);
+      expect(cel1).toBeDefined();
+      if (cel1 && 'data' in cel1) {
+        expect(cel1.data[0][0]).toBe(5);
+      }
+      // i=1: t=2/3 >= 0.5 → picks gridB (all 9)
+      const cel2 = asset.getCel(1, 3);
+      expect(cel2).toBeDefined();
+      if (cel2 && 'data' in cel2) {
+        expect(cel2.data[0][0]).toBe(9);
+      }
+    });
+
+    it('returns error for broken LinkedCel resolution', async () => {
+      const assetData: Asset = {
+        name: 'broken_link_sprite',
+        width: 2,
+        height: 2,
+        perspective: 'flat' as const,
+        palette: Array.from({ length: 256 }, () => [0, 0, 0, 0]) as Asset['palette'],
+        layers: [{ id: 1, name: 'Base', type: 'image' as const, opacity: 255, visible: true }],
+        frames: [
+          { index: 0, duration_ms: 100 },
+          { index: 1, duration_ms: 100 },
+        ],
+        tags: [],
+        cels: {
+          // frame 0 is a LinkedCel pointing to a non-existent source
+          '1/0': { link: '1/99' },
+          '1/1': {
+            x: 0,
+            y: 0,
+            data: [
+              [1, 1],
+              [1, 1],
+            ],
+          },
+        },
+      };
+      const a = AssetClass.fromJSON(assetData);
+      workspace.loadedAssets.set('broken_link_sprite', a);
+
+      const r = await handler({
+        action: 'interpolate_frames',
+        asset_name: 'broken_link_sprite',
+        frame_start: 0,
+        frame_end: 1,
+        count: 1,
+      });
+      expect(r.isError).toBe(true);
+      expect(r.content[0].text).toContain('LinkedCel resolution failed');
+    });
+  });
 });
