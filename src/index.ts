@@ -40,6 +40,7 @@ import { registerScaffoldUiIconsPrompt } from './prompts/scaffold-ui-icons.js';
 import { registerScaffoldUiFramePrompt } from './prompts/scaffold-ui-frame.js';
 import { registerScaffoldAttackPrompt } from './prompts/scaffold-attack.js';
 import { registerScaffoldSideScrollerPrompt } from './prompts/scaffold-side-scroller.js';
+import { registerScaffoldVfxPrompt } from './prompts/scaffold-vfx.js';
 
 // Create the MCP server instance
 const server = new McpServer({
@@ -72,6 +73,7 @@ registerScaffoldUiIconsPrompt(server);
 registerScaffoldUiFramePrompt(server);
 registerScaffoldAttackPrompt(server);
 registerScaffoldSideScrollerPrompt(server);
+registerScaffoldVfxPrompt(server);
 
 const useHttp = process.argv.includes('--http');
 const HTTP_PORT = 3001;

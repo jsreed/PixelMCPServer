@@ -839,7 +839,7 @@ New prompts and export formats that broaden the range of art assets the LLM can 
 
 #### 8C.2 `scaffold_vfx` Prompt
 
-- [ ] **8C.2.1** **`scaffold_vfx` prompt** (`src/prompts/scaffold-vfx.ts`) — arguments: `name`, optional `vfx_type`, optional `width`/`height`, optional `frame_count`, optional `palette`. Messages guide through VFX sprite creation with timing advice (fast attack → slow decay), color choices, scale progression.
+- [x] **8C.2.1** **`scaffold_vfx` prompt** (`src/prompts/scaffold-vfx.ts`) — arguments: `name`, optional `vfx_type`, optional `width`/`height`, optional `frame_count`, optional `palette`. Messages guide through VFX sprite creation with timing advice (fast attack → slow decay), color choices, scale progression.
 
 #### 8C.3 `scaffold_parallax` Prompt
 
