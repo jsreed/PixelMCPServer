@@ -814,7 +814,7 @@ Features that produce richer Godot `.tres` resources for direct import without m
 
 #### 8B.6 Per-Tag Side-Scroller Verification
 
-- [ ] **8B.6.1** **Verify `export per_tag`** works correctly with side-scroller animation states (no `facing` property — just tag names like `idle`, `run`, `jump`). Ensure separator-dropping logic handles tags with no facing gracefully.
+- [x] **8B.6.1** **Verify `export per_tag`** works correctly with side-scroller animation states (no `facing` property — just tag names like `idle`, `run`, `jump`). Ensure separator-dropping logic handles tags with no facing gracefully.
 
 #### 8B.7 Testing
 

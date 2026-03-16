@@ -829,6 +829,306 @@ describe('Export Tool', () => {
     });
   });
 
+  // ─── per_tag side-scroller ─────────────────────────────────────
+
+  describe('per_tag side-scroller', () => {
+    const sideScrollerData = {
+      name: 'player',
+      width: 4,
+      height: 4,
+      perspective: 'flat' as const,
+      palette: Array.from({ length: 256 }, (_, i) => [i === 1 ? 255 : 0, 0, 0, i === 0 ? 0 : 255]),
+      layers: [{ id: 1, name: 'body', type: 'image' as const, visible: true, opacity: 255 }],
+      frames: [
+        { index: 0, duration_ms: 100 },
+        { index: 1, duration_ms: 100 },
+        { index: 2, duration_ms: 100 },
+        { index: 3, duration_ms: 100 },
+        { index: 4, duration_ms: 100 },
+        { index: 5, duration_ms: 100 },
+        { index: 6, duration_ms: 100 },
+      ],
+      tags: [
+        { type: 'frame' as const, name: 'idle', start: 0, end: 1, direction: 'forward' as const },
+        { type: 'frame' as const, name: 'run', start: 2, end: 4, direction: 'forward' as const },
+        { type: 'frame' as const, name: 'jump', start: 5, end: 6, direction: 'forward' as const },
+      ],
+      cels: {
+        '1/0': {
+          x: 0,
+          y: 0,
+          data: [
+            [1, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+        },
+        '1/1': {
+          x: 0,
+          y: 0,
+          data: [
+            [0, 1, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+        },
+        '1/2': {
+          x: 0,
+          y: 0,
+          data: [
+            [0, 0, 1, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+        },
+        '1/3': {
+          x: 0,
+          y: 0,
+          data: [
+            [0, 0, 0, 1],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+        },
+        '1/4': {
+          x: 0,
+          y: 0,
+          data: [
+            [0, 0, 0, 0],
+            [1, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+        },
+        '1/5': {
+          x: 0,
+          y: 0,
+          data: [
+            [0, 0, 0, 0],
+            [0, 1, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+        },
+        '1/6': {
+          x: 0,
+          y: 0,
+          data: [
+            [0, 0, 0, 0],
+            [0, 0, 1, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+        },
+      },
+    };
+
+    const mixedTagsData = {
+      name: 'player',
+      width: 4,
+      height: 4,
+      perspective: 'flat' as const,
+      palette: Array.from({ length: 256 }, (_, i) => [i === 1 ? 255 : 0, 0, 0, i === 0 ? 0 : 255]),
+      layers: [{ id: 1, name: 'body', type: 'image' as const, visible: true, opacity: 255 }],
+      frames: [
+        { index: 0, duration_ms: 100 },
+        { index: 1, duration_ms: 100 },
+        { index: 2, duration_ms: 100 },
+        { index: 3, duration_ms: 100 },
+        { index: 4, duration_ms: 100 },
+      ],
+      tags: [
+        { type: 'frame' as const, name: 'idle', start: 0, end: 1, direction: 'forward' as const },
+        {
+          type: 'frame' as const,
+          name: 'walk_right',
+          start: 2,
+          end: 4,
+          direction: 'forward' as const,
+          facing: 'E' as const,
+        },
+      ],
+      cels: {
+        '1/0': {
+          x: 0,
+          y: 0,
+          data: [
+            [1, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+        },
+        '1/1': {
+          x: 0,
+          y: 0,
+          data: [
+            [0, 1, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+        },
+        '1/2': {
+          x: 0,
+          y: 0,
+          data: [
+            [0, 0, 1, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+        },
+        '1/3': {
+          x: 0,
+          y: 0,
+          data: [
+            [0, 0, 0, 1],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+        },
+        '1/4': {
+          x: 0,
+          y: 0,
+          data: [
+            [0, 0, 0, 0],
+            [1, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+        },
+      },
+    };
+
+    it('exports all tags without facing, dropping direction separator', async () => {
+      workspace.loadedAssets.set(
+        'player',
+        AssetClass.fromJSON(sideScrollerData as unknown as Asset),
+      );
+      const outDir = path.join(TEST_DIR, 'per_tag_side_scroller_a');
+      const result = await exportHandler(
+        {
+          action: 'per_tag',
+          asset_name: 'player',
+          path: outDir,
+          scale_factor: 1,
+        },
+        {} as unknown,
+      );
+
+      expect(result.content[0].text).toContain('Exported 3 tag sequences');
+
+      const idlePath = path.join(outDir, 'player_idle.png');
+      const runPath = path.join(outDir, 'player_run.png');
+      const jumpPath = path.join(outDir, 'player_jump.png');
+
+      expect(fs.existsSync(idlePath)).toBe(true);
+      expect(fs.existsSync(runPath)).toBe(true);
+      expect(fs.existsSync(jumpPath)).toBe(true);
+
+      const idlePng = PNG.sync.read(fs.readFileSync(idlePath));
+      expect(idlePng.width).toBe(8);
+      expect(idlePng.height).toBe(4);
+
+      const runPng = PNG.sync.read(fs.readFileSync(runPath));
+      expect(runPng.width).toBe(12);
+      expect(runPng.height).toBe(4);
+
+      const jumpPng = PNG.sync.read(fs.readFileSync(jumpPath));
+      expect(jumpPng.width).toBe(8);
+      expect(jumpPng.height).toBe(4);
+    });
+
+    it('respects tags filter and only exports specified tags', async () => {
+      workspace.loadedAssets.set(
+        'player',
+        AssetClass.fromJSON(sideScrollerData as unknown as Asset),
+      );
+      const outDir = path.join(TEST_DIR, 'per_tag_side_scroller_b');
+      const result = await exportHandler(
+        {
+          action: 'per_tag',
+          asset_name: 'player',
+          path: outDir,
+          scale_factor: 1,
+          tags: ['run', 'jump'],
+        },
+        {} as unknown,
+      );
+
+      expect(result.content[0].text).toContain('Exported 2 tag sequences');
+
+      expect(fs.existsSync(path.join(outDir, 'player_run.png'))).toBe(true);
+      expect(fs.existsSync(path.join(outDir, 'player_jump.png'))).toBe(true);
+      expect(fs.existsSync(path.join(outDir, 'player_idle.png'))).toBe(false);
+    });
+
+    it('uses custom pattern without {direction} token', async () => {
+      workspace.loadedAssets.set(
+        'player',
+        AssetClass.fromJSON(sideScrollerData as unknown as Asset),
+      );
+      const projectWithPattern = ProjectClass.fromJSON(path.join(TEST_DIR, 'pixelmcp.json'), {
+        pixelmcp_version: '1.0',
+        name: 'Test Project',
+        assets: {},
+        conventions: { export_pattern: '{name}_{tag}.png' },
+      });
+      workspace.project = projectWithPattern;
+
+      const outDir = path.join(TEST_DIR, 'per_tag_side_scroller_c');
+      const result = await exportHandler(
+        {
+          action: 'per_tag',
+          asset_name: 'player',
+          path: outDir,
+          scale_factor: 1,
+        },
+        {} as unknown,
+      );
+
+      expect(result.content[0].text).toContain('Exported 3 tag sequences');
+
+      expect(fs.existsSync(path.join(outDir, 'player_idle.png'))).toBe(true);
+      expect(fs.existsSync(path.join(outDir, 'player_run.png'))).toBe(true);
+      expect(fs.existsSync(path.join(outDir, 'player_jump.png'))).toBe(true);
+    });
+
+    it('handles mixed tags: no facing drops separator, facing is kept', async () => {
+      workspace.loadedAssets.set('player', AssetClass.fromJSON(mixedTagsData as unknown as Asset));
+      const outDir = path.join(TEST_DIR, 'per_tag_side_scroller_d');
+      const result = await exportHandler(
+        {
+          action: 'per_tag',
+          asset_name: 'player',
+          path: outDir,
+          scale_factor: 1,
+        },
+        {} as unknown,
+      );
+
+      expect(result.content[0].text).toContain('Exported 2 tag sequences');
+
+      const idlePath = path.join(outDir, 'player_idle.png');
+      const walkPath = path.join(outDir, 'player_walk_right_E.png');
+
+      expect(fs.existsSync(idlePath)).toBe(true);
+      expect(fs.existsSync(walkPath)).toBe(true);
+
+      const idlePng = PNG.sync.read(fs.readFileSync(idlePath));
+      expect(idlePng.width).toBe(8);
+
+      const walkPng = PNG.sync.read(fs.readFileSync(walkPath));
+      expect(walkPng.width).toBe(12);
+    });
+  });
+
   // ─── E2E Tests ─────────────────────────────────────────────────
 
   describe('E2E', () => {

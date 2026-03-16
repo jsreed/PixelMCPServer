@@ -563,7 +563,7 @@ async function handlePerTagExport(
     const filename = resolveExportPattern(exportPattern, {
       name: assetName,
       tag: tag.name,
-      direction: (tag.facing as string) || '',
+      direction: tag.facing ?? '',
       variant: '', // Variants are handled at project load time right now
       frame: '', // Could be multiple frames per tag
     });
