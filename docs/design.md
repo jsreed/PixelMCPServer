@@ -1237,13 +1237,28 @@ Arguments:
 
 The following features are documented for future implementation but are lower priority than the core tool enhancements above.
 
-**`interpolate_frames` action on `asset` tool** — inserts N intermediate frames between two keyframes by interpolating pixel positions. Accepts `frame_start`, `frame_end`, `count` (number of intermediate frames to insert). Interpolation method: per-pixel nearest-neighbor blending between the two keyframe cels (for indexed color, picks the source or destination index based on a threshold). Useful for roughing out smooth animation transitions that the LLM can then refine. Wrapped in a Command for undo/redo.
+**`interpolate_frames` action on `asset` tool** — inserts N intermediate frames between two keyframes by interpolating pixel data.
+Accepts `frame_start`, `frame_end`, `count` (number of intermediate frames to insert).
+Interpolation method: per-pixel threshold blending — for each pixel, picks the source or destination palette index based on the interpolation position (produces a dissolve/crossfade effect appropriate for indexed color).
+The `count` new frames are inserted at position `frame_start + 1`; `frame_end` and all later frames shift right by `count`.
+All image layers are interpolated independently; non-image layers (shape, tilemap, group) are skipped (no cel created for those layers on the new frames).
+If a source cel is a LinkedCel, it is resolved to its target's pixel data before interpolation; an error is returned if resolution fails.
+Both source cels must be ImageCels (or LinkedCels pointing to ImageCels); mismatched cel types produce an error.
+Interpolated frames inherit `duration_ms` from `frame_start`.
+The entire operation (frame insertion + cel population) is atomic — a single Command for undo/redo.
+Useful for roughing out smooth animation transitions that the LLM can then refine.
 
 **`detect_jaggies` read-only action on `asset` tool** — analyzes a target cel for jaggy artifacts: staircase patterns on edges that should be smooth curves or diagonals. Reports pixel coordinates and suggested corrections (e.g., "add intermediate pixel at (x,y) with color between indices A and B"). Does not modify pixel data. Returns `{ clean: true }` or `{ jaggies: [{ x, y, severity, suggestion }] }`. Complements `detect_banding` for pixel art quality analysis.
 
 **`scale2x` algorithm option on export** — adds a `scale_algorithm` parameter (enum: `nearest`, `scale2x`) to export actions that accept `scale_factor`. Scale2x is a pixel art-specific upscaling algorithm that smooths edges while preserving sharp details, producing cleaner results than nearest-neighbor at 2× magnification. Only valid when `scale_factor` is a power of 2 (2, 4, 8 — applied iteratively).
 
-**Color cycling metadata** — adds an optional `color_cycling` array on the Asset type, where each entry defines a range of palette indices that cycle at a specified speed (`{ start_index, end_index, speed_ms, direction: "forward" | "reverse" | "ping_pong" }`). A `set_color_cycling` action on the `palette` tool manages this metadata. Color cycling is stored in the asset JSON and can be exported as Godot shader uniform metadata. Useful for retro water, fire, and rainbow effects without additional animation frames.
+**Color cycling metadata** — adds an optional `color_cycling` array on the Asset type, where each entry defines a range of palette indices that cycle at a specified speed (`{ start_index, end_index, speed_ms, direction: "forward" | "reverse" | "ping_pong" }`).
+A `set_color_cycling` action on the `palette` tool manages this metadata (palette-adjacent — it controls which palette indices animate at runtime).
+Validation: `start_index < end_index`, both in 0–255, `speed_ms > 0`.
+Color cycling is stored in the asset JSON and serialized/deserialized alongside other optional asset metadata (follows the `nine_slice` pattern: optional field on Asset interface, getter/setter with `markDirty()` on AssetClass, deep-copy restoration in `_restoreDataPatch()`).
+A new `AssetMetadataCommand` captures the `color_cycling` array before/after for undo/redo (distinct from `PaletteCommand` which captures palette colors).
+For Godot export, color cycling entries are emitted as a `metadata/color_cycling` section in the SpriteFrames `.tres` resource, readable at runtime via `get_meta("color_cycling")`.
+Useful for retro water, fire, and rainbow effects without additional animation frames.
 
 **`scaffold_bitmap_font` prompt** — guides creation of a bitmap font asset: fixed-width glyph grid, character mapping, kerning metadata. Paired with a `bitmap_font` export action that outputs a Godot `BitmapFont` `.tres` resource referencing the glyph atlas PNG.
 

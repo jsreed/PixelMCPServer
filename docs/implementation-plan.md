@@ -880,8 +880,8 @@ Lower-priority features that are documented for completeness. Implement as time 
 
 #### 8D.2 Animation Interpolation
 
-- [ ] **8D.2.1** **Frame interpolation algorithm** (`src/algorithms/interpolate.ts`) — `interpolateFrames(celA, celB, count): number[][][]`. Per-pixel threshold blending between two keyframe cels, producing `count` intermediate 2D arrays.
-- [ ] **8D.2.2** **`interpolate_frames` action on asset tool** — insert `count` new frames between `frame_start` and `frame_end`, populate cels from interpolation algorithm. Wrapped in Command.
+- [ ] **8D.2.1** **Frame interpolation algorithm** (`src/algorithms/interpolate.ts`) — `interpolateFrames(celA: number[][], celB: number[][], count: number): number[][][]`. Per-pixel threshold blending between two keyframe cels, producing `count` intermediate 2D arrays. For each pixel at interpolation step `t` (0→1), picks `celA` index if `t < 0.5`, else `celB` index; transparent (0) pixels in either source are preserved (if both non-zero, threshold applies). [design §2.4 Future Considerations]
+- [ ] **8D.2.2** **`interpolate_frames` action on asset tool** — insert `count` new frames at position `frame_start + 1` (`frame_end` and later shift right by `count`). Populate cels from interpolation algorithm for all image layers independently; skip non-image layers. Resolve LinkedCels to source data before interpolating; error on type mismatch (both must be ImageCels). Interpolated frames inherit `duration_ms` from `frame_start`. Atomic single Command (frame insertion + cel writes in one undo step). [design §2.4 Future Considerations]
 
 #### 8D.3 Advanced Upscaling (Scale2x)
 
@@ -895,9 +895,9 @@ Lower-priority features that are documented for completeness. Implement as time 
 
 #### 8D.5 Color Cycling
 
-- [ ] **8D.5.1** **`color_cycling` asset metadata** — optional array on Asset type: `Array<{ start_index, end_index, speed_ms, direction }>`.
-- [ ] **8D.5.2** **`set_color_cycling` palette action** — manage color cycling entries. Wrapped in Command.
-- [ ] **8D.5.3** **Export color cycling as shader metadata** — emit alongside Godot resources for runtime cycling.
+- [ ] **8D.5.1** **`color_cycling` asset metadata** — add `ColorCycleEntry` interface (`{ start_index, end_index, speed_ms, direction: 'forward' | 'reverse' | 'ping_pong' }`) and optional `color_cycling?: ColorCycleEntry[]` on Asset type. Follow `nine_slice` pattern: getter/setter with `markDirty()` on AssetClass, deep-copy restoration in `_restoreDataPatch()`. Validation: `start_index < end_index`, both 0–255, `speed_ms > 0`. [design §2.4 Future Considerations]
+- [ ] **8D.5.2** **`set_color_cycling` palette action** — manage color cycling entries on the asset. New `AssetMetadataCommand` class (`src/commands/asset-metadata-command.ts`) captures `color_cycling` array before/after for undo/redo (distinct from `PaletteCommand` which captures palette colors). [design §2.4 Future Considerations]
+- [ ] **8D.5.3** **Export color cycling as Godot metadata** — emit `color_cycling` entries as a `metadata/color_cycling` section in the SpriteFrames `.tres` resource, readable at runtime via `get_meta("color_cycling")`. [design §2.4 Future Considerations]
 
 #### 8D.6 Bitmap Font Workflow
 
@@ -907,10 +907,10 @@ Lower-priority features that are documented for completeness. Implement as time 
 #### 8D.7 Testing
 
 - [ ] **8D.7.1** **Background removal tests** — matching pixels replaced with 0; non-matching unchanged; ignores selection.
-- [ ] **8D.7.2** **Interpolation tests** — correct number of intermediate frames inserted; boundary frames unchanged; command undo removes inserted frames.
+- [ ] **8D.7.2** **Interpolation tests** — correct number of intermediate frames inserted; boundary frames unchanged; command undo removes inserted frames; non-image layers skipped; LinkedCel resolution; type mismatch error; interpolated frames inherit duration from frame_start.
 - [ ] **8D.7.3** **Scale2x tests** — output dimensions correct; known pattern produces expected smoothed output; error on non-power-of-2 scale factor.
 - [ ] **8D.7.4** **Jaggy detection tests** — known staircase pattern detected; clean diagonal not flagged; report structure correct.
-- [ ] **8D.7.5** **Color cycling tests** — metadata roundtrip; `set_color_cycling` command undo/redo.
+- [ ] **8D.7.5** **Color cycling tests** — metadata roundtrip (save/load preserves entries); `set_color_cycling` command undo/redo via AssetMetadataCommand; validation rejects `start_index >= end_index`, out-of-range indices, `speed_ms <= 0`; Godot export includes `metadata/color_cycling` in `.tres`.
 - [ ] **8D.7.6** **Bitmap font tests** — prompt registration and argument validation; export produces glyph atlas with correct dimensions.
 
 > **Definition of Done — Phase 8D:** All Tier 4 features implemented and tested. Background removal, animation interpolation, Scale2x upscaling, jaggy detection, color cycling, and bitmap font workflow all have passing tests.
