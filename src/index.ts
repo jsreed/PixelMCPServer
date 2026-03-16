@@ -41,6 +41,7 @@ import { registerScaffoldUiFramePrompt } from './prompts/scaffold-ui-frame.js';
 import { registerScaffoldAttackPrompt } from './prompts/scaffold-attack.js';
 import { registerScaffoldSideScrollerPrompt } from './prompts/scaffold-side-scroller.js';
 import { registerScaffoldVfxPrompt } from './prompts/scaffold-vfx.js';
+import { registerScaffoldParallaxPrompt } from './prompts/scaffold-parallax.js';
 
 // Create the MCP server instance
 const server = new McpServer({
@@ -74,6 +75,7 @@ registerScaffoldUiFramePrompt(server);
 registerScaffoldAttackPrompt(server);
 registerScaffoldSideScrollerPrompt(server);
 registerScaffoldVfxPrompt(server);
+registerScaffoldParallaxPrompt(server);
 
 const useHttp = process.argv.includes('--http');
 const HTTP_PORT = 3001;

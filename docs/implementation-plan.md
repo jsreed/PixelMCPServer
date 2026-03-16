@@ -843,7 +843,7 @@ New prompts and export formats that broaden the range of art assets the LLM can 
 
 #### 8C.3 `scaffold_parallax` Prompt
 
-- [ ] **8C.3.1** **`scaffold_parallax` prompt** (`src/prompts/scaffold-parallax.ts`) — arguments: `name`, optional `layer_count`, optional `viewport_width`, optional `height`, optional `palette`. Messages guide through parallax layer creation with depth ordering, atmospheric perspective color guidance, tile-seam alignment.
+- [x] **8C.3.1** **`scaffold_parallax` prompt** (`src/prompts/scaffold-parallax.ts`) — arguments: `name`, optional `layer_count`, optional `viewport_width`, optional `height`, optional `palette`. Messages guide through parallax layer creation with depth ordering, atmospheric perspective color guidance, tile-seam alignment.
 
 #### 8C.4 `scaffold_props` Prompt
 
