@@ -162,6 +162,17 @@ export interface NineSlice {
 }
 
 /**
+ * A single color cycling range definition.
+ * Defines a range of palette indices that cycle at runtime.
+ */
+export interface ColorCycleEntry {
+  start_index: number;
+  end_index: number;
+  speed_ms: number;
+  direction: 'forward' | 'reverse' | 'ping_pong';
+}
+
+/**
  * Core type for a complete Asset document.
  * Represents a single art file loaded in the workspace.
  */
@@ -209,4 +220,6 @@ export interface Asset {
 
   /** Nine-slice scaling margins for UI panel export */
   nine_slice?: NineSlice;
+  /** Color cycling ranges for runtime palette animation */
+  color_cycling?: ColorCycleEntry[];
 }

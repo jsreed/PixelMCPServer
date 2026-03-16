@@ -77,6 +77,38 @@ describe('godot-resources', () => {
       const res = generateGodotSpriteFrames(asset, 'test_strip.png', 2);
       expect(res).toContain('region = Rect2(0, 0, 20, 20)');
     });
+
+    test('emits metadata/color_cycling when asset has color_cycling', () => {
+      const asset = createDummyAsset({
+        frames: [{ index: 0, duration_ms: 100 }],
+        color_cycling: [
+          { start_index: 0, end_index: 7, speed_ms: 100, direction: 'forward' },
+          { start_index: 10, end_index: 15, speed_ms: 200, direction: 'reverse' },
+        ],
+      });
+      const res = generateGodotSpriteFrames(asset, 'test_strip.png', 1);
+      expect(res).toContain('metadata/color_cycling = [');
+      expect(res).toContain('"start_index": 0');
+      expect(res).toContain('"end_index": 7');
+      expect(res).toContain('"speed_ms": 100');
+    });
+
+    test('does not emit metadata/color_cycling when absent', () => {
+      const asset = createDummyAsset({
+        frames: [{ index: 0, duration_ms: 100 }],
+      });
+      const res = generateGodotSpriteFrames(asset, 'test_strip.png', 1);
+      expect(res).not.toContain('metadata/color_cycling');
+    });
+
+    test('emits correct direction strings', () => {
+      const asset = createDummyAsset({
+        frames: [{ index: 0, duration_ms: 100 }],
+        color_cycling: [{ start_index: 0, end_index: 7, speed_ms: 150, direction: 'ping_pong' }],
+      });
+      const res = generateGodotSpriteFrames(asset, 'test_strip.png', 1);
+      expect(res).toContain('"direction": "ping_pong"');
+    });
   });
 
   describe('generateGodotShapesAnimation', () => {

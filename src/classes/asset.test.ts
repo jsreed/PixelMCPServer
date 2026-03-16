@@ -715,6 +715,53 @@ describe('AssetClass', () => {
     });
   });
 
+  // ─── Color cycling support ───────────────────────────────────────
+
+  describe('color_cycling', () => {
+    it('getter returns undefined by default', () => {
+      const asset = new AssetClass(mockAssetData);
+      expect(asset.color_cycling).toBeUndefined();
+    });
+
+    it('setter sets value and marks dirty', () => {
+      const asset = new AssetClass(mockAssetData);
+      const entries = [
+        { start_index: 0, end_index: 7, speed_ms: 100, direction: 'forward' as const },
+      ];
+      asset.color_cycling = entries;
+      expect(asset.color_cycling).toEqual(entries);
+      expect(asset.isDirty).toBe(true);
+    });
+
+    it('toJSON includes color_cycling when set', () => {
+      const asset = new AssetClass(mockAssetData);
+      const entries = [
+        { start_index: 2, end_index: 5, speed_ms: 200, direction: 'reverse' as const },
+      ];
+      asset.color_cycling = entries;
+      const json = asset.toJSON();
+      expect(json.color_cycling).toEqual(entries);
+    });
+
+    it('toJSON omits color_cycling when undefined', () => {
+      const asset = new AssetClass(mockAssetData);
+      const json = asset.toJSON();
+      expect(json.color_cycling).toBeUndefined();
+    });
+
+    it('fromJSON round-trip preserves color_cycling', () => {
+      const asset = new AssetClass(mockAssetData);
+      const entries = [
+        { start_index: 1, end_index: 4, speed_ms: 150, direction: 'ping_pong' as const },
+        { start_index: 10, end_index: 15, speed_ms: 300, direction: 'forward' as const },
+      ];
+      asset.color_cycling = entries;
+      const json = asset.toJSON();
+      const restored = AssetClass.fromJSON(json);
+      expect(restored.color_cycling).toEqual(entries);
+    });
+  });
+
   // ─── Gap 3: toJSON / fromJSON roundtrip fidelity ─────────────────
 
   describe('toJSON / fromJSON roundtrip', () => {

@@ -90,6 +90,15 @@ export function generateGodotSpriteFrames(
   }
 
   tres += animations.join(', ') + `]\n`;
+
+  if (asset.color_cycling && asset.color_cycling.length > 0) {
+    const entries = asset.color_cycling.map(
+      (e) =>
+        `{"start_index": ${String(e.start_index)}, "end_index": ${String(e.end_index)}, "speed_ms": ${String(e.speed_ms)}, "direction": "${e.direction}"}`,
+    );
+    tres += `metadata/color_cycling = [${entries.join(', ')}]\n`;
+  }
+
   return tres;
 }
 

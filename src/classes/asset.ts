@@ -8,6 +8,7 @@ import {
   type TileAnimation,
   type TileCustomData,
   type TileAlternatives,
+  type ColorCycleEntry,
 } from '../types/asset.js';
 import { PaletteClass } from './palette.js';
 import * as errors from '../errors.js';
@@ -127,6 +128,15 @@ export class AssetClass {
 
   set nine_slice(value: NineSlice | undefined) {
     this._data.nine_slice = value;
+    this.markDirty();
+  }
+
+  get color_cycling(): ColorCycleEntry[] | undefined {
+    return this._data.color_cycling;
+  }
+
+  set color_cycling(value: ColorCycleEntry[] | undefined) {
+    this._data.color_cycling = value;
     this.markDirty();
   }
 
@@ -901,6 +911,10 @@ export class AssetClass {
     if ('tile_alternatives' in patch)
       this._data.tile_alternatives = patch.tile_alternatives
         ? (JSON.parse(JSON.stringify(patch.tile_alternatives)) as TileAlternatives)
+        : undefined;
+    if ('color_cycling' in patch)
+      this._data.color_cycling = patch.color_cycling
+        ? (JSON.parse(JSON.stringify(patch.color_cycling)) as ColorCycleEntry[])
         : undefined;
     this.markDirty();
   }

@@ -895,9 +895,9 @@ Lower-priority features that are documented for completeness. Implement as time 
 
 #### 8D.5 Color Cycling
 
-- [ ] **8D.5.1** **`color_cycling` asset metadata** — add `ColorCycleEntry` interface (`{ start_index, end_index, speed_ms, direction: 'forward' | 'reverse' | 'ping_pong' }`) and optional `color_cycling?: ColorCycleEntry[]` on Asset type. Follow `nine_slice` pattern: getter/setter with `markDirty()` on AssetClass, deep-copy restoration in `_restoreDataPatch()`. Validation: `start_index < end_index`, both 0–255, `speed_ms > 0`. [design §2.4 Future Considerations]
-- [ ] **8D.5.2** **`set_color_cycling` palette action** — manage color cycling entries on the asset. New `AssetMetadataCommand` class (`src/commands/asset-metadata-command.ts`) captures `color_cycling` array before/after for undo/redo (distinct from `PaletteCommand` which captures palette colors). [design §2.4 Future Considerations]
-- [ ] **8D.5.3** **Export color cycling as Godot metadata** — emit `color_cycling` entries as a `metadata/color_cycling` section in the SpriteFrames `.tres` resource, readable at runtime via `get_meta("color_cycling")`. [design §2.4 Future Considerations]
+- [x] **8D.5.1** **`color_cycling` asset metadata** — add `ColorCycleEntry` interface (`{ start_index, end_index, speed_ms, direction: 'forward' | 'reverse' | 'ping_pong' }`) and optional `color_cycling?: ColorCycleEntry[]` on Asset type. Follow `nine_slice` pattern: getter/setter with `markDirty()` on AssetClass, deep-copy restoration in `_restoreDataPatch()`. Validation: `start_index < end_index`, both 0–255, `speed_ms > 0`. [design §2.4 Future Considerations]
+- [x] **8D.5.2** **`set_color_cycling` palette action** — manage color cycling entries on the asset. New `AssetMetadataCommand` class (`src/commands/asset-metadata-command.ts`) captures `color_cycling` array before/after for undo/redo (distinct from `PaletteCommand` which captures palette colors). [design §2.4 Future Considerations]
+- [x] **8D.5.3** **Export color cycling as Godot metadata** — emit `color_cycling` entries as a `metadata/color_cycling` section in the SpriteFrames `.tres` resource, readable at runtime via `get_meta("color_cycling")`. [design §2.4 Future Considerations]
 
 #### 8D.6 Bitmap Font Workflow
 

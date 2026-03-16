@@ -2,10 +2,12 @@ import { z } from 'zod';
 import { type McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { getWorkspace } from '../classes/workspace.js';
 import { PaletteCommand } from '../commands/palette-command.js';
+import { AssetMetadataCommand } from '../commands/asset-metadata-command.js';
 import { loadPaletteFile, savePaletteFile } from '../io/palette-io.js';
 import * as errors from '../errors.js';
 import * as path from 'node:path';
 import { type Color } from '../types/palette.js';
+import { type ColorCycleEntry } from '../types/asset.js';
 import { createResourceLink } from '../utils/resource-link.js';
 
 /**
@@ -13,7 +15,17 @@ import { createResourceLink } from '../utils/resource-link.js';
  */
 const paletteInputSchema = {
   action: z
-    .enum(['info', 'set', 'set_bulk', 'swap', 'generate_ramp', 'load', 'save', 'fetch_lospec'])
+    .enum([
+      'info',
+      'set',
+      'set_bulk',
+      'swap',
+      'generate_ramp',
+      'load',
+      'save',
+      'fetch_lospec',
+      'set_color_cycling',
+    ])
     .describe('Palette action to perform'),
   asset_name: z.string().optional().describe('Target asset name'),
   index: z.number().int().optional().describe('Palette index (0-255) for set/swap'),
@@ -44,6 +56,17 @@ const paletteInputSchema = {
     .describe('Hue rotation degrees (-360 to +360) for end color in generate_ramp'),
   name: z.string().optional().describe('Palette name for save, or Lospec slug for fetch_lospec'),
   path: z.string().optional().describe('File path for load/save (relative to pixelmcp.json)'),
+  color_cycling: z
+    .array(
+      z.object({
+        start_index: z.number().int().min(0).max(255),
+        end_index: z.number().int().min(0).max(255),
+        speed_ms: z.number().min(1),
+        direction: z.enum(['forward', 'reverse', 'ping_pong']),
+      }),
+    )
+    .optional()
+    .describe('Color cycling entries for set_color_cycling'),
 };
 
 /**
@@ -55,7 +78,7 @@ export function registerPaletteTool(server: McpServer): void {
     {
       title: 'Palette',
       description:
-        'Query and manage the indexed color palette. Actions: info, set, set_bulk, swap, generate_ramp, load, save, fetch_lospec.',
+        'Query and manage the indexed color palette. Actions: info, set, set_bulk, swap, generate_ramp, load, save, fetch_lospec, set_color_cycling.',
       inputSchema: paletteInputSchema,
     },
     async (args) => {
@@ -99,6 +122,12 @@ export function registerPaletteTool(server: McpServer): void {
           return handleSave(workspace, asset, args.path, args.name);
         case 'fetch_lospec':
           return handleFetchLospec(workspace, asset, args.name);
+        case 'set_color_cycling':
+          return handleSetColorCycling(
+            workspace,
+            asset,
+            args.color_cycling as ColorCycleEntry[] | undefined,
+          );
         default:
           return errors.invalidArgument(`Unknown palette action: ${String(args.action)}`);
       }
@@ -362,6 +391,46 @@ async function handleSave(
       {
         type: 'text' as const,
         text: JSON.stringify({ message: `Palette saved to '${filePath}'.`, path: resolvedPath }),
+      },
+    ],
+  };
+}
+
+function handleSetColorCycling(
+  workspace: Workspace,
+  asset: Asset,
+  entries: ColorCycleEntry[] | undefined,
+) {
+  // Validate entries
+  if (entries !== undefined) {
+    for (const entry of entries) {
+      if (entry.start_index >= entry.end_index) {
+        return errors.invalidArgument(
+          `Color cycling: start_index (${String(entry.start_index)}) must be less than end_index (${String(entry.end_index)}).`,
+        );
+      }
+    }
+  }
+
+  try {
+    const cmd = new AssetMetadataCommand(asset, () => {
+      asset.color_cycling = entries && entries.length > 0 ? entries : undefined;
+    });
+    workspace.pushCommand(cmd);
+  } catch (e: unknown) {
+    return errors.domainError(e instanceof Error ? e.message : String(e));
+  }
+
+  const message =
+    entries && entries.length > 0
+      ? `Color cycling set with ${String(entries.length)} ${entries.length === 1 ? 'entry' : 'entries'}.`
+      : 'Color cycling cleared.';
+
+  return {
+    content: [
+      {
+        type: 'text' as const,
+        text: JSON.stringify({ message }),
       },
     ],
   };

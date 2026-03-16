@@ -465,4 +465,80 @@ describe('palette tool', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('missing-palette');
   });
+
+  // ─── set_color_cycling action ─────────────────────────────────────
+
+  it('set_color_cycling sets entries on asset', async () => {
+    const result = await handler({
+      action: 'set_color_cycling',
+      asset_name: 'sprite',
+      color_cycling: [{ start_index: 0, end_index: 7, speed_ms: 100, direction: 'forward' }],
+    });
+
+    expect(result.isError).toBeUndefined();
+    const data = JSON.parse(result.content[0].text) as { message: string };
+    expect(data.message).toContain('1 entry');
+
+    const asset = getAsset('sprite');
+    expect(asset.color_cycling).toEqual([
+      { start_index: 0, end_index: 7, speed_ms: 100, direction: 'forward' },
+    ]);
+  });
+
+  it('set_color_cycling with empty array clears entries', async () => {
+    // First set some entries
+    const asset = getAsset('sprite');
+    asset.color_cycling = [{ start_index: 0, end_index: 7, speed_ms: 100, direction: 'forward' }];
+
+    const result = await handler({
+      action: 'set_color_cycling',
+      asset_name: 'sprite',
+      color_cycling: [],
+    });
+
+    expect(result.isError).toBeUndefined();
+    const data = JSON.parse(result.content[0].text) as { message: string };
+    expect(data.message).toContain('cleared');
+    expect(asset.color_cycling).toBeUndefined();
+  });
+
+  it('set_color_cycling with undefined clears entries', async () => {
+    const asset = getAsset('sprite');
+    asset.color_cycling = [{ start_index: 0, end_index: 7, speed_ms: 100, direction: 'forward' }];
+
+    const result = await handler({
+      action: 'set_color_cycling',
+      asset_name: 'sprite',
+    });
+
+    expect(result.isError).toBeUndefined();
+    const data = JSON.parse(result.content[0].text) as { message: string };
+    expect(data.message).toContain('cleared');
+    expect(asset.color_cycling).toBeUndefined();
+  });
+
+  it('set_color_cycling validates start_index < end_index', async () => {
+    const result = await handler({
+      action: 'set_color_cycling',
+      asset_name: 'sprite',
+      color_cycling: [{ start_index: 7, end_index: 3, speed_ms: 100, direction: 'forward' }],
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('start_index');
+  });
+
+  it('set_color_cycling is undoable', async () => {
+    await handler({
+      action: 'set_color_cycling',
+      asset_name: 'sprite',
+      color_cycling: [{ start_index: 0, end_index: 7, speed_ms: 100, direction: 'forward' }],
+    });
+
+    const asset = getAsset('sprite');
+    expect(asset.color_cycling).toBeDefined();
+
+    workspace.undo();
+    expect(asset.color_cycling).toBeUndefined();
+  });
 });
