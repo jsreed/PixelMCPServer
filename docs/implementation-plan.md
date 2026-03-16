@@ -847,7 +847,7 @@ New prompts and export formats that broaden the range of art assets the LLM can 
 
 #### 8C.4 `scaffold_props` Prompt
 
-- [ ] **8C.4.1** **`scaffold_props` prompt** (`src/prompts/scaffold-props.ts`) — arguments: `name`, optional `prop_type`, optional `reference_character`, optional `width`/`height`, optional `palette`. Messages guide through environment prop creation with state-based tags, hitbox layers, scale consistency.
+- [x] **8C.4.1** **`scaffold_props` prompt** (`src/prompts/scaffold-props.ts`) — arguments: `name`, optional `prop_type`, optional `reference_character`, optional `width`/`height`, optional `palette`. Messages guide through environment prop creation with state-based tags, hitbox layers, scale consistency.
 
 #### 8C.5 Normal Map Generation
 
