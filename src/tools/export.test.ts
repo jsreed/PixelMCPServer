@@ -827,6 +827,20 @@ describe('Export Tool', () => {
       expect(png.width).toBe(24);
       expect(png.height).toBe(8);
     });
+
+    it('returns isError for columns < 1', async () => {
+      const result = await exportHandler(
+        {
+          action: 'spritesheet_grid',
+          asset_name: 'test_asset',
+          path: path.join(TEST_DIR, 'grid_badcols.png'),
+          columns: 0,
+        },
+        {} as unknown,
+      );
+
+      expect((result as { isError?: boolean }).isError).toBeTruthy();
+    });
   });
 
   // ─── per_tag side-scroller ─────────────────────────────────────

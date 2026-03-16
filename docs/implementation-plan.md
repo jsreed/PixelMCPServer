@@ -818,11 +818,11 @@ Features that produce richer Godot `.tres` resources for direct import without m
 
 #### 8B.7 Testing
 
-- [ ] **8B.7.1** **Animated tile tests** — `set_tile_animation` storage and roundtrip; `clear_tile_animation` removes metadata and round-trips; `.tres` output contains animation properties; command undo/redo.
-- [ ] **8B.7.2** **Custom data tests** — `set_tile_data` auto-creates layers; `clear_tile_data` removes single key or all custom data; multiple data types stored correctly; `.tres` output contains custom data; command undo/redo.
-- [ ] **8B.7.3** **Occlusion tests** — `set_tile_physics` with `occlusion_polygon`; `.tres` output contains occlusion layer.
-- [ ] **8B.7.4** **Tile alternative tests** — `add_tile_alternative` auto-assigns ID; `remove_tile_alternative` removes by ID; `.tres` output contains alternative entries with transform flags; command undo/redo.
-- [ ] **8B.7.5** **Grid spritesheet tests** — correct dimensions for various `columns` values; transparent fill in incomplete rows; `columns < 1` error.
+- [x] **8B.7.1** **Animated tile tests** — `set_tile_animation` storage and roundtrip; `clear_tile_animation` removes metadata and round-trips; `.tres` output contains animation properties; command undo/redo.
+- [x] **8B.7.2** **Custom data tests** — `set_tile_data` auto-creates layers; `clear_tile_data` removes single key or all custom data; multiple data types stored correctly; `.tres` output contains custom data; command undo/redo.
+- [x] **8B.7.3** **Occlusion tests** — `set_tile_physics` with `occlusion_polygon`; `.tres` output contains occlusion layer.
+- [x] **8B.7.4** **Tile alternative tests** — `add_tile_alternative` auto-assigns ID; `remove_tile_alternative` removes by ID; `.tres` output contains alternative entries with transform flags; command undo/redo.
+- [x] **8B.7.5** **Grid spritesheet tests** — correct dimensions for various `columns` values; transparent fill in incomplete rows; `columns < 1` error.
 
 > **Definition of Done — Phase 8B:** Animated tiles, custom data layers, occlusion polygons, and tile alternatives all round-trip through save/load and appear in Godot `.tres` output. Grid spritesheet export produces correct layouts. All 8B.7 tests pass.
 
@@ -834,7 +834,7 @@ New prompts and export formats that broaden the range of art assets the LLM can 
 
 #### 8C.1 Enhance `scaffold_character`
 
-- [ ] **8C.1.1** **Broaden `scaffold_character` prompt** — add `role` argument (player/npc/enemy/boss) and `animations` argument. Adjust messages to include behavioral animation states based on role: enemies get `hurt`/`death`/`aggro`; NPCs get `idle_variant`/`interact`; bosses get `phase_transition`. Player remains the default with `idle`/`walk`/`attack`.
+- [ ] **8C.1.1** **Broaden `scaffold_character` prompt** — add `role` argument (player/npc/enemy/boss/any) and `animations` argument. Adjust messages to include behavioral animation states based on role: enemies get `hurt`/`death`/`aggro`; NPCs get `idle_variant`/`interact`; bosses get `phase_transition`. Player remains the default with `idle`/`walk`/`attack`.
 - [ ] **8C.1.2** **Update prompt tests** — verify role-based animation state suggestions, verify `animations` override works.
 
 #### 8C.2 `scaffold_vfx` Prompt

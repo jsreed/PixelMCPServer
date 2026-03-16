@@ -124,6 +124,114 @@ describe('asset-io', () => {
     expect(loaded).toEqual(original);
   });
 
+  it('roundtrips tile_animation', async () => {
+    const filePath = path.join(tempDir, 'tile-anim.json');
+    const original = makeTestAsset();
+    original.tile_width = 16;
+    original.tile_height = 16;
+    original.tile_count = 4;
+    original.tile_animation = {
+      '0': { frame_count: 4, frame_duration_ms: 200, separation: 2 },
+      '2': { frame_count: 3, frame_duration_ms: 100, separation: 0 },
+    };
+
+    await saveAssetFile(filePath, original);
+    const loaded = await loadAssetFile(filePath);
+
+    expect(loaded.tile_animation).toEqual(original.tile_animation);
+    expect(loaded.tile_animation?.['0']?.frame_count).toBe(4);
+    expect(loaded.tile_animation?.['0']?.separation).toBe(2);
+    expect(loaded.tile_animation?.['2']?.frame_count).toBe(3);
+  });
+
+  it('roundtrips tile_custom_data', async () => {
+    const filePath = path.join(tempDir, 'tile-data.json');
+    const original = makeTestAsset();
+    original.tile_width = 16;
+    original.tile_height = 16;
+    original.tile_count = 4;
+    original.tile_custom_data = {
+      layers: [
+        { name: 'movement_cost', type: 'int' },
+        { name: 'terrain_type', type: 'string' },
+        { name: 'passable', type: 'bool' },
+      ],
+      tiles: {
+        '0': { movement_cost: 2, terrain_type: 'grass', passable: true },
+        '1': { movement_cost: 5, terrain_type: 'water', passable: false },
+      },
+    };
+
+    await saveAssetFile(filePath, original);
+    const loaded = await loadAssetFile(filePath);
+
+    expect(loaded.tile_custom_data).toEqual(original.tile_custom_data);
+    expect(loaded.tile_custom_data?.layers).toHaveLength(3);
+    expect(loaded.tile_custom_data?.tiles['0']?.['movement_cost']).toBe(2);
+    expect(loaded.tile_custom_data?.tiles['1']?.['passable']).toBe(false);
+  });
+
+  it('roundtrips tile_alternatives', async () => {
+    const filePath = path.join(tempDir, 'tile-alts.json');
+    const original = makeTestAsset();
+    original.tile_width = 16;
+    original.tile_height = 16;
+    original.tile_count = 2;
+    original.tile_alternatives = {
+      '0': [
+        { alternative_id: 1, flip_h: true, flip_v: false, transpose: false },
+        { alternative_id: 2, flip_h: false, flip_v: true, transpose: true },
+      ],
+      '1': [{ alternative_id: 1, flip_h: false, flip_v: false, transpose: false }],
+    };
+
+    await saveAssetFile(filePath, original);
+    const loaded = await loadAssetFile(filePath);
+
+    expect(loaded.tile_alternatives).toEqual(original.tile_alternatives);
+    expect(loaded.tile_alternatives?.['0']).toHaveLength(2);
+    expect(loaded.tile_alternatives?.['0']?.[0]?.flip_h).toBe(true);
+    expect(loaded.tile_alternatives?.['0']?.[1]?.transpose).toBe(true);
+    expect(loaded.tile_alternatives?.['1']?.[0]?.alternative_id).toBe(1);
+  });
+
+  it('roundtrips occlusion_polygon inside tile_physics', async () => {
+    const filePath = path.join(tempDir, 'tile-occlusion.json');
+    const original = makeTestAsset();
+    original.tile_width = 16;
+    original.tile_height = 16;
+    original.tile_count = 2;
+    original.tile_physics = {
+      physics_layers: [{ collision_layer: 1, collision_mask: 1 }],
+      tiles: {
+        '0': {
+          polygon: [
+            [0, 0],
+            [16, 0],
+            [16, 16],
+            [0, 16],
+          ],
+          occlusion_polygon: [
+            [2, 2],
+            [14, 2],
+            [14, 14],
+            [2, 14],
+          ],
+        },
+      },
+    };
+
+    await saveAssetFile(filePath, original);
+    const loaded = await loadAssetFile(filePath);
+
+    expect(loaded.tile_physics?.tiles['0']?.occlusion_polygon).toEqual([
+      [2, 2],
+      [14, 2],
+      [14, 14],
+      [2, 14],
+    ]);
+  });
+
   it('updates modified timestamp on save', async () => {
     const filePath = path.join(tempDir, 'time.json');
     const original = makeTestAsset();
