@@ -13,10 +13,17 @@ import { generateNormalMap } from '../algorithms/normal-map.js';
 import { generatePaletteLUT } from '../algorithms/palette-lut.js';
 import { buildCompositeLayers, buildPaletteMap } from '../utils/render.js';
 import { upscale } from '../algorithms/upscale.js';
+import { scale2x } from '../algorithms/scale2x.js';
 import { packRectangles, type PackInput } from '../algorithms/bin-pack.js';
 import { resolveExportPattern } from '../algorithms/export-pattern.js';
 import { generateGodotImportSidecar } from '../io/godot-import.js';
 import * as godotResources from '../io/godot-resources.js';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type ScaleAlgorithm = 'nearest' | 'scale2x';
 
 // ---------------------------------------------------------------------------
 // Zod input schema
@@ -44,6 +51,10 @@ const exportInputZodSchema = z.object({
   asset_name: z.string().optional().describe('Target asset name (required except for atlas)'),
   path: z.string().describe('Output file or directory path'),
   scale_factor: z.number().int().min(1).optional().describe('Scale factor for export (default 1)'),
+  scale_algorithm: z
+    .enum(['nearest', 'scale2x'])
+    .optional()
+    .describe('Upscale algorithm (default nearest). scale2x requires power-of-2 scale_factor.'),
   frame: z.number().int().min(0).optional().describe('Frame index to export (for png, normal_map)'),
   pad: z.number().int().optional().describe('Pixel padding for atlas (default 0)'),
   extrude: z.boolean().optional().describe('Extrude edge pixels for atlas (default false)'),
@@ -68,6 +79,20 @@ function ok(data: object) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] };
 }
 
+function applyUpscale(
+  buffer: Uint8Array,
+  width: number,
+  height: number,
+  scaleFactor: number,
+  algorithm: ScaleAlgorithm,
+): Uint8Array {
+  if (scaleFactor <= 1) return buffer;
+  if (algorithm === 'scale2x') {
+    return scale2x(buffer, width, height, scaleFactor);
+  }
+  return upscale(buffer, width, height, scaleFactor);
+}
+
 // ---------------------------------------------------------------------------
 // Register
 // ---------------------------------------------------------------------------
@@ -88,6 +113,16 @@ export function registerExportTool(server: McpServer): void {
         scaleFactor = args.scale_factor;
       }
 
+      const scaleAlgorithm: ScaleAlgorithm = args.scale_algorithm ?? 'nearest';
+
+      if (
+        scaleAlgorithm === 'scale2x' &&
+        scaleFactor > 1 &&
+        (scaleFactor & (scaleFactor - 1)) !== 0
+      ) {
+        return errors.invalidArgument('scale2x requires a power-of-2 scale_factor (2, 4, 8)');
+      }
+
       const outPath = args.path;
 
       try {
@@ -98,6 +133,7 @@ export function registerExportTool(server: McpServer): void {
             scaleFactor,
             args.pad ?? 0,
             args.extrude === true,
+            scaleAlgorithm,
           );
         }
 
@@ -108,6 +144,7 @@ export function registerExportTool(server: McpServer): void {
             scaleFactor,
             args.pad ?? 0,
             args.extrude === true,
+            scaleAlgorithm,
           );
         }
 
@@ -124,21 +161,65 @@ export function registerExportTool(server: McpServer): void {
               outPath,
               scaleFactor,
               args.frame ?? 0,
+              scaleAlgorithm,
             );
           case 'gif':
-            return await handleGifExport(workspace, assetName, outPath, scaleFactor);
+            return await handleGifExport(
+              workspace,
+              assetName,
+              outPath,
+              scaleFactor,
+              scaleAlgorithm,
+            );
           case 'spritesheet_strip':
-            return await handleStripExport(workspace, assetName, outPath, scaleFactor);
+            return await handleStripExport(
+              workspace,
+              assetName,
+              outPath,
+              scaleFactor,
+              scaleAlgorithm,
+            );
           case 'per_tag':
-            return await handlePerTagExport(workspace, assetName, outPath, scaleFactor, args.tags);
+            return await handlePerTagExport(
+              workspace,
+              assetName,
+              outPath,
+              scaleFactor,
+              args.tags,
+              scaleAlgorithm,
+            );
           case 'godot_spriteframes':
-            return await handleGodotSpriteframesExport(workspace, assetName, outPath, scaleFactor);
+            return await handleGodotSpriteframesExport(
+              workspace,
+              assetName,
+              outPath,
+              scaleFactor,
+              scaleAlgorithm,
+            );
           case 'godot_tileset':
-            return await handleGodotTilesetExport(workspace, assetName, outPath, scaleFactor);
+            return await handleGodotTilesetExport(
+              workspace,
+              assetName,
+              outPath,
+              scaleFactor,
+              scaleAlgorithm,
+            );
           case 'godot_static':
-            return await handleGodotStaticExport(workspace, assetName, outPath, scaleFactor);
+            return await handleGodotStaticExport(
+              workspace,
+              assetName,
+              outPath,
+              scaleFactor,
+              scaleAlgorithm,
+            );
           case 'godot_ui_frame':
-            return await handleGodotUiFrameExport(workspace, assetName, outPath, scaleFactor);
+            return await handleGodotUiFrameExport(
+              workspace,
+              assetName,
+              outPath,
+              scaleFactor,
+              scaleAlgorithm,
+            );
           case 'spritesheet_per_layer':
             return await handlePerLayerStripExport(
               workspace,
@@ -146,9 +227,17 @@ export function registerExportTool(server: McpServer): void {
               outPath,
               scaleFactor,
               args.layers,
+              scaleAlgorithm,
             );
           case 'spritesheet_grid':
-            return await handleGridExport(workspace, assetName, outPath, scaleFactor, args.columns);
+            return await handleGridExport(
+              workspace,
+              assetName,
+              outPath,
+              scaleFactor,
+              args.columns,
+              scaleAlgorithm,
+            );
           case 'normal_map':
             return await handleNormalMapExport(
               workspace,
@@ -156,6 +245,7 @@ export function registerExportTool(server: McpServer): void {
               outPath,
               scaleFactor,
               args.frame ?? 0,
+              scaleAlgorithm,
             );
           case 'palette_lut':
             return await handlePaletteLutExport(
@@ -184,6 +274,7 @@ async function handlePngExport(
   outPath: string,
   scaleFactor: number,
   frameIndex: number,
+  scaleAlgorithm: ScaleAlgorithm,
 ) {
   const asset = requireAsset(workspace, assetName);
   if (isError(asset)) return asset;
@@ -195,9 +286,7 @@ async function handlePngExport(
     buildPaletteMap(asset.palette),
     Math.min(frameIndex, asset.frames.length - 1),
   );
-  if (scaleFactor > 1) {
-    buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
-  }
+  buffer = applyUpscale(buffer, asset.width, asset.height, scaleFactor, scaleAlgorithm);
 
   const outWidth = asset.width * scaleFactor;
   const outHeight = asset.height * scaleFactor;
@@ -213,6 +302,7 @@ async function handleNormalMapExport(
   outPath: string,
   scaleFactor: number,
   frameIndex: number,
+  scaleAlgorithm: ScaleAlgorithm,
 ) {
   const asset = requireAsset(workspace, assetName);
   if (isError(asset)) return asset;
@@ -227,9 +317,7 @@ async function handleNormalMapExport(
 
   // Generate normal map at native resolution, then upscale
   let normalBuffer = generateNormalMap(buffer, asset.width, asset.height);
-  if (scaleFactor > 1) {
-    normalBuffer = upscale(normalBuffer, asset.width, asset.height, scaleFactor);
-  }
+  normalBuffer = applyUpscale(normalBuffer, asset.width, asset.height, scaleFactor, scaleAlgorithm);
 
   const outWidth = asset.width * scaleFactor;
   const outHeight = asset.height * scaleFactor;
@@ -243,6 +331,7 @@ async function handleGifExport(
   assetName: string,
   outPath: string,
   scaleFactor: number,
+  scaleAlgorithm: ScaleAlgorithm,
 ) {
   const asset = requireAsset(workspace, assetName);
   if (isError(asset)) return asset;
@@ -260,9 +349,7 @@ async function handleGifExport(
       buildPaletteMap(asset.palette),
       frame.index,
     );
-    if (scaleFactor > 1) {
-      buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
-    }
+    buffer = applyUpscale(buffer, asset.width, asset.height, scaleFactor, scaleAlgorithm);
 
     // We need a palette for the GIF, gifenc provides quantize
     // We can extract RGBA arrays for use from our composite RGBA
@@ -296,6 +383,7 @@ async function handleStripExport(
   assetName: string,
   outPath: string,
   scaleFactor: number,
+  scaleAlgorithm: ScaleAlgorithm,
 ) {
   const asset = requireAsset(workspace, assetName);
   if (isError(asset)) return asset;
@@ -316,9 +404,7 @@ async function handleStripExport(
       buildPaletteMap(asset.palette),
       i,
     );
-    if (scaleFactor > 1) {
-      buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
-    }
+    buffer = applyUpscale(buffer, asset.width, asset.height, scaleFactor, scaleAlgorithm);
 
     // copy buffer into strip sequence
     const xOffset = i * frameWidth;
@@ -345,6 +431,7 @@ async function handleGridExport(
   outPath: string,
   scaleFactor: number,
   columns: number | undefined,
+  scaleAlgorithm: ScaleAlgorithm,
 ) {
   const asset = requireAsset(workspace, assetName);
   if (isError(asset)) return asset;
@@ -373,9 +460,7 @@ async function handleGridExport(
       buildPaletteMap(asset.palette),
       i,
     );
-    if (scaleFactor > 1) {
-      buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
-    }
+    buffer = applyUpscale(buffer, asset.width, asset.height, scaleFactor, scaleAlgorithm);
 
     const xOffset = col * frameWidth;
     const yOffset = row * frameHeight;
@@ -411,6 +496,7 @@ function buildAtlasPixels(
   scaleFactor: number,
   padding: number,
   extrude: boolean,
+  scaleAlgorithm: ScaleAlgorithm,
 ): AtlasPixels | { error: ReturnType<typeof errors.domainError> } {
   const assetsToPack: PackInput[] = [];
   const rawAssets = Array.from(workspace.loadedAssets.values());
@@ -446,9 +532,7 @@ function buildAtlasPixels(
       buildPaletteMap(asset.palette),
       0,
     );
-    if (scaleFactor > 1) {
-      buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
-    }
+    buffer = applyUpscale(buffer, asset.width, asset.height, scaleFactor, scaleAlgorithm);
 
     const { x: dstX, y: dstY, width: srcW, height: srcH } = placement;
     const actualW = srcW - extrudeAmount;
@@ -522,8 +606,9 @@ async function handleAtlasExport(
   scaleFactor: number,
   padding: number,
   extrude: boolean,
+  scaleAlgorithm: ScaleAlgorithm,
 ) {
-  const result = buildAtlasPixels(workspace, scaleFactor, padding, extrude);
+  const result = buildAtlasPixels(workspace, scaleFactor, padding, extrude, scaleAlgorithm);
   if ('error' in result) return result.error;
 
   await writePng(outPath, result.width, result.height, result.buffer);
@@ -542,6 +627,7 @@ async function handlePerTagExport(
   outDir: string,
   scaleFactor: number,
   tagsFilter: string[] | undefined,
+  scaleAlgorithm: ScaleAlgorithm,
 ) {
   const asset = requireAsset(workspace, assetName);
   if (isError(asset)) return asset;
@@ -597,9 +683,7 @@ async function handlePerTagExport(
         buildPaletteMap(asset.palette),
         frameIndex,
       );
-      if (scaleFactor > 1) {
-        buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
-      }
+      buffer = applyUpscale(buffer, asset.width, asset.height, scaleFactor, scaleAlgorithm);
 
       const xOffset = i * frameWidth;
       for (let y = 0; y < frameHeight; y++) {
@@ -642,6 +726,7 @@ async function handlePerLayerStripExport(
   outDir: string,
   scaleFactor: number,
   layerIds: number[] | undefined,
+  scaleAlgorithm: ScaleAlgorithm,
 ) {
   const asset = requireAsset(workspace, assetName);
   if (isError(asset)) return asset;
@@ -700,9 +785,7 @@ async function handlePerLayerStripExport(
 
     for (let i = 0; i < frameCount; i++) {
       let buffer = compositeFrame(asset.width, asset.height, singleLayer, paletteMap, i);
-      if (scaleFactor > 1) {
-        buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
-      }
+      buffer = applyUpscale(buffer, asset.width, asset.height, scaleFactor, scaleAlgorithm);
 
       const xOffset = i * frameWidth;
       for (let y = 0; y < frameHeight; y++) {
@@ -800,6 +883,7 @@ async function handleGodotSpriteframesExport(
   assetName: string,
   outPath: string,
   scaleFactor: number,
+  scaleAlgorithm: ScaleAlgorithm,
 ) {
   const asset = requireAsset(workspace, assetName);
   if (isError(asset)) return asset;
@@ -822,9 +906,7 @@ async function handleGodotSpriteframesExport(
       buildPaletteMap(asset.palette),
       asset.frames[i].index,
     );
-    if (scaleFactor > 1) {
-      buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
-    }
+    buffer = applyUpscale(buffer, asset.width, asset.height, scaleFactor, scaleAlgorithm);
 
     const xOffset = i * frameWidth;
     for (let y = 0; y < frameHeight; y++) {
@@ -881,6 +963,7 @@ async function handleGodotTilesetExport(
   assetName: string,
   outPath: string,
   scaleFactor: number,
+  scaleAlgorithm: ScaleAlgorithm,
 ) {
   const asset = requireAsset(workspace, assetName);
   if (isError(asset)) return asset;
@@ -903,9 +986,7 @@ async function handleGodotTilesetExport(
     buildPaletteMap(asset.palette),
     0,
   );
-  if (scaleFactor > 1) {
-    buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
-  }
+  buffer = applyUpscale(buffer, asset.width, asset.height, scaleFactor, scaleAlgorithm);
 
   const outWidth = asset.width * scaleFactor;
   const outHeight = asset.height * scaleFactor;
@@ -940,6 +1021,7 @@ async function handleGodotStaticExport(
   assetName: string,
   outPath: string,
   scaleFactor: number,
+  scaleAlgorithm: ScaleAlgorithm,
 ) {
   const asset = requireAsset(workspace, assetName);
   if (isError(asset)) return asset;
@@ -951,9 +1033,7 @@ async function handleGodotStaticExport(
     buildPaletteMap(asset.palette),
     0,
   );
-  if (scaleFactor > 1) {
-    buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
-  }
+  buffer = applyUpscale(buffer, asset.width, asset.height, scaleFactor, scaleAlgorithm);
 
   const outWidth = asset.width * scaleFactor;
   const outHeight = asset.height * scaleFactor;
@@ -984,6 +1064,7 @@ async function handleGodotUiFrameExport(
   assetName: string,
   outPath: string,
   scaleFactor: number,
+  scaleAlgorithm: ScaleAlgorithm,
 ) {
   const asset = requireAsset(workspace, assetName);
   if (isError(asset)) return asset;
@@ -1001,9 +1082,7 @@ async function handleGodotUiFrameExport(
     buildPaletteMap(asset.palette),
     0,
   );
-  if (scaleFactor > 1) {
-    buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
-  }
+  buffer = applyUpscale(buffer, asset.width, asset.height, scaleFactor, scaleAlgorithm);
 
   const outWidth = asset.width * scaleFactor;
   const outHeight = asset.height * scaleFactor;
@@ -1043,8 +1122,9 @@ async function handleGodotAtlasExport(
   scaleFactor: number,
   padding: number,
   extrude: boolean,
+  scaleAlgorithm: ScaleAlgorithm,
 ) {
-  const result = buildAtlasPixels(workspace, scaleFactor, padding, extrude);
+  const result = buildAtlasPixels(workspace, scaleFactor, padding, extrude, scaleAlgorithm);
   if ('error' in result) return result.error;
 
   let dirName = path.dirname(outPath);

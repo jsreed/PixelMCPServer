@@ -1143,6 +1143,109 @@ describe('Export Tool', () => {
     });
   });
 
+  // ─── scale_algorithm tests ─────────────────────────────────────
+
+  describe('scale_algorithm', () => {
+    it('rejects scale2x with non-power-of-2 scale_factor', async () => {
+      const outPath = path.join(TEST_DIR, 'scale2x_bad.png');
+      const result = await exportHandler(
+        {
+          action: 'png',
+          asset_name: 'test_asset',
+          path: outPath,
+          scale_factor: 3,
+          scale_algorithm: 'scale2x',
+        },
+        {} as unknown,
+      );
+
+      expect((result as { isError?: boolean }).isError).toBe(true);
+      expect(result.content[0].text).toContain('power-of-2');
+    });
+
+    it('scale2x with scale_factor 2 produces correct output dimensions', async () => {
+      const outPath = path.join(TEST_DIR, 'scale2x_2x.png');
+      const result = await exportHandler(
+        {
+          action: 'png',
+          asset_name: 'test_asset',
+          path: outPath,
+          scale_factor: 2,
+          scale_algorithm: 'scale2x',
+        },
+        {} as unknown,
+      );
+
+      expect(result.content[0].text).toContain('Exported PNG');
+      expect(fs.existsSync(outPath)).toBe(true);
+
+      const png = PNG.sync.read(fs.readFileSync(outPath));
+      // Original 4×4 at scale 2 → 8×8
+      expect(png.width).toBe(8);
+      expect(png.height).toBe(8);
+    });
+
+    it('default scale_algorithm is nearest — no error for any integer scale_factor', async () => {
+      const outPath = path.join(TEST_DIR, 'nearest_default.png');
+      const result = await exportHandler(
+        {
+          action: 'png',
+          asset_name: 'test_asset',
+          path: outPath,
+          scale_factor: 3,
+          // no scale_algorithm provided
+        },
+        {} as unknown,
+      );
+
+      expect((result as { isError?: boolean }).isError).toBeUndefined();
+      expect(result.content[0].text).toContain('Exported PNG');
+      const png = PNG.sync.read(fs.readFileSync(outPath));
+      expect(png.width).toBe(12);
+      expect(png.height).toBe(12);
+    });
+
+    it('scale2x with scale_factor 1 works without error', async () => {
+      const outPath = path.join(TEST_DIR, 'scale2x_1x.png');
+      const result = await exportHandler(
+        {
+          action: 'png',
+          asset_name: 'test_asset',
+          path: outPath,
+          scale_factor: 1,
+          scale_algorithm: 'scale2x',
+        },
+        {} as unknown,
+      );
+
+      expect((result as { isError?: boolean }).isError).toBeUndefined();
+      expect(result.content[0].text).toContain('Exported PNG');
+      const png = PNG.sync.read(fs.readFileSync(outPath));
+      expect(png.width).toBe(4);
+      expect(png.height).toBe(4);
+    });
+
+    it('scale2x accepts valid power-of-2 scale_factor 4 and succeeds', async () => {
+      const outPath = path.join(TEST_DIR, 'scale2x_4x.png');
+      const result = await exportHandler(
+        {
+          action: 'png',
+          asset_name: 'test_asset',
+          path: outPath,
+          scale_factor: 4,
+          scale_algorithm: 'scale2x',
+        },
+        {} as unknown,
+      );
+
+      expect((result as { isError?: boolean }).isError).toBeUndefined();
+      expect(result.content[0].text).toContain('Exported PNG');
+      const png = PNG.sync.read(fs.readFileSync(outPath));
+      expect(png.width).toBe(16);
+      expect(png.height).toBe(16);
+    });
+  });
+
   // ─── E2E Tests ─────────────────────────────────────────────────
 
   describe('E2E', () => {

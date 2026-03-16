@@ -885,8 +885,8 @@ Lower-priority features that are documented for completeness. Implement as time 
 
 #### 8D.3 Advanced Upscaling (Scale2x)
 
-- [ ] **8D.3.1** **Scale2x algorithm** (`src/algorithms/scale2x.ts`) — pixel art upscaling that smooths edges while preserving sharp details. Applied iteratively for 4×, 8×.
-- [ ] **8D.3.2** **`scale_algorithm` parameter on export** — add optional enum param (`nearest` | `scale2x`) to export actions. Default `nearest`. Validate `scale2x` only valid with power-of-2 scale factors.
+- [x] **8D.3.1** **Scale2x algorithm** (`src/algorithms/scale2x.ts`) — pixel art upscaling that smooths edges while preserving sharp details. Applied iteratively for 4×, 8×.
+- [x] **8D.3.2** **`scale_algorithm` parameter on export** — add optional enum param (`nearest` | `scale2x`) to export actions. Default `nearest`. Validate `scale2x` only valid with power-of-2 scale factors.
 
 #### 8D.4 Jaggy Detection
 
