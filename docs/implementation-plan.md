@@ -861,10 +861,10 @@ New prompts and export formats that broaden the range of art assets the LLM can 
 
 #### 8C.7 Testing
 
-- [ ] **8C.7.1** **Reworked scaffold_character tests** — animation menu present when `animations` omitted, `animations` override skips menu, `description` threaded into text, layout algorithm example is arithmetically correct.
-- [ ] **8C.7.2** **New prompt tests** — `scaffold_vfx`, `scaffold_parallax`, `scaffold_props` registration, argument validation, messages reference correct tool actions.
-- [ ] **8C.7.3** **Normal map tests** — Sobel output verified against known gradient inputs; flat surface produces (128, 128, 255) blue; edge detection produces correct directional normals.
-- [ ] **8C.7.4** **Palette LUT tests** — LUT dimensions correct (256 × palette_count); pixel values match source palettes; single-palette LUT is 256×1.
+- [x] **8C.7.1** **Reworked scaffold_character tests** — animation menu present when `animations` omitted, `animations` override skips menu, `description` threaded into text, layout algorithm example is arithmetically correct.
+- [x] **8C.7.2** **New prompt tests** — `scaffold_vfx`, `scaffold_parallax`, `scaffold_props` registration, argument validation, messages reference correct tool actions.
+- [x] **8C.7.3** **Normal map tests** — Sobel output verified against known gradient inputs; flat surface produces (128, 128, 255) blue; edge detection produces correct directional normals.
+- [x] **8C.7.4** **Palette LUT tests** — LUT dimensions correct (256 × palette_count); pixel values match source palettes; single-palette LUT is 256×1.
 
 > **Definition of Done — Phase 8C:** Enhanced `scaffold_character` covers all character roles with behavioral states. Three new prompts (vfx, parallax, props) pass registration and message tests. Normal map export produces valid tangent-space normal maps. Palette LUT export produces correct lookup textures. All 8C.7 tests pass.
 
