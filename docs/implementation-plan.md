@@ -810,7 +810,7 @@ Features that produce richer Godot `.tres` resources for direct import without m
 
 #### 8B.5 Grid Spritesheet Export
 
-- [ ] **8B.5.1** **`spritesheet_grid` export action** — composite frames into grid layout with `columns` parameter (default `ceil(sqrt(frame_count))`). Validate `columns ≥ 1`. Fill incomplete final row with transparent pixels.
+- [x] **8B.5.1** **`spritesheet_grid` export action** — composite frames into grid layout with `columns` parameter (default `ceil(sqrt(frame_count))`). Validate `columns ≥ 1`. Fill incomplete final row with transparent pixels.
 
 #### 8B.6 Per-Tag Side-Scroller Verification
 

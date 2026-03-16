@@ -726,6 +726,109 @@ describe('Export Tool', () => {
     });
   });
 
+  // ─── spritesheet_grid ──────────────────────────────────────────
+
+  describe('spritesheet_grid', () => {
+    it('uses default columns (ceil(sqrt(3))=2) → 8×8 PNG', async () => {
+      const outPath = path.join(TEST_DIR, 'grid_default.png');
+      const result = await exportHandler(
+        {
+          action: 'spritesheet_grid',
+          asset_name: 'test_asset',
+          path: outPath,
+        },
+        {} as unknown,
+      );
+
+      expect(result.content[0].text).toContain('Exported spritesheet grid to');
+      const png = PNG.sync.read(fs.readFileSync(outPath));
+      // 3 frames, ceil(sqrt(3))=2 cols, ceil(3/2)=2 rows → 4*2=8 wide, 4*2=8 tall
+      expect(png.width).toBe(8);
+      expect(png.height).toBe(8);
+    });
+
+    it('explicit 3 columns → 1 row → 12×4 PNG', async () => {
+      const outPath = path.join(TEST_DIR, 'grid_3cols.png');
+      await exportHandler(
+        {
+          action: 'spritesheet_grid',
+          asset_name: 'test_asset',
+          path: outPath,
+          columns: 3,
+        },
+        {} as unknown,
+      );
+
+      const png = PNG.sync.read(fs.readFileSync(outPath));
+      // 3 frames, 3 cols, 1 row → 4*3=12 wide, 4*1=4 tall
+      expect(png.width).toBe(12);
+      expect(png.height).toBe(4);
+    });
+
+    it('single column → 3 rows → 4×12 PNG', async () => {
+      const outPath = path.join(TEST_DIR, 'grid_1col.png');
+      await exportHandler(
+        {
+          action: 'spritesheet_grid',
+          asset_name: 'test_asset',
+          path: outPath,
+          columns: 1,
+        },
+        {} as unknown,
+      );
+
+      const png = PNG.sync.read(fs.readFileSync(outPath));
+      // 3 frames, 1 col, 3 rows → 4*1=4 wide, 4*3=12 tall
+      expect(png.width).toBe(4);
+      expect(png.height).toBe(12);
+    });
+
+    it('incomplete last row has transparent pixels in bottom-right cell', async () => {
+      const outPath = path.join(TEST_DIR, 'grid_transparent.png');
+      await exportHandler(
+        {
+          action: 'spritesheet_grid',
+          asset_name: 'test_asset',
+          path: outPath,
+          columns: 2,
+        },
+        {} as unknown,
+      );
+
+      const png = PNG.sync.read(fs.readFileSync(outPath));
+      // 3 frames, 2 cols, 2 rows → 8×8; bottom-right cell (col=1, row=1) is empty
+      expect(png.width).toBe(8);
+      expect(png.height).toBe(8);
+
+      // Check all pixels in the bottom-right 4×4 quadrant (x=4..7, y=4..7) are transparent
+      for (let y = 4; y < 8; y++) {
+        for (let x = 4; x < 8; x++) {
+          const idx = (y * png.width + x) * 4;
+          expect(png.data[idx + 3]).toBe(0); // alpha must be 0
+        }
+      }
+    });
+
+    it('applies scale_factor → (4*2*3) × (4*2*1) = 24×8 PNG', async () => {
+      const outPath = path.join(TEST_DIR, 'grid_scaled.png');
+      await exportHandler(
+        {
+          action: 'spritesheet_grid',
+          asset_name: 'test_asset',
+          path: outPath,
+          columns: 3,
+          scale_factor: 2,
+        },
+        {} as unknown,
+      );
+
+      const png = PNG.sync.read(fs.readFileSync(outPath));
+      // 3 frames, 3 cols, 1 row, scale=2 → (4*2*3)=24 wide, (4*2*1)=8 tall
+      expect(png.width).toBe(24);
+      expect(png.height).toBe(8);
+    });
+  });
+
   // ─── E2E Tests ─────────────────────────────────────────────────
 
   describe('E2E', () => {

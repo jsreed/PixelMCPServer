@@ -34,6 +34,7 @@ const exportInputZodSchema = z.object({
       'godot_ui_frame',
       'godot_atlas',
       'spritesheet_per_layer',
+      'spritesheet_grid',
     ])
     .describe('Export action to perform'),
   asset_name: z.string().optional().describe('Target asset name (required except for atlas)'),
@@ -47,6 +48,12 @@ const exportInputZodSchema = z.object({
     .array(z.number().int())
     .optional()
     .describe('Layer IDs to include for spritesheet_per_layer (defaults to all image layers)'),
+  columns: z
+    .number()
+    .int()
+    .min(1)
+    .optional()
+    .describe('Grid columns for spritesheet_grid (default ceil(sqrt(frame_count)))'),
 });
 
 function ok(data: object) {
@@ -132,6 +139,8 @@ export function registerExportTool(server: McpServer): void {
               scaleFactor,
               args.layers,
             );
+          case 'spritesheet_grid':
+            return await handleGridExport(workspace, assetName, outPath, scaleFactor, args.columns);
           default:
             return errors.invalidArgument(`Unknown export action: ${String(args.action)}`);
         }
@@ -274,6 +283,62 @@ async function handleStripExport(
   await writePng(outPath, outWidth, outHeight, stripBuffer);
 
   return ok({ message: `Exported spritesheet strip to '${outPath}'.` });
+}
+
+async function handleGridExport(
+  workspace: ReturnType<typeof getWorkspace>,
+  assetName: string,
+  outPath: string,
+  scaleFactor: number,
+  columns: number | undefined,
+) {
+  const asset = requireAsset(workspace, assetName);
+  if (isError(asset)) return asset;
+
+  const frameCount = asset.frames.length;
+  const cols = columns ?? Math.ceil(Math.sqrt(frameCount));
+
+  if (cols < 1) return errors.invalidArgument('spritesheet_grid requires columns ≥ 1.');
+
+  const rows = Math.ceil(frameCount / cols);
+  const frameWidth = asset.width * scaleFactor;
+  const frameHeight = asset.height * scaleFactor;
+  const outWidth = frameWidth * cols;
+  const outHeight = frameHeight * rows;
+
+  const gridBuffer = new Uint8Array(outWidth * outHeight * 4);
+
+  for (let i = 0; i < frameCount; i++) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+
+    let buffer = compositeFrame(
+      asset.width,
+      asset.height,
+      buildCompositeLayers(asset),
+      buildPaletteMap(asset.palette),
+      i,
+    );
+    if (scaleFactor > 1) {
+      buffer = upscale(buffer, asset.width, asset.height, scaleFactor);
+    }
+
+    const xOffset = col * frameWidth;
+    const yOffset = row * frameHeight;
+    for (let y = 0; y < frameHeight; y++) {
+      for (let x = 0; x < frameWidth; x++) {
+        const srcIdx = (y * frameWidth + x) * 4;
+        const dstIdx = ((yOffset + y) * outWidth + (xOffset + x)) * 4;
+        gridBuffer[dstIdx] = buffer[srcIdx];
+        gridBuffer[dstIdx + 1] = buffer[srcIdx + 1];
+        gridBuffer[dstIdx + 2] = buffer[srcIdx + 2];
+        gridBuffer[dstIdx + 3] = buffer[srcIdx + 3];
+      }
+    }
+  }
+
+  await writePng(outPath, outWidth, outHeight, gridBuffer);
+  return ok({ message: `Exported spritesheet grid to '${outPath}'.` });
 }
 
 // ---------------------------------------------------------------------------
