@@ -1210,10 +1210,10 @@ Arguments:
 ---
 
 **`scaffold_parallax`**
-Guide the LLM through creating parallax background layers for side-scrolling or horizontal scenes. Each layer is a separate asset with a width that is a multiple of the viewport width (for seamless horizontal tiling). Covers: layer depth ordering (sky → far mountains → near hills → foreground), color perspective (less saturated and lighter for distant layers), tile-seam alignment, and scroll-rate metadata stored as asset-level custom properties.
+Guide the LLM through creating a parallax background as a single asset with multiple image layers for side-scrolling or horizontal scenes. The canvas width is 2× the viewport width for seamless horizontal tiling. Covers: layer depth ordering (sky → far mountains → near hills → foreground), atmospheric perspective (less saturated and lighter for distant layers), tile-seam alignment, and scroll-speed guidance for the game engine.
 
 Arguments:
-- `name` (required) — base name prefix for the layer assets (e.g., `"forest"` → `"forest_sky"`, `"forest_far"`, `"forest_mid"`, `"forest_near"`)
+- `name` (required) — asset name for the parallax background
 - `layer_count` (optional) — number of parallax depth layers; defaults to 4
 - `viewport_width` (optional) — game viewport width in pixels; layers are created as multiples of this; defaults to 320
 - `height` (optional) — layer height in pixels; defaults to 180

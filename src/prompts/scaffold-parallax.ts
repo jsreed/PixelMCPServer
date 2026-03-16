@@ -70,8 +70,8 @@ export function buildScaffoldParallaxText(args: {
   palette?: string;
 }): string {
   const layerCount = args.layer_count ?? 4;
-  const viewportWidth = args.viewport_width ?? 160;
-  const height = args.height ?? 64;
+  const viewportWidth = args.viewport_width ?? 320;
+  const height = args.height ?? 180;
   const canvasWidth = viewportWidth * 2;
 
   const layerNames = resolveLayerNames(layerCount);
@@ -226,14 +226,14 @@ export function registerScaffoldParallaxPrompt(server: McpServer): void {
           .positive()
           .optional()
           .describe(
-            'Viewport width in pixels (canvas will be 2x this for seamless tiling), default 160',
+            'Viewport width in pixels (canvas will be 2x this for seamless tiling), default 320',
           ),
         height: z
           .number()
           .int()
           .positive()
           .optional()
-          .describe('Canvas height in pixels, default 64'),
+          .describe('Canvas height in pixels, default 180'),
         palette: z
           .string()
           .optional()

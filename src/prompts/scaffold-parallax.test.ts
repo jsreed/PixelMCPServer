@@ -80,9 +80,9 @@ describe('scaffold_parallax prompt', () => {
   });
 
   describe('viewport_width handling', () => {
-    it('default (160) produces canvas width 320', () => {
+    it('default (320) produces canvas width 640', () => {
       const text = buildScaffoldParallaxText({ name: 'forest_bg' });
-      expect(text).toContain('320');
+      expect(text).toContain('640');
     });
 
     it('custom viewport_width=256 produces canvas width 512', () => {
