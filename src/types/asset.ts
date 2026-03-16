@@ -126,6 +126,28 @@ export interface TileCustomData {
   tiles: Record<string, Record<string, string | number | boolean>>;
 }
 
+// --- Tile alternative metadata types ---
+
+/**
+ * A single alternative variant for a tile slot.
+ * Uses the same pixel data as the base tile but with transform flags.
+ * Maps to Godot's TileSetAtlasSource alternative tile system.
+ */
+export interface TileAlternativeEntry {
+  alternative_id: number;
+  flip_h: boolean;
+  flip_v: boolean;
+  transpose: boolean;
+}
+
+/**
+ * Per-tile alternative variants for a tileset.
+ * Keys are tile slot index strings (e.g., "0", "5").
+ * Each tile can have multiple alternatives with different transform combinations.
+ * Populated by `tileset add_tile_alternative`, consumed by `export godot_tileset`.
+ */
+export type TileAlternatives = Record<string, TileAlternativeEntry[]>;
+
 // --- Nine-slice metadata types ---
 
 /**
@@ -180,6 +202,8 @@ export interface Asset {
   tile_animation?: TileAnimation;
   /** Per-tile custom data for gameplay metadata */
   tile_custom_data?: TileCustomData;
+  /** Per-tile alternative variants with transform flags */
+  tile_alternatives?: TileAlternatives;
 
   // --- Optional Fields (UI Art) ---
 

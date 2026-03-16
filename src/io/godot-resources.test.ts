@@ -651,5 +651,76 @@ describe('godot-resources', () => {
       // Must NOT appear as a non-zero row
       expect(res).not.toMatch(/255:\d+\/0\/0/); // not 255:1/0, 255:2/0, etc.
     });
+
+    test('emits alternative tile with flip_h', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 1,
+        tile_alternatives: {
+          '0': [{ alternative_id: 1, flip_h: true, flip_v: false, transpose: false }],
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      expect(res).toContain('0:0/1 = 0');
+      expect(res).toContain('0:0/1/flip_h = true');
+      expect(res).not.toContain('0:0/1/flip_v');
+      expect(res).not.toContain('0:0/1/transpose');
+    });
+
+    test('emits alternative with all transform flags', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 1,
+        tile_alternatives: {
+          '0': [{ alternative_id: 2, flip_h: true, flip_v: true, transpose: true }],
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      expect(res).toContain('0:0/2 = 0');
+      expect(res).toContain('0:0/2/flip_h = true');
+      expect(res).toContain('0:0/2/flip_v = true');
+      expect(res).toContain('0:0/2/transpose = true');
+    });
+
+    test('emits multiple alternatives for same tile', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 1,
+        tile_alternatives: {
+          '0': [
+            { alternative_id: 1, flip_h: true, flip_v: false, transpose: false },
+            { alternative_id: 2, flip_h: false, flip_v: true, transpose: false },
+          ],
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      expect(res).toContain('0:0/1 = 0');
+      expect(res).toContain('0:0/1/flip_h = true');
+      expect(res).toContain('0:0/2 = 0');
+      expect(res).toContain('0:0/2/flip_v = true');
+    });
+
+    test('does not emit false transform flags', () => {
+      const asset = createDummyAsset({
+        tile_width: 16,
+        tile_height: 16,
+        tile_count: 1,
+        tile_alternatives: {
+          '0': [{ alternative_id: 1, flip_h: false, flip_v: false, transpose: false }],
+        },
+      });
+      const res = generateGodotTileSet(asset, 'atlas.png', 1);
+
+      expect(res).toContain('0:0/1 = 0');
+      expect(res).not.toContain('flip_h');
+      expect(res).not.toContain('flip_v');
+      expect(res).not.toContain('transpose');
+    });
   });
 });

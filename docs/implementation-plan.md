@@ -802,11 +802,11 @@ Features that produce richer Godot `.tres` resources for direct import without m
 
 #### 8B.4 Tile Alternatives
 
-- [ ] **8B.4.1** **`tile_alternatives` asset storage** — extend asset types with `tile_alternatives: Record<string, Array<{ alternative_id, flip_h, flip_v, transpose }>>`. Add to roundtrip. Extends the Phase 1 Asset type definition (`src/types/asset.ts`) with new optional field.
-- [ ] **8B.4.2** **`TileAlternativeCommand`** — captures alternatives before-state.
-- [ ] **8B.4.3** **`add_tile_alternative` tileset action** — add to Zod schema, auto-assign `alternative_id` if not provided, validate tile exists, store, wrap in command.
-- [ ] **8B.4.4** **Emit alternative tiles in `godot_tileset` `.tres`** — alternative tile entries with transform flags (`flip_h`, `flip_v`, `transpose`).
-- [ ] **8B.4.5** **`remove_tile_alternative` tileset action** — add to Zod schema, validate `tile_index` and `alternative_id` exist, remove alternative, wrap in command.
+- [x] **8B.4.1** **`tile_alternatives` asset storage** — extend asset types with `tile_alternatives: Record<string, Array<{ alternative_id, flip_h, flip_v, transpose }>>`. Add to roundtrip. Extends the Phase 1 Asset type definition (`src/types/asset.ts`) with new optional field.
+- [x] **8B.4.2** **`TileAlternativeCommand`** — captures alternatives before-state.
+- [x] **8B.4.3** **`add_tile_alternative` tileset action** — add to Zod schema, auto-assign `alternative_id` if not provided, validate tile exists, store, wrap in command.
+- [x] **8B.4.4** **Emit alternative tiles in `godot_tileset` `.tres`** — alternative tile entries with transform flags (`flip_h`, `flip_v`, `transpose`).
+- [x] **8B.4.5** **`remove_tile_alternative` tileset action** — add to Zod schema, validate `tile_index` and `alternative_id` exist, remove alternative, wrap in command.
 
 #### 8B.5 Grid Spritesheet Export
 

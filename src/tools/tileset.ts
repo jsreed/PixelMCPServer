@@ -6,6 +6,7 @@ import { createResourceLink } from '../utils/resource-link.js';
 import { TilesetCommand } from '../commands/tileset-command.js';
 import { TileAnimationCommand } from '../commands/tile-animation-command.js';
 import { TileDataCommand } from '../commands/tile-data-command.js';
+import { TileAlternativeCommand } from '../commands/tile-alternative-command.js';
 import { getCanonicalSlots, assignPeeringBits } from '../algorithms/autotile.js';
 import { isoToPixel } from '../algorithms/isometric.js';
 import { type ImageCel } from '../types/cel.js';
@@ -22,6 +23,8 @@ const tilesetInputSchema = {
       'clear_tile_animation',
       'set_tile_data',
       'clear_tile_data',
+      'add_tile_alternative',
+      'remove_tile_alternative',
     ])
     .describe('Action to perform'),
   asset_name: z.string().optional().describe('Target asset. Defaults to first loaded.'),
@@ -77,6 +80,12 @@ const tilesetInputSchema = {
     .union([z.string(), z.number(), z.boolean()])
     .optional()
     .describe('Custom data value to set'),
+
+  // add_tile_alternative / remove_tile_alternative args
+  alternative_id: z.number().int().optional().describe('Alternative tile ID'),
+  flip_h: z.boolean().optional().describe('Horizontal flip for tile alternative'),
+  flip_v: z.boolean().optional().describe('Vertical flip for tile alternative'),
+  transpose: z.boolean().optional().describe('Diagonal transpose for tile alternative'),
 
   // set_tile_animation args
   frame_count: z.number().int().optional().describe('Number of animation frames'),
@@ -572,6 +581,109 @@ export function registerTilesetTool(server: McpServer): void {
                     ? `Tile custom data '${clearLayerName}' cleared.`
                     : 'All tile custom data cleared.',
                   tile_index: clearTileIdx,
+                }),
+              },
+            ],
+          };
+        }
+
+        if (args.action === 'add_tile_alternative') {
+          if (args.tile_index === undefined)
+            return errors.invalidArgument('add_tile_alternative requires tile_index');
+          if (!asset.tile_width || !asset.tile_height) return errors.notATileset(assetName);
+          const altCount = asset.tile_count ?? 0;
+          if (args.tile_index < 0 || args.tile_index >= altCount) {
+            return errors.tileIndexNotFound(args.tile_index, assetName);
+          }
+          const tileIdx = args.tile_index;
+          const flipH = args.flip_h ?? false;
+          const flipV = args.flip_v ?? false;
+          const transposeFlag = args.transpose ?? false;
+          const requestedAltId = args.alternative_id;
+
+          const altCmd = new TileAlternativeCommand(asset, () => {
+            const alternatives = asset.tile_alternatives ?? {};
+            const tileKey = tileIdx.toString();
+            if (!(tileKey in alternatives)) {
+              alternatives[tileKey] = [];
+            }
+
+            let altId = requestedAltId;
+            if (altId === undefined) {
+              const existing = alternatives[tileKey];
+              const maxId = existing.reduce((max, a) => Math.max(max, a.alternative_id), 0);
+              altId = maxId + 1;
+            }
+
+            alternatives[tileKey].push({
+              alternative_id: altId,
+              flip_h: flipH,
+              flip_v: flipV,
+              transpose: transposeFlag,
+            });
+            asset.tile_alternatives = { ...alternatives };
+          });
+          workspace.pushCommand(altCmd);
+
+          const assignedAltId =
+            asset.tile_alternatives?.[tileIdx.toString()]?.at(-1)?.alternative_id ?? 1;
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  message: 'Tile alternative added.',
+                  tile_index: tileIdx,
+                  alternative_id: assignedAltId,
+                }),
+              },
+            ],
+          };
+        }
+
+        if (args.action === 'remove_tile_alternative') {
+          if (args.tile_index === undefined)
+            return errors.invalidArgument('remove_tile_alternative requires tile_index');
+          if (args.alternative_id === undefined)
+            return errors.invalidArgument('remove_tile_alternative requires alternative_id');
+          if (!asset.tile_width || !asset.tile_height) return errors.notATileset(assetName);
+          const removeCount = asset.tile_count ?? 0;
+          if (args.tile_index < 0 || args.tile_index >= removeCount) {
+            return errors.tileIndexNotFound(args.tile_index, assetName);
+          }
+          const removeTileIdx = args.tile_index;
+          const removeAltId = args.alternative_id;
+          const removeTileKey = removeTileIdx.toString();
+          const existingAlts = asset.tile_alternatives?.[removeTileKey];
+          if (!existingAlts || !existingAlts.find((a) => a.alternative_id === removeAltId)) {
+            return errors.alternativeNotFound(removeAltId, removeTileIdx, assetName);
+          }
+
+          const removeAltCmd = new TileAlternativeCommand(asset, () => {
+            const alternatives = asset.tile_alternatives;
+            if (!alternatives) return;
+            alternatives[removeTileKey] = alternatives[removeTileKey].filter(
+              (a) => a.alternative_id !== removeAltId,
+            );
+            if (alternatives[removeTileKey].length === 0) {
+              // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+              delete alternatives[removeTileKey];
+            }
+            if (Object.keys(alternatives).length === 0) {
+              asset.tile_alternatives = undefined;
+            } else {
+              asset.tile_alternatives = { ...alternatives };
+            }
+          });
+          workspace.pushCommand(removeAltCmd);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  message: 'Tile alternative removed.',
+                  tile_index: removeTileIdx,
+                  alternative_id: removeAltId,
                 }),
               },
             ],

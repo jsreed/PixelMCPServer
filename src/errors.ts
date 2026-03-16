@@ -212,6 +212,16 @@ export function tileIndexNotFound(index: number, name: string): DomainErrorRespo
   return domainError(`Tile index ${String(index)} does not exist in tileset '${name}'.`);
 }
 
+export function alternativeNotFound(
+  id: number,
+  tileIndex: number,
+  name: string,
+): DomainErrorResponse {
+  return domainError(
+    `Alternative ${String(id)} does not exist for tile ${String(tileIndex)} in tileset '${name}'.`,
+  );
+}
+
 // ----------------------------------------------------------------------------
 // export
 // ----------------------------------------------------------------------------

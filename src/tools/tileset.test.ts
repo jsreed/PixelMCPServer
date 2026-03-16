@@ -728,4 +728,183 @@ describe('tileset tool', () => {
     expect(links.length).toBeGreaterThan(0);
     expect(links[0]?.uri).toContain('pixel://view/tileset/');
   });
+
+  describe('add_tile_alternative', () => {
+    beforeEach(async () => {
+      await callTool({ action: 'extract_tile', x: 0, y: 0 });
+    });
+
+    it('adds alternative with auto-assigned ID = 1', async () => {
+      const result = await callTool({
+        action: 'add_tile_alternative',
+        tile_index: 0,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = JSON.parse(result.content?.[0]?.text ?? '{}') as {
+        alternative_id: number;
+        tile_index: number;
+      };
+      expect(content.alternative_id).toBe(1);
+      expect(content.tile_index).toBe(0);
+
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      expect(asset.tile_alternatives?.['0']).toHaveLength(1);
+    });
+
+    it('auto-increments ID when called twice', async () => {
+      await callTool({ action: 'add_tile_alternative', tile_index: 0 });
+      const result = await callTool({ action: 'add_tile_alternative', tile_index: 0 });
+
+      expect(result.isError).toBeFalsy();
+      const content = JSON.parse(result.content?.[0]?.text ?? '{}') as {
+        alternative_id: number;
+      };
+      expect(content.alternative_id).toBe(2);
+
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      expect(asset.tile_alternatives?.['0']).toHaveLength(2);
+    });
+
+    it('accepts explicit alternative_id', async () => {
+      const result = await callTool({
+        action: 'add_tile_alternative',
+        tile_index: 0,
+        alternative_id: 42,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = JSON.parse(result.content?.[0]?.text ?? '{}') as {
+        alternative_id: number;
+      };
+      expect(content.alternative_id).toBe(42);
+
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      expect(asset.tile_alternatives?.['0']?.[0]?.alternative_id).toBe(42);
+    });
+
+    it('defaults flip_h, flip_v, transpose to false', async () => {
+      await callTool({ action: 'add_tile_alternative', tile_index: 0 });
+
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      const alt = asset.tile_alternatives?.['0']?.[0];
+      expect(alt?.flip_h).toBe(false);
+      expect(alt?.flip_v).toBe(false);
+      expect(alt?.transpose).toBe(false);
+    });
+
+    it('stores transform flags when provided', async () => {
+      await callTool({
+        action: 'add_tile_alternative',
+        tile_index: 0,
+        flip_h: true,
+        flip_v: true,
+        transpose: true,
+      });
+
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      const alt = asset.tile_alternatives?.['0']?.[0];
+      expect(alt?.flip_h).toBe(true);
+      expect(alt?.flip_v).toBe(true);
+      expect(alt?.transpose).toBe(true);
+    });
+
+    it('returns isError for nonexistent tile_index', async () => {
+      const result = await callTool({
+        action: 'add_tile_alternative',
+        tile_index: 99,
+      });
+      expect(result.isError).toBeTruthy();
+    });
+
+    it('returns isError for missing tile_index', async () => {
+      const result = await callTool({
+        action: 'add_tile_alternative',
+      });
+      expect(result.isError).toBeTruthy();
+    });
+
+    it('undo removes added alternative', async () => {
+      await callTool({ action: 'add_tile_alternative', tile_index: 0 });
+
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      expect(asset.tile_alternatives?.['0']).toHaveLength(1);
+
+      workspace.undo();
+      expect(asset.tile_alternatives).toBeUndefined();
+    });
+  });
+
+  describe('remove_tile_alternative', () => {
+    beforeEach(async () => {
+      await callTool({ action: 'extract_tile', x: 0, y: 0 });
+      await callTool({ action: 'add_tile_alternative', tile_index: 0, alternative_id: 1 });
+      await callTool({ action: 'add_tile_alternative', tile_index: 0, alternative_id: 2 });
+    });
+
+    it('removes existing alternative', async () => {
+      const result = await callTool({
+        action: 'remove_tile_alternative',
+        tile_index: 0,
+        alternative_id: 1,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = JSON.parse(result.content?.[0]?.text ?? '{}') as {
+        tile_index: number;
+        alternative_id: number;
+      };
+      expect(content.tile_index).toBe(0);
+      expect(content.alternative_id).toBe(1);
+
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      expect(asset.tile_alternatives?.['0']).toHaveLength(1);
+      expect(asset.tile_alternatives?.['0']?.[0]?.alternative_id).toBe(2);
+    });
+
+    it('returns isError for nonexistent alternative_id', async () => {
+      const result = await callTool({
+        action: 'remove_tile_alternative',
+        tile_index: 0,
+        alternative_id: 99,
+      });
+      expect(result.isError).toBeTruthy();
+    });
+
+    it('returns isError for nonexistent tile_index', async () => {
+      const result = await callTool({
+        action: 'remove_tile_alternative',
+        tile_index: 99,
+        alternative_id: 1,
+      });
+      expect(result.isError).toBeTruthy();
+    });
+
+    it('cleans up tile_alternatives when last alternative removed', async () => {
+      await callTool({ action: 'remove_tile_alternative', tile_index: 0, alternative_id: 1 });
+      await callTool({ action: 'remove_tile_alternative', tile_index: 0, alternative_id: 2 });
+
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      expect(asset.tile_alternatives).toBeUndefined();
+    });
+
+    it('undo restores removed alternative', async () => {
+      await callTool({ action: 'remove_tile_alternative', tile_index: 0, alternative_id: 1 });
+
+      const asset = workspace.loadedAssets.get('test_tileset');
+      if (!asset) throw new Error('Asset missing');
+      expect(asset.tile_alternatives?.['0']).toHaveLength(1);
+
+      workspace.undo();
+      expect(asset.tile_alternatives?.['0']).toHaveLength(2);
+    });
+  });
 });

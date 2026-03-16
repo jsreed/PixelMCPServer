@@ -251,7 +251,13 @@ export function generateGodotTileSet(
 
   // Tiles are stored in a horizontal strip on the asset canvas (slot N at x=N*tileW, y=0).
   // The exported PNG preserves that layout, so all tiles are at row=0, col=slot_index.
-  if (asset.tile_physics || asset.tile_terrain || asset.tile_animation || asset.tile_custom_data) {
+  if (
+    asset.tile_physics ||
+    asset.tile_terrain ||
+    asset.tile_animation ||
+    asset.tile_custom_data ||
+    asset.tile_alternatives
+  ) {
     if (asset.tile_physics) {
       for (const tileStr of Object.keys(asset.tile_physics.tiles)) {
         const col = parseInt(tileStr, 10);
@@ -329,6 +335,24 @@ export function generateGodotTileSet(
             formattedValue = String(value);
           }
           tres += `${String(col)}:0/0/custom_data_${String(layerIdx)} = ${formattedValue}\n`;
+        }
+      }
+    }
+    if (asset.tile_alternatives) {
+      for (const tileStr of Object.keys(asset.tile_alternatives)) {
+        const col = parseInt(tileStr, 10);
+        const alts = asset.tile_alternatives[tileStr];
+        for (const alt of alts) {
+          tres += `${String(col)}:0/${String(alt.alternative_id)} = 0\n`;
+          if (alt.flip_h) {
+            tres += `${String(col)}:0/${String(alt.alternative_id)}/flip_h = true\n`;
+          }
+          if (alt.flip_v) {
+            tres += `${String(col)}:0/${String(alt.alternative_id)}/flip_v = true\n`;
+          }
+          if (alt.transpose) {
+            tres += `${String(col)}:0/${String(alt.alternative_id)}/transpose = true\n`;
+          }
         }
       }
     }
