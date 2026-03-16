@@ -84,7 +84,10 @@ describe('generateNormalMap flat surface', () => {
     const h = 4;
     // All same color — zero gradient everywhere
     const basePixel: [number, number, number, number] = [180, 90, 45, 255];
-    const pixels: [number, number, number, number][] = Array.from({ length: w * h }, () => basePixel);
+    const pixels: [number, number, number, number][] = Array.from(
+      { length: w * h },
+      () => basePixel,
+    );
     const input = makeRgba(pixels);
     const result = generateNormalMap(input, w, h);
 
@@ -99,7 +102,10 @@ describe('generateNormalMap flat surface', () => {
     const w = 3;
     const h = 3;
     const transparentPixel: [number, number, number, number] = [0, 0, 0, 0];
-    const pixels: [number, number, number, number][] = Array.from({ length: w * h }, () => transparentPixel);
+    const pixels: [number, number, number, number][] = Array.from(
+      { length: w * h },
+      () => transparentPixel,
+    );
     const input = makeRgba(pixels);
     const result = generateNormalMap(input, w, h);
 
@@ -196,7 +202,10 @@ describe('generateNormalMap output invariants', () => {
     const w = 3;
     const h = 3;
     const basePixel: [number, number, number, number] = [100, 150, 200, 255];
-    const pixels: [number, number, number, number][] = Array.from({ length: w * h }, () => basePixel);
+    const pixels: [number, number, number, number][] = Array.from(
+      { length: w * h },
+      () => basePixel,
+    );
     const input = makeRgba(pixels);
     const inputCopy = new Uint8Array(input);
     generateNormalMap(input, w, h);

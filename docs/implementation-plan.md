@@ -856,8 +856,8 @@ New prompts and export formats that broaden the range of art assets the LLM can 
 
 #### 8C.6 Palette Swap LUT Export
 
-- [ ] **8C.6.1** **LUT generation algorithm** (`src/algorithms/palette-lut.ts`) — `generatePaletteLUT(palettes: Array<Array<[r,g,b,a]>>): Uint8Array`. Build a 256×N RGBA texture where row R, column C = palettes[R][C]. Pure function.
-- [ ] **8C.6.2** **`palette_lut` export action** — gather asset palette + palette_sources palettes, pass to LUT algorithm, encode as PNG, write to path.
+- [x] **8C.6.1** **LUT generation algorithm** (`src/algorithms/palette-lut.ts`) — `generatePaletteLUT(palettes: Array<Array<[r,g,b,a]>>): Uint8Array`. Build a 256×N RGBA texture where row R, column C = palettes[R][C]. Pure function.
+- [x] **8C.6.2** **`palette_lut` export action** — gather asset palette + palette_sources palettes, pass to LUT algorithm, encode as PNG, write to path.
 
 #### 8C.7 Testing
 

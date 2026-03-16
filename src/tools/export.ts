@@ -10,6 +10,7 @@ import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 
 import { compositeFrame, type CompositeLayer } from '../algorithms/composite.js';
 import { generateNormalMap } from '../algorithms/normal-map.js';
+import { generatePaletteLUT } from '../algorithms/palette-lut.js';
 import { buildCompositeLayers, buildPaletteMap } from '../utils/render.js';
 import { upscale } from '../algorithms/upscale.js';
 import { packRectangles, type PackInput } from '../algorithms/bin-pack.js';
@@ -37,6 +38,7 @@ const exportInputZodSchema = z.object({
       'spritesheet_per_layer',
       'spritesheet_grid',
       'normal_map',
+      'palette_lut',
     ])
     .describe('Export action to perform'),
   asset_name: z.string().optional().describe('Target asset name (required except for atlas)'),
@@ -56,6 +58,10 @@ const exportInputZodSchema = z.object({
     .min(1)
     .optional()
     .describe('Grid columns for spritesheet_grid (default ceil(sqrt(frame_count)))'),
+  palette_sources: z
+    .array(z.string())
+    .optional()
+    .describe('Asset names whose palettes provide additional LUT rows for palette_lut'),
 });
 
 function ok(data: object) {
@@ -150,6 +156,13 @@ export function registerExportTool(server: McpServer): void {
               outPath,
               scaleFactor,
               args.frame ?? 0,
+            );
+          case 'palette_lut':
+            return await handlePaletteLutExport(
+              workspace,
+              assetName,
+              outPath,
+              args.palette_sources,
             );
           default:
             return errors.invalidArgument(`Unknown export action: ${String(args.action)}`);
@@ -713,6 +726,53 @@ async function handlePerLayerStripExport(
   return ok({
     message: `Exported ${String(generatedFiles.length)} per-layer strips.`,
     files: generatedFiles,
+  });
+}
+
+async function handlePaletteLutExport(
+  workspace: ReturnType<typeof getWorkspace>,
+  assetName: string,
+  outPath: string,
+  paletteSources: string[] | undefined,
+) {
+  const asset = requireAsset(workspace, assetName);
+  if (isError(asset)) return asset;
+
+  const palettes: Array<[number, number, number, number][]> = [];
+
+  // Row 0: asset's current palette
+  const basePalette: [number, number, number, number][] = [];
+  for (let i = 0; i < 256; i++) {
+    basePalette.push(asset.palette.get(i));
+  }
+  palettes.push(basePalette);
+
+  // Additional rows from palette_sources
+  if (paletteSources) {
+    for (const sourceName of paletteSources) {
+      const sourceAsset = workspace.loadedAssets.get(sourceName);
+      if (!sourceAsset) {
+        return errors.assetNotLoaded(sourceName);
+      }
+      const srcPalette: [number, number, number, number][] = [];
+      for (let i = 0; i < 256; i++) {
+        srcPalette.push(sourceAsset.palette.get(i));
+      }
+      palettes.push(srcPalette);
+    }
+  }
+
+  const lutBuffer = generatePaletteLUT(palettes);
+  const width = 256;
+  const height = palettes.length;
+
+  await writePng(outPath, width, height, lutBuffer);
+
+  return ok({
+    message: `Exported palette LUT to '${outPath}'.`,
+    lut_width: width,
+    lut_height: height,
+    palette_count: palettes.length,
   });
 }
 
