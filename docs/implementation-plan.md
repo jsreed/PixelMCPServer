@@ -851,8 +851,8 @@ New prompts and export formats that broaden the range of art assets the LLM can 
 
 #### 8C.5 Normal Map Generation
 
-- [ ] **8C.5.1** **Sobel normal map algorithm** (`src/algorithms/normal-map.ts`) — `generateNormalMap(rgbaBuffer, width, height): Uint8Array`. Convert to grayscale luminance, apply 3×3 Sobel operators, map gradients to tangent-space RGB normals. Pure function, unit tested.
-- [ ] **8C.5.2** **`normal_map` export action** — composite asset at target frame, pass RGBA buffer to normal map algorithm, upscale, encode as PNG, write to path.
+- [x] **8C.5.1** **Sobel normal map algorithm** (`src/algorithms/normal-map.ts`) — `generateNormalMap(rgbaBuffer, width, height): Uint8Array`. Convert to grayscale luminance, apply 3×3 Sobel operators, map gradients to tangent-space RGB normals. Pure function, unit tested.
+- [x] **8C.5.2** **`normal_map` export action** — composite asset at target frame, pass RGBA buffer to normal map algorithm, upscale, encode as PNG, write to path.
 
 #### 8C.6 Palette Swap LUT Export
 

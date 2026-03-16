@@ -9,6 +9,7 @@ import { PNG } from 'pngjs';
 import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 
 import { compositeFrame, type CompositeLayer } from '../algorithms/composite.js';
+import { generateNormalMap } from '../algorithms/normal-map.js';
 import { buildCompositeLayers, buildPaletteMap } from '../utils/render.js';
 import { upscale } from '../algorithms/upscale.js';
 import { packRectangles, type PackInput } from '../algorithms/bin-pack.js';
@@ -35,12 +36,13 @@ const exportInputZodSchema = z.object({
       'godot_atlas',
       'spritesheet_per_layer',
       'spritesheet_grid',
+      'normal_map',
     ])
     .describe('Export action to perform'),
   asset_name: z.string().optional().describe('Target asset name (required except for atlas)'),
   path: z.string().describe('Output file or directory path'),
   scale_factor: z.number().int().min(1).optional().describe('Scale factor for export (default 1)'),
-  frame: z.number().int().min(0).optional().describe('Frame index to export (for png)'),
+  frame: z.number().int().min(0).optional().describe('Frame index to export (for png, normal_map)'),
   pad: z.number().int().optional().describe('Pixel padding for atlas (default 0)'),
   extrude: z.boolean().optional().describe('Extrude edge pixels for atlas (default false)'),
   tags: z.array(z.string()).optional().describe('Optional list of tag names to export for per_tag'),
@@ -141,6 +143,14 @@ export function registerExportTool(server: McpServer): void {
             );
           case 'spritesheet_grid':
             return await handleGridExport(workspace, assetName, outPath, scaleFactor, args.columns);
+          case 'normal_map':
+            return await handleNormalMapExport(
+              workspace,
+              assetName,
+              outPath,
+              scaleFactor,
+              args.frame ?? 0,
+            );
           default:
             return errors.invalidArgument(`Unknown export action: ${String(args.action)}`);
         }
@@ -182,6 +192,37 @@ async function handlePngExport(
   await writePng(outPath, outWidth, outHeight, buffer);
 
   return ok({ message: `Exported PNG to '${outPath}'.` });
+}
+
+async function handleNormalMapExport(
+  workspace: ReturnType<typeof getWorkspace>,
+  assetName: string,
+  outPath: string,
+  scaleFactor: number,
+  frameIndex: number,
+) {
+  const asset = requireAsset(workspace, assetName);
+  if (isError(asset)) return asset;
+
+  const buffer = compositeFrame(
+    asset.width,
+    asset.height,
+    buildCompositeLayers(asset),
+    buildPaletteMap(asset.palette),
+    Math.min(frameIndex, asset.frames.length - 1),
+  );
+
+  // Generate normal map at native resolution, then upscale
+  let normalBuffer = generateNormalMap(buffer, asset.width, asset.height);
+  if (scaleFactor > 1) {
+    normalBuffer = upscale(normalBuffer, asset.width, asset.height, scaleFactor);
+  }
+
+  const outWidth = asset.width * scaleFactor;
+  const outHeight = asset.height * scaleFactor;
+  await writePng(outPath, outWidth, outHeight, normalBuffer);
+
+  return ok({ message: `Exported normal map to '${outPath}'.` });
 }
 
 async function handleGifExport(
